@@ -119,7 +119,7 @@ s = content("Data-quality findings that shape the model", "Data and QA/QC");
 const qa = [
   ["Payload is estimated", `${fmt(D.payload38 * 100)}% of payloads are multiples of 38 t (bucket passes): CV 8% tonnage error modelled`],
   ["Grades are source values", `${D.n_sig} grade signatures repeated across 275 loads: correlated grade error`],
-  ["Dump Z unreliable", "Z minus surveyed surface: P10/P90 -2.8/+2.0 m. Only X/Y used"],
+  ["Dump Z unreliable; stuck GPS", "Z vs surface P10/P90 -2.8/+2.0 m; 14 loads (2.4 kt) share one default position: X/Y imputed"],
   ["Two files mis-dated", "Topo_2503xx re-dated to 2026-03-28/29 via a logged override, not by renaming"],
   ["FMS has gaps", "No records 03-17, 03-23 to 03-27; 56 h silence 03-16 to 03-18 while 4,843 m³ was placed"],
   ["Cuts hidden in solids", "Solid bottoms up to 2 m below earlier surfaces: dozer cuts re-handled as sources"],
@@ -130,7 +130,7 @@ qa.forEach((q, i) => {
   s.addText(q[0], { x: x + 0.2, y: y + 0.15, w: 3.45, h: 0.55, fontSize: 18, bold: true, color: C.accent1, margin: 0, isTextBox: true, objectName: `qa${i}_h` });
   s.addText(q[1], { x: x + 0.2, y: y + 0.75, w: 3.45, h: 1.5, fontSize: 14, color: C.text1, margin: 0, valign: "top", isTextBox: true, objectName: `qa${i}_t` });
 });
-s.addNotes("Presenter: Member 2. No record was deleted: 13 flags, each with a documented treatment (D2). Emphasise that these findings changed the method: payload and grade error enter the Monte Carlo, Z is ignored, and gaps become an explicit 'unattributed' class.");
+s.addNotes("Presenter: Member 2. No record was deleted: 14 flags, each with a documented treatment (D2). Emphasise that these findings changed the method: payload and grade error enter the Monte Carlo, Z is ignored, and gaps become an explicit 'unattributed' class.");
 
 s = content(`Surveys represent the end of the day (r = ${fmt(D.align_r, 2)})`, "Data and QA/QC");
 fitImg(s, "align", 0.5, 1.4, 8.6, 3.6);

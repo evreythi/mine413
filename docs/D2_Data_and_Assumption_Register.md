@@ -34,6 +34,7 @@ Units and coordinate reference: metres. Easting is about 511,300 and Northing ab
 | QA-F08 | FMS starts at 17:43 on 03-15, part-way through the first survey period | `daily_coverage.csv` | Period 0 treated as partially covered: 65% of its fill is unattributed | As above | |
 | QA-F09 | 1 load (228 t, 03-31 20:52) is after the last survey | F12 | Placed **provisionally** with the forward physics model and flagged; re-reconciled automatically when the next survey arrives | 0.1% of tonnes | Class "Provisional" |
 | QA-F10 | All dumps lie within 60 m of surveyed change (F09 = 0); 18 dumps fall in survey-gap periods (F13) | Flags | Retained | - | Flags |
+| QA-F11 | **Default / stuck FMS position.** 14 records (2,356 t, 5.3% of FMS tonnes, 03-16 to 03-28) share the identical position E 511,334.7, N 7,122,320.4, Z 4,473.0. That position is below the floor and, until 03-27, in front of the face toe. These are also the 14 records of flag F10 | `fms_records_with_flags.csv` (F14) | Retained. X/Y imputed as the tonnage-weighted centroid of the other dumps of the same period (A-32); original X/Y kept (`x_raw`, `y_raw`); GPS error ×5 in Monte Carlo | Avoids placing 2.4 kt from a fictitious point at the toe | F14 flag, `loc_imputed` column in `movement/loads_used.csv` |
 
 ## 2.2 Surveys (DS-2, DS-3)
 
@@ -67,6 +68,7 @@ The surveyed change solids total **35,096 m³**. With the inferred unobserved to
 | PP-06 | Cuts detected from bottoms below earlier tops | Solids omit decreases | Removal + re-handling | Mixing | `cut_volume` per period |
 | PP-07 | Load after last survey | Not yet surveyed | Forward-model nowcast, flagged | 228 t | Class "Provisional" |
 | PP-08 | No record excluded | Brief: do not simply delete | Flags only | - | All 275 records used |
+| PP-09 | Location of 14 default-position records imputed | Position is physically impossible (QA-F11) | Period centroid of other dumps | Their material is allocated from the platform instead of the toe | `x_raw`/`y_raw` retained; flag F14 |
 
 # 4. Assumption register
 
@@ -105,6 +107,7 @@ Columns follow the course outline, Task 4: Assumption | Need | Justification | C
 | A-28 | No time-dependent settlement after placement | Not observable | Short record (2 weeks) | Small volume bias | Absorbed in κ range |
 | A-29 | Dump Z is not used | QA-F06 | Unreliable | None | - |
 | A-30 | Boundary conditions: material cannot leave the domain; outside the domain is not modelled | Numerics | Domain covers all observed change | None inside the domain | - |
+| A-32 | Records sharing an identical X/Y/Z with ≥ 2 others carry a default/stuck FMS position; their dump X/Y is the tonnage-weighted centroid of the period's other dumps | 14 records have an impossible location (QA-F11) | Identical coordinates to 0.01 m over 12 days, below the floor, cannot be real dump events | Allocation of 2.4 kt within its period | GPS σ ×5 for these loads in MC |
 | A-31 | Missing data: FMS gaps → unattributed class; survey gaps → gap periods; no synthetic loads are invented | Missing-data treatment | Transparency over completeness | Unattributed share is large (21% of tonnes) | Reported; R-02 |
 
 # 5. Data that would most reduce uncertainty (value of information)

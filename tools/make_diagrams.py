@@ -36,7 +36,7 @@ def workflow():
     box(ax, 1.6, 5.7, 2.6, 0.7, "Survey change solids (*.dxf)\nnew files -> data/inbox", "data")
     box(ax, 1.6, 4.6, 2.6, 0.8, "config/project.yaml\nsurvey_overrides.csv\n(assumptions A-xx)", "dec")
     box(ax, 4.7, 6.2, 2.6, 0.9, "1-2 IMPORT\nscan sources, SHA-256 registry,\nstandardise, rasterise (cache)", "proc")
-    box(ax, 4.7, 4.9, 2.6, 0.9, "3 QA/QC\n13 FMS flags, survey checks,\ncoverage, alignment", "proc")
+    box(ax, 4.7, 4.9, 2.6, 0.9, "3 QA/QC\n14 FMS flags, survey checks,\ncoverage, alignment", "proc")
     box(ax, 4.7, 3.6, 2.6, 0.9, "4 PERIODS\nsurvey times, gap detection,\nloads -> periods", "proc")
     box(ax, 4.7, 2.2, 2.6, 1.1, "5 MATERIAL MOVEMENT (CPST)\ncuts, push cost, partial OT,\ndeposit layers, carry-over", "core")
     box(ax, 8.0, 6.2, 2.7, 0.9, "6-7 BLOCK MODEL\n5x5x2 m, tonnes, Cu, Au, Ag,\nmetal, class, provenance", "core")

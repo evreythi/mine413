@@ -149,10 +149,10 @@ def class_maps(df, bg, rec, out: Path):
         a1.imshow(a, origin="lower", extent=ext, cmap=pl.discrete_cmap([pl.CONF_COLORS[k] for k in order]), vmin=-0.5, vmax=3.5, interpolation="nearest")
         a1.set_aspect("equal"); a1.grid(False); a1.set_xticks([]); a1.set_yticks([])
         a1.set_title("Dominant confidence class per block column", loc="left")
-        for k in order:
-            a1.bar(0, 0, color=pl.CONF_COLORS[k], label=k)
-        a1.legend(loc="lower left", ncol=4)
-        a2.barh(order[::-1], t[order[::-1]].values / 1000, color=[pl.CONF_COLORS[k] for k in order[::-1]])
+        from matplotlib.patches import Patch
+        a1.legend(handles=[Patch(color=pl.CONF_COLORS[k], label=k) for k in order], loc="upper center",
+                  bbox_to_anchor=(0.5, -0.02), ncol=4)
+        a2.barh(order[::-1], t[order[::-1]].values / 1000, color=[pl.CONF_COLORS[k] for k in order[::-1]], zorder=3)
         for yv, v in enumerate(t[order[::-1]].values / 1000):
             a2.text(v, yv, f" {v:.1f} kt", va="center", fontsize=8, color=pl.INK2)
         a2.set_xlabel("kt"); a2.set_title("Tonnes by confidence class", loc="left")
@@ -163,17 +163,17 @@ def uncertainty_maps(df, bg, out: Path):
     import matplotlib.pyplot as plt
     if "cu_cv" not in df:
         return
-    d = df[df["t_fms"] > 0]
+    d = df[df["frac_fms"] >= 0.5]   # Monte Carlo ranges; other blocks carry the prior range
     col = d.groupby(["iy", "ix"]).apply(lambda q: pd.Series({
         "cv": np.average(q["cu_cv"], weights=q["tonnes"]),
         "w": np.average(q["cu_p90"] - q["cu_p10"], weights=q["tonnes"])}), include_groups=False).reset_index()
     ext = [bg.x0, bg.x0 + bg.nx * bg.dx, bg.y0, bg.y0 + bg.ny * bg.dy]
     fig, axs = plt.subplots(1, 2, figsize=(12, 4.8))
-    for ax, key, lab, vmax in zip(axs, ["cv", "w"], ["Cu grade coefficient of variation", "Cu P90 - P10 (% Cu)"], [0.3, 4]):
+    for ax, key, lab, vmax in zip(axs, ["cv", "w"], ["Cu grade coefficient of variation", "Cu P90 - P10 (% Cu)"], [0.2, 2.5]):
         a = np.full((bg.ny, bg.nx), np.nan)
         a[col["iy"], col["ix"]] = col[key]
         im = ax.imshow(a, origin="lower", extent=ext, cmap=pl.SEQ_OR, vmin=0, vmax=vmax, interpolation="nearest")
         ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([]); ax.grid(False)
-        ax.set_title(lab + " (column, tonnes-weighted)", loc="left", fontsize=9.5)
+        ax.set_title(lab + "\nblocks >= 50% FMS-tracked, column tonnes-weighted", loc="left", fontsize=9.5)
         fig.colorbar(im, ax=ax, shrink=0.75)
     pl.save(fig, out / "fig_unc_block_maps.png")

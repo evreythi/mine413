@@ -213,8 +213,13 @@ def prepare_loads(ds, cfg, rng=None, perturb=None, exclude_ids=()):
             M = np.array([mult[k] for k in sig])
             cu, au, ag = cu * M[:, 0], au * M[:, 1], ag * M[:, 2]
         kappa = perturb.get("compaction", kappa)
+    # A-32: records sharing an identical X/Y/Z with >= 2 others are a default /
+    # stuck FMS position (QA flag F14). Their X/Y is imputed after period
+    # assignment (below); originals are kept in x_raw / y_raw.
+    rep = f.groupby(["x", "y", "z"])["cycle_id"].transform("size").values >= cfg.get("fms", {}).get("repeated_location_min", 3)
     rho = f["density"].values.astype(float) * kappa
     t0 = pd.Timestamp(ds.surveys[0].datetime.normalize())
+    out_x0, out_y0 = x.copy(), y.copy()
     out = pd.DataFrame({
         "cycle_id": f["cycle_id"].values, "time": f["timestamp"].values,
         "x": x, "y": y, "z": f["z"].values, "m": m, "cu": cu, "au": au, "ag": ag, "rho": rho,
@@ -227,6 +232,23 @@ def prepare_loads(ds, cfg, rng=None, perturb=None, exclude_ids=()):
     per = np.searchsorted(np.array(edges, dtype="datetime64[ns]"), out["time"].values.astype("datetime64[ns]"), side="left") - 1
     # per == -1 : before record ; per == len(times) : after last survey (provisional)
     out["period"] = per
+    out["x_raw"], out["y_raw"] = f["x"].values.astype(float), f["y"].values.astype(float)
+    out["loc_imputed"] = rep
+    if rep.any():
+        good = ~rep
+        for i in np.nonzero(rep)[0]:
+            same = good & (per == per[i])
+            if same.sum() < 3:   # too few in the period: 10 nearest-in-time good loads
+                dt = np.abs((out["time"].values - out["time"].values[i]).astype("timedelta64[s]").astype(float))
+                dt[~good] = np.inf
+                same = np.zeros(len(out), bool)
+                same[np.argsort(dt)[:10]] = True
+            wgt = out["m"].values[same]
+            out.loc[i, "x"] = np.average(out_x0[same], weights=wgt)
+            out.loc[i, "y"] = np.average(out_y0[same], weights=wgt)
+            if perturb and perturb.get("gps_sigma"):
+                out.loc[i, "x"] += rng.normal(0, 4 * perturb["gps_sigma"])
+                out.loc[i, "y"] += rng.normal(0, 4 * perturb["gps_sigma"])
     return out.sort_values("time").reset_index(drop=True)
 
 

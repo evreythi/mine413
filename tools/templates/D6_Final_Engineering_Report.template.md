@@ -13,7 +13,7 @@ date: "November 2026 - model run {{RUN_ID}}"
 
 * Payloads are bucket-pass estimates; every value is a multiple of 38 t.
 * Grades are 21 source-block signatures, not load assays.
-* Dump elevations are unreliable.
+* Dump elevations are unreliable, and 14 records carry a default (stuck) position.
 * Two survey files carry the wrong year.
 * No survey exists for 03-17 or 03-23 to 03-26.
 * The FMS is silent for long periods (03-16 12:27 to 03-18 20:47, and 03-22 18:28 to 03-28 03:54) while the surveys show material being placed.
@@ -68,7 +68,7 @@ Coordinates are a projected mine grid in metres (E ≈ 511,300, N ≈ 7,122,300,
 
 # Data Analysis and QA/QC
 
-The full QA/QC is in D2 Section 2 and `outputs/qaqc/`. No record was deleted. Thirteen flags were applied, each with a documented treatment (Table 4.1).
+The full QA/QC is in D2 Section 2 and `outputs/qaqc/`. No record was deleted. Fourteen flags were applied, each with a documented treatment (Table 4.1).
 
 {{TABLE_FLAGS}}
 
@@ -76,11 +76,12 @@ The full QA/QC is in D2 Section 2 and `outputs/qaqc/`. No record was deleted. Th
 
 * **Surveys are change solids (QA-S01).** Every rasterised cell is crossed by exactly two faces. The divergence-theorem volume equals the gridded volume. The bottom of each solid equals the top of the previous one to 0.000 m (P5-P95) in overlaps. This turned a "partial surface" problem into a measured-fill problem.
 * **Mis-dated files (QA-S02).** `Topo_250328/250329` were re-dated to 2026-03-28/29 by a logged override. All ten layer names carry the year token '25', so the year in names is unreliable, but the FMS dates and face progression are unambiguous.
-* **Survey timing (QA-S03).** Assigning surveys to 23:59 gives r = 0.96 between period FMS volume and surveyed volume. Any time before 10:00 gives r ≤ 0.21 (Figure 4.3).
+* **Survey timing (QA-S03).** Assigning surveys to 23:59 gives r = 0.96 between period FMS volume and surveyed volume. Any time before 10:00 gives r ≤ 0.21 (alignment figure below).
 * **Elevation decreases hidden in solids (QA-S05)** and **toe-clipped solids (QA-S06)**. These are handled as dozer cuts and as unobserved toe fill respectively.
 * **Payload and grade (QA-F02, F03).** Payloads are estimated, not weighed, and grades are source-block values. Both enter the uncertainty analysis as correlated errors.
 * **Dump Z (QA-F06).** Z minus the surveyed surface at dump time has P10/P90 of −2.8/+2.0 m, so only X/Y is used.
-* **Completeness (QA-F07).** FMS and survey coverage are uneven in time (Figure 4.2).
+* **Default FMS position (QA-F11).** Fourteen records (2,356 t) share one identical position, below the floor and in front of the toe. This is a default or stuck position, not a dump location, so their X/Y is imputed from the other dumps of the same period (A-32). The originals are retained.
+* **Completeness (QA-F07).** FMS and survey coverage are uneven in time (daily coverage figure below).
 
 ![Dump locations (orange, by day) and survey change-solid footprints (blue, light = early).](../outputs/qaqc/fig_qaqc_dump_map.png)
 
@@ -96,7 +97,7 @@ The full QA/QC is in D2 Section 2 and `outputs/qaqc/`. No record was deleted. Th
 
 # Stockpile Growth Analysis
 
-The stockpile grew by end-dumping on a platform at about 4,488-4,490 m. Dozers pushed material over a crescent-shaped crest, and the south face advanced about 30 m in two weeks (Figure 5.1). The face stands at a median 36.7° (P75 38.5°). The floor is a near-horizontal plane at 4,475.1 m (dip 0.29°, residual SD 0.26 m).
+The stockpile grew by end-dumping on a platform at about 4,488-4,490 m. Dozers pushed material over a crescent-shaped crest, and the south face advanced about 30 m in two weeks (face-advance map below). The face stands at a median 36.7° (P75 38.5°). The floor is a near-horizontal plane at 4,475.1 m (dip 0.29°, residual SD 0.26 m).
 
 ![Survey period in which each cell first received fill.](../outputs/growth/fig_growth_face_advance.png)
 
@@ -147,10 +148,10 @@ The complete register (31 assumptions with need, justification, consequence and 
 
 | ID | Assumption | Effect if wrong | Treatment |
 |---|---|---|---|
-| A-06 | In-pile density = FMS density (κ = 1) | Total and unattributed/legacy tonnes scale ±10-20% | MC κ ~ U(0.80, 1.05); tornado |
+| A-06 | In-pile density = FMS density (κ = 1) | Total tonnes ±10% for κ ±0.1 (182-222 kt) | MC κ ~ U(0.80, 1.05); tornado |
 | A-22 | Legacy grade = FMS mean | Legacy metal could differ by any amount | Separate class; "Uninformed"; prior range; sampling (R-03) |
-| A-13/A-13b/A-14 | Geometry of never-surveyed parts; toe fill | Legacy/unattributed volumes | Switch tested; full survey (R-01) |
-| A-05 | Survey at 23:59 | Loads shift one period | Alignment analysis; MC |
+| A-13/A-13b/A-14 | Geometry of never-surveyed parts; toe fill | 14.5 kt moves between unattributed and legacy; block Cu 0.25% | Switch tested; full survey (R-01) |
+| A-05 | Survey at 23:59 | Loads shift one period; largest effect on block grades (0.28% Cu) | Alignment analysis; MC |
 | A-18 | Mixing length 6 m | Block-scale grade smoothing | Twin experiment; MC; tornado |
 | A-21 | Unattributed grade = neighbouring periods | Grade of 21% of tonnes | Bootstrap in MC; separate class |
 
@@ -250,8 +251,8 @@ Sixty Monte Carlo realisations jointly sampled the following (D3, Section 7):
 
 **Interpretation.**
 
-* The total tonnage range is dominated by the density/swell basis (κ) and by the A-13b treatment of toe fill (unattributed vs legacy). Survey bias, timing and the movement parameters contribute less.
-* The spatial grade field of the FMS-tracked material is most sensitive to the mixing length and the survey time. Its block Cu CV is typically 7-9%, with a maximum of about 19%.
+* **Total tonnage.** In the Monte Carlo the range is dominated by the density/swell basis (κ). In the tornado, κ = 0.9/1.1 moves the total by about ±20 kt (182-222 kt). The A-13b switch (toe fill treated as unattributed or as legacy) moves about 14.5 kt between those two classes, with little change in total. Grid resolution changes the total by about 1%. The movement parameters (ε, α, L_max), survey precision and survey time change it by less than 0.7%.
+* **Spatial grade field.** The grade field of the FMS-tracked material (mean absolute block Cu change) is most sensitive to the survey-time assumption (0.28% Cu when surveys are assumed at 21:00) and the A-13b switch (0.25% Cu). Next come the mixing length (ε = 2 m: 0.12%), the maximum push (50 m: 0.12%) and grid resolution (≤ 0.12%). Raising the maximum push to 130 m changes nothing, because no reconstructed push reaches 90 m. Monte Carlo block Cu CV for FMS-tracked blocks is typically 7-9% (maximum about 19%).
 * **What the Monte Carlo cannot quantify.** The legacy grade is an assumption, not a measurement. For blocks with less than 50% FMS-tracked material we therefore report a *prior* range: the load-scale P10-P90 of all FMS loads, {{PRIOR_CU}} % Cu. We do not report Monte Carlo precision for these blocks, because it would be false.
 
 Information types in the results: measured (survey solids, FMS inputs), inferred (survey timing, floor, pre-record surface, toe fill), assumed (legacy grade and density, κ, unattributed grade) and model-generated (load destinations, block grades, ranges). These are distinguished field by field in the block model (D4, Section 1.1).
@@ -274,8 +275,13 @@ Eight automated tests (including end-to-end conservation) guard every change. Th
 
 # Results and Discussion
 
-1. **Where the dumped material is.** FMS-tracked material forms a 2-6 m thick skin on the south and west faces and the upper benches, laid in daily layers that dip with the face (Figure 8.3). Mean push distance is about 27 m (P90 65 m). Most loads are spread over 10-15 m of face, which reflects mixing on the face.
-2. **Grade pattern.** The tracked material shows strong day-to-day grade variation (daily mean 5.8-12.2% Cu, 5.8-10.0 g/t Au). This produces banding parallel to the face. High-Cu material placed on 03-21 and 03-28 lies in the outer south-west and south faces. The lower-Cu 03-19/20 material lies just inside it. Reclaim from the face therefore needs blending to smooth the feed.
+1. **Where the dumped material is.** FMS-tracked material forms a skin on the south and west faces and the upper benches. Its column thickness is typically 1.6-5.3 m (interquartile range; up to 10 m where the face advanced most), laid in daily layers that dip with the face (see the block model sections). The median reconstructed push is about 20 m per load (P90 about 54 m), and a typical load is spread over a 10-15 m patch of face (median spread 12 m). This reflects dozer spreading and rolling on the face.
+2. **Grade pattern.** Daily mean grade varies strongly (5.8-12.2% Cu and 5.8-10.1 g/t Au by day), so the tracked material is banded parallel to the face:
+   * 03-16 material (about 10.1% Cu) lies furthest inside, under the north-central crest;
+   * low-Cu material from 03-19 and 03-20 (5.8-6.4%) forms the middle band;
+   * high-Cu material from 03-28 (about 12.1%) forms the south face, overlain at the toe by 03-29 material (about 8.7%).
+
+   A reclaim cut advancing from the south face would therefore see the feed grade change by more than a factor of two over about 20 m, so it must be blended.
 3. **The legacy core dominates the tonnage** but carries no grade information in the supplied data. Its geometry (base plane plus inferred platform) is also the least certain part of the model.
 4. **The FMS record is incomplete.** About {{UNATT_VOL}} m³ of surveyed fill has no FMS source. This is a data-system issue that should be fixed before the pile is reclaimed.
 

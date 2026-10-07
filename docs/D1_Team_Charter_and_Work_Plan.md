@@ -103,6 +103,7 @@ Buffer: the 48 h before the deadline are reserved for review only, not new analy
 | DEC-06 | Allocation by entropy-regularised optimal transport (CPST) | Survey-constrained, mass-conserving, mixing parameter explicit | | |
 | DEC-07 | Base-case density = FMS density (κ = 1.0); κ tested 0.80-1.05 | Measured value preferred; confounded with missing FMS | | |
 | DEC-08 | Block size 5 × 5 × 2 m | Survey/GPS resolution, reclaim equipment, sensitivity tested | | |
+| DEC-10 | Impute X/Y of 14 records with an identical default position (A-32) | QA-F11: physically impossible location | | |
 | DEC-09 | Legacy material reported separately with assumed grade, never mixed into "measured" totals | Professional accountability (Section 6.2 of brief) | | |
 
 # 9. Agreement

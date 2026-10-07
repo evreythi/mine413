@@ -28,6 +28,8 @@ FLAG_RULES = {
     "F11_z_residual": ("|Dump Z - surface| > 3 m where surface known", "Retained; Z not used by algorithm (XY only)"),
     "F12_after_last_survey": ("Dump after the last survey", "Placed provisionally (unreconciled) - updated when next survey arrives"),
     "F13_survey_gap_period": ("Dump inside a period with a missing survey", "Retained; period flagged in reconciliation"),
+    "F14_repeated_location": ("Identical X/Y/Z shared by >= 3 records (default / stuck FMS position)",
+                              "Retained; X/Y imputed as tonnage-weighted centroid of the period's other dumps, GPS error x5 in Monte Carlo"),
 }
 
 
@@ -91,6 +93,8 @@ def run_qaqc(ds, cfg, out: Path, rec=None) -> dict:
     for a, b in gap_periods:
         gp |= (f["timestamp"] > a) & (f["timestamp"] <= b)
     f["F13_survey_gap_period"] = gp
+    rep = f.groupby(["x", "y", "z"])["cycle_id"].transform("size")
+    f["F14_repeated_location"] = rep >= 3
     flag_cols = list(FLAG_RULES)
     f["n_flags"] = f[flag_cols].sum(axis=1)
     f["exclude_from_model"] = f["F01_duplicate_id"] | f["F02_missing_field"] | f["F03_bad_timestamp"]

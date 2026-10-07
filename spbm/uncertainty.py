@@ -177,7 +177,8 @@ def _tornado(tab, out):
                ("tracked_blocks_cu_pct", "Cu grade of FMS-tracked blocks, %"),
                ("total_tonnes", "Total modelled tonnes"),
                ("mean_abs_block_cu_change", "Mean |block Cu change| vs base, % Cu")]
-    fig, axs = plt.subplots(2, 2, figsize=(13, 8))
+    fig, axs = plt.subplots(2, 2, figsize=(13, 9))
+    fig.subplots_adjust(hspace=0.42, wspace=0.45)
     for ax, (m, lab) in zip(axs.flat, metrics):
         d = tab[tab.parameter != "base"].pivot(index="parameter", columns="level", values=m)
         if m == "mean_abs_block_cu_change":

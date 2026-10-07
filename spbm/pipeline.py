@@ -157,7 +157,10 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
     with open(root / "summary.json", "w") as fh:
         json.dump({"key_results": summary, "qaqc": q["summary"], "geometry": geo, "forward_best": tv["best"] if tv else None}, fh, indent=2, default=str)
     _tables_md(root, q, ptab, st, vb, inv, vr, geo, tv, tw, mc)
-    man = audit.write_manifest(cfg, ds.files, root, summary, started, notes)
+    used = [f for f in ds.files if f.kind == "fms" or f.name in set(ds.register["file"])]
+    if until:
+        notes.append(f"Data restricted to records/surveys up to {until}")
+    man = audit.write_manifest(cfg, used, root, summary, started, notes)
     rep = audit.change_report(root)
     log(f"done - run {man['run_id']}" + (" (change report written)" if rep else ""))
     return {"rec": rec, "df": df, "bg": bg, "summary": summary}

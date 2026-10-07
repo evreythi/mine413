@@ -62,6 +62,11 @@ infill:
   # (toe-clipped solids / missing surveys). false = trust solid bottoms (legacy).
   front_unobserved_fill: true
 
+fms:
+  # A-32: an X/Y/Z shared by this many records is treated as a default/stuck
+  # FMS position; X/Y is imputed from the period's other dumps (QA flag F14)
+  repeated_location_min: 3
+
 density:
   # A-06: in-pile bulk density = FMS 'Dens' (t/m3) x compaction factor
   compaction_factor: 1.0

@@ -60,7 +60,7 @@ with the detection limit $\tau = k\sqrt2\,\sigma_z$ = 0.14 m (A-08, A-09).
 
 ## 3.4 Sources
 
-* **Loads** $k$ of the period: $v_k = m_k / (\kappa\,\rho_k)$ m³, located at the dump cell. Properties per m³: $\boldsymbol\pi_k = \boldsymbol\Pi(m_k, g_k)/v_k$ (question A: *initial placement* is a point parcel at the reported X/Y; GPS uncertainty is handled by Monte Carlo, Section 7).
+* **Loads** $k$ of the period: $v_k = m_k / (\kappa\,\rho_k)$ m³, located at the dump cell (for the 14 records with a default FMS position, the tonnage-weighted centroid of the period's other dumps, A-32). Properties per m³: $\boldsymbol\pi_k = \boldsymbol\Pi(m_k, g_k)/v_k$ (question A: *initial placement* is a point parcel at the reported X/Y; GPS uncertainty is handled by Monte Carlo, Section 7).
 * **Carried parcels** from the previous period (A-23), at their original dump cell.
 * **Cut sources** $j$ (Section 3.2).
 * **Dummy source U** (unattributed) with volume $V_F = \sum_c b_c$.
