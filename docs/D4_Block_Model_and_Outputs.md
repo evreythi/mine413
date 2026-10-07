@@ -80,7 +80,7 @@ subtitle: "Pit I HG stockpile - current state after the 2026-03-29 survey (provi
 | 4474-4478 | 792 | 53,383 | 8.35 | 7.97 | 4,455 | 13.7 |
 
 
-Source: `outputs/blockmodel/summary_by_bench_4m.csv` (model run 20261007T075413).
+Source: `outputs/blockmodel/summary_by_bench_4m.csv` (model run 20261007T081228).
 
 # 3. Visualisations
 

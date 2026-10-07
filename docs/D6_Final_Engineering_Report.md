@@ -2,7 +2,7 @@
 title: "Long-Term Stockpile Reconstruction and Block Modelling - Pit I HG Stockpile"
 subtitle: "D6 Final Engineering Report to Mine Management | MIN E 413 Surface Mining Methods and Operations Management, Fall 2026"
 author: "Long-Term Mine Planning Team: [Member 1], [Member 2], [Member 3], [Member 4], [Member 5]"
-date: "November 2026 - model run 20261007T075413"
+date: "November 2026 - model run 20261007T081228"
 ---
 
 # Executive Summary

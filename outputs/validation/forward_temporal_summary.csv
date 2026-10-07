@@ -1,0 +1,7 @@
+set,mode,w1_m,capture,centroid_err_m
+calibration,no-push baseline,21.844,0.294,20.306
+calibration,push (calibrated),19.015,0.341,17.788
+calibration,push (default),20.03,0.374,18.767
+test (unseen),no-push baseline,20.374,0.339,16.138
+test (unseen),push (calibrated),18.605,0.39,14.368
+test (unseen),push (default),18.554,0.43,14.345
