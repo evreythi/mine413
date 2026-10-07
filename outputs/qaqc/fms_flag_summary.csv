@@ -1,0 +1,15 @@
+flag,description,records,treatment
+F01_duplicate_id,Duplicate Cycle ID,0,"Second occurrence excluded from modelling, kept in register"
+F02_missing_field,Missing mandatory field,0,"Excluded from modelling (cannot be placed/graded), kept in register"
+F03_bad_timestamp,Unparseable timestamp,0,"Excluded from modelling, kept in register"
+F04_id_out_of_order,Cycle ID not in chronological order,33,Information only - timestamp governs ordering
+F05_low_payload,Payload < 50% of median (part load),2,Retained; higher payload uncertainty in Monte Carlo
+F06_high_payload,Payload > 150% of median,3,Retained; checked against truck class; higher uncertainty
+F07_grade_outlier,Grade outside Q1-3IQR..Q3+3IQR or <=0,1,Retained (source-block grade); flagged
+F08_density_range,Density outside 1.5-3.0 t/m3,0,Retained; flagged
+F09_far_from_face,Dump > 60 m from any surveyed change,0,Retained; push distance check
+F10_below_floor,Dump Z below fitted stockpile floor - 0.5 m,14,"Retained; XY used, Z not used by algorithm"
+F11_z_residual,|Dump Z - surface| > 3 m where surface known,29,Retained; Z not used by algorithm (XY only)
+F12_after_last_survey,Dump after the last survey,1,Placed provisionally (unreconciled) - updated when next survey arrives
+F13_survey_gap_period,Dump inside a period with a missing survey,18,Retained; period flagged in reconciliation
+F14_repeated_location,Identical X/Y/Z shared by >= 3 records (default / stuck FMS position),14,"Retained; X/Y imputed as tonnage-weighted centroid of the period's other dumps, GPS error x5 in Monte Carlo"

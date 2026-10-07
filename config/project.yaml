@@ -1,0 +1,138 @@
+# =====================================================================
+# SPBM - Stockpile Block Model platform : project configuration
+# ---------------------------------------------------------------------
+# Every engineering parameter lives here (never hard-coded in the code).
+# The comment "A-xx" links a parameter to the Assumption Register
+# (docs/D2_Data_and_Assumption_Register.md). Changing a value here and
+# re-running `python -m spbm run` reproduces the whole analysis.
+# =====================================================================
+
+project:
+  name: "Pit I long-term HG stockpile (HGHS) - reconstruction & block model"
+  # A-01: CRS. Coordinates are projected metres (E ~511 300, N ~7 122 300,
+  # Z ~4 480 m). Treated as the mine grid (UTM-like, southern hemisphere).
+  # No datum transformation is applied: FMS and surveys share the grid.
+  crs_note: "Mine grid, projected metres (assumed UTM, southern hemisphere); FMS and surveys on the same grid"
+
+inputs:
+  # Sources scanned (in order) for FMS *.csv and survey *.dxf files.
+  # Zip archives are read in place (never modified). New data can be
+  # dropped into data/inbox/ and picked up by `python -m spbm update`.
+  sources:
+    - "Data_Topo 2026.zip"
+    - "data/inbox"
+  fms_pattern: "*.csv"
+  survey_pattern: "*.dxf"
+  survey_overrides: "config/survey_overrides.csv"   # manual corrections, each with a reason
+  cache_dir: "data/cache"
+
+outputs:
+  root: "outputs"
+
+time:
+  # A-05: survey acquisition time of day (not supplied). Selected by the
+  # temporal-alignment analysis (outputs/growth/temporal_alignment.csv).
+  survey_time: "23:59"
+  survey_time_candidates: ["00:00", "03:00", "05:00", "06:00", "07:00", "08:00", "09:00", "10:00", "12:00", "15:00", "18:00", "21:00", "22:00", "23:00", "23:59"]
+
+grid:
+  cell: 1.0          # A-24 horizontal simulation resolution (m)
+  dz: 0.25           # A-24 vertical integration step for blocks (m)
+  margin: 6.0        # m around data extent
+
+survey:
+  sigma_z: 0.05      # A-08 vertical survey precision, 1-sigma (m)
+  lod_k: 2.0         # A-09 level of detection tau = k*sqrt(2)*sigma_z  (~0.14 m)
+  min_patch_cells: 4 # isolated change cells smaller than this are treated as noise
+
+base:
+  # A-12: stockpile floor = plane fitted to toe cells (elevation within
+  # toe_band of the global survey minimum) of all surveys.
+  toe_band: 1.0
+  robust_iterations: 3
+
+infill:
+  # A-13/A-14: geometry of never-surveyed cells at the start of the record.
+  repose_deg: 37.0      # A-03 angle of repose (measured: median face slope 34-36 deg, P75 38 deg)
+  platform_rule: "nearest_crest"  # behind-crest cells take the nearest surveyed crest elevation
+  domain: "hull"        # model domain = convex hull of surveyed cells + dump points
+  # A-13b: first-surveyed cells in FRONT of an earlier surveyed face are assumed
+  # to have been at the repose-angle extrapolation of that face (floor beyond the
+  # toe); a solid bottom above that is fill not captured by any solid
+  # (toe-clipped solids / missing surveys). false = trust solid bottoms (legacy).
+  front_unobserved_fill: true
+
+fms:
+  # A-32: an X/Y/Z shared by this many records is treated as a default/stuck
+  # FMS position; X/Y is imputed from the period's other dumps (QA flag F14)
+  repeated_location_min: 3
+
+density:
+  # A-06: in-pile bulk density = FMS 'Dens' (t/m3) x compaction factor
+  compaction_factor: 1.0
+  legacy_density: null  # null -> tonnage-weighted mean FMS density
+
+movement:
+  # A-15..A-19 - see docs/D3 for equations
+  epsilon: 6.0          # m  : entropic mixing length (degree of mixing)
+  alpha_up: 4.0         # -  : uphill push penalty (m of horizontal push per m of lift)
+  max_push: 90.0        # m  : maximum effective dozer push distance (geodesic)
+  retain_cost: 90.0     # m  : cost of leaving FMS volume on the unsurveyed platform
+  unattributed_cost: 90.0 # m: cost of filling observed volume from an unknown source
+  retain_sigma: 6.0     # m  : spreading kernel for material retained on the platform
+  sinkhorn_tol: 1.0e-6  # relative marginal tolerance
+  sinkhorn_max_iter: 5000
+  cut_as_source: true   # observed elevation decreases on previously-observed cells re-handle material
+
+imputation:
+  # A-21: grade imputed to observed fill that FMS cannot explain
+  method: "period_neighbours"   # tonnage-weighted mean of loads in the period +/- 1 period
+  legacy_grade: "fms_mean"      # A-22: assumed grade of pre-record (legacy) material
+
+forward:
+  # Predictive (unconstrained) model: push to crest + avalanche cellular automaton
+  repose_deg: 37.0
+  crest_slope_deg: 20.0  # a cell is "crest/face" where local slope exceeds this
+  deposit_radius: 3.0    # m: footprint radius of a pushed load at the crest
+  ca_tol: 0.01           # m: convergence tolerance of the avalanche CA
+  ca_max_iter: 6000
+  calib_periods: [1, 2, 3, 4, 5]
+  test_periods: [6, 7, 8, 9]
+
+blockmodel:
+  block: [5.0, 5.0, 2.0]        # A-25 block size dx, dy, dz (m)
+  origin_z: 4474.0               # block z origin (m) - aligned with stockpile floor
+  min_fill_fraction: 0.0         # export every block containing material (partial blocks carry fill_frac)
+  cutoff_cu: [0, 4, 6, 8, 9, 10, 11, 12]
+
+confidence:
+  # Block confidence classes (see D3 section 7)
+  high:   {min_tracked: 0.8, max_cv: 0.10}
+  medium: {min_tracked: 0.5, max_cv: 0.20}
+  low:    {min_tracked: 0.2}
+
+uncertainty:
+  n_realizations: 60
+  seed: 413
+  gps_sigma: 3.0            # A-07 m, horizontal GPS error (1 sigma)
+  payload_cv: 0.08          # A-10 per-load payload error (pass-count estimate)
+  payload_bias_sd: 0.03     # A-10 systematic scale error per realization
+  assay_cv: 0.10            # A-11 per-source-signature grade error
+  compaction_range: [0.90, 1.10]
+  epsilon_range: [2.0, 15.0]
+  alpha_range: [1.0, 10.0]
+  max_push_range: [50.0, 130.0]
+  survey_bias_sd: 0.05      # m, per-survey vertical datum error
+  survey_time_choices: ["21:00", "22:00", "23:00", "23:59"]
+
+sensitivity:
+  # one-at-a-time ranges (low, high) for the tornado chart
+  epsilon: [2.0, 15.0]
+  alpha_up: [1.0, 10.0]
+  max_push: [50.0, 130.0]
+  compaction_factor: [0.90, 1.10]
+  sigma_z: [0.025, 0.15]
+  survey_time: ["21:00", "23:59"]
+  cell: [0.5, 2.5]
+  front_unobserved_fill: [false, true]
+  block: [[2.0, 2.0, 1.0], [10.0, 10.0, 4.0]]

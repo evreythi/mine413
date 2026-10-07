@@ -1,0 +1,6 @@
+{
+  "name": "spbm-doc-tools",
+  "private": true,
+  "description": "Document tooling: presentation (pptxgenjs) and PDF rendering (playwright/chromium)",
+  "dependencies": { "pptxgenjs": "^3.12.0" }
+}
