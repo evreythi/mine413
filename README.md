@@ -47,7 +47,7 @@ outputs/                            results of the submitted run (all reproducib
 docs/                               deliverables (Markdown sources) and docs/build/ (DOCX, PDF, XLSX, PPTX)
 ```
 
-## Key results (base case, run `20261007T081228`)
+## Key results (base case, run `20261007T164408`)
 
 | Material class | Tonnes | Share | Cu % | Au g/t | Grade basis |
 |---|---|---|---|---|---|
