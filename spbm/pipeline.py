@@ -23,7 +23,7 @@ def _md(df: pd.DataFrame, floatfmt="{:,.2f}") -> str:
     cols = [str(c) for c in d.columns]
     lines = ["| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
     for _, r in d.iterrows():
-        lines.append("| " + " | ".join(str(v) for v in r.values) + " |")
+        lines.append("| " + " | ".join(str(v).replace("|", "\\|") for v in r.values) + " |")
     return "\n".join(lines)
 
 

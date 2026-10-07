@@ -60,12 +60,16 @@ docs/                               deliverables (Markdown sources) and docs/bui
 * FMS mass and metal balance: exact (relative error < 1e-9). Geometry RMSE vs survey: 0.026 m.
 * Synthetic known-truth test: block Cu RMSE 0.80% (r = 0.90) vs 1.18% for a period-average model.
 
+> **Grade units are as supplied and unconfirmed.** 8.4% Cu / 8.0 g/t Au is roughly an order of magnitude above typical Cu-Au feed. Confirm with Geology before using any contained-metal figure. Legacy and unattributed grades equal or derive from the FMS mean by assumption (A-22, A-21), which is why the class grades are nearly identical.
+
+The class split above is exact (each block's tonnes divided among classes). `outputs/blockmodel/summary_by_dominant_info_class.csv` labels whole blocks by their dominant class instead, so its class totals differ while the grand total is the same.
+
 Every number is traced to `outputs/audit/run_manifest.json`; full tables in `outputs/report_tables.md`.
 
 ## What the team still has to do before submission
 
-1. Put real names, roles and signatures into D1; keep the meeting log / contribution record (D1 §8) from what actually happens.
+1. Enter names in `config/team.yaml` (fills every `[Member n]` in the built documents, the deck and the zip name). Sign D1, and keep the meeting log and contribution record (D1 §8) from what actually happens, including proposer and approver for each decision.
 2. Each member writes their own **D8** (reflection + confidential peer assessment) and **D9** (ethics/equity response) from the templates.
 3. Complete the verification log in **Appendix A** (AI/software disclosure) and confirm the course AI policy.
 4. Rehearse D7 (speaker notes assign each member's part).
-5. Re-run `python tools/build_docs.py` after any edit, then `python tools/make_submission.py --team <name>` to create the Canvas zip.
+5. Re-run `python tools/build_docs.py` after any edit, then `python tools/make_submission.py` to create the Canvas zip.

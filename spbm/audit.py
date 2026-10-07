@@ -26,10 +26,31 @@ def sha256_file(p: Path) -> str:
 
 
 def git_commit() -> str:
+    """Code identity for the manifest. In a Git checkout: the commit hash
+    (with '+modified' if tracked files differ). In a packaged copy (e.g. the
+    submission zip, no .git): the commit recorded in BUILD_INFO.json when the
+    package was made. Never fails, never writes to stderr."""
     try:
-        return subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], text=True).strip()
+        h = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], text=True,
+                                    stderr=subprocess.DEVNULL).strip()
+        dirty = subprocess.run(["git", "-C", str(ROOT), "diff", "--quiet", "HEAD", "--", "spbm", "config"],
+                               stderr=subprocess.DEVNULL).returncode != 0
+        return h + ("+modified" if dirty else "")
     except Exception:
-        return "n/a"
+        info = ROOT / "BUILD_INFO.json"
+        if info.exists():
+            b = json.loads(info.read_text())
+            return f"not a git checkout; packaged from commit {b.get('git_commit', '?')} ({b.get('packaged', '?')}); code identity via spbm_source_sha256"
+        return "not a git checkout; code identity via spbm_source_sha256"
+
+
+def source_hash() -> str:
+    """SHA-256 over the platform source and configuration, so code identity is
+    verifiable even without Git."""
+    h = hashlib.sha256()
+    for p in sorted(list((ROOT / "spbm").glob("*.py")) + list((ROOT / "config").glob("*"))):
+        h.update(p.name.encode()); h.update(p.read_bytes())
+    return h.hexdigest()[:16]
 
 
 def update_registry(files, out: Path) -> pd.DataFrame:
@@ -67,7 +88,7 @@ def write_manifest(cfg, files, outputs_root: Path, summary: dict, started: datet
     man = {
         "run_id": run_id, "started": started.isoformat(timespec="seconds"),
         "finished": datetime.now().isoformat(timespec="seconds"),
-        "git_commit": git_commit(), "config_file": cfg.get("_path"), "config_hash": config_hash(cfg),
+        "git_commit": git_commit(), "spbm_source_sha256": source_hash(), "config_file": cfg.get("_path"), "config_hash": config_hash(cfg),
         "software": versions(),
         "inputs": [{"file": f.name, "kind": f.kind, "sha256": f.sha256, "bytes": f.size, "origin": f.origin} for f in files],
         "manual_interventions": pd.read_csv(ROOT / cfg["inputs"]["survey_overrides"]).to_dict("records")
@@ -89,7 +110,7 @@ def write_manifest(cfg, files, outputs_root: Path, summary: dict, started: datet
     hist = outputs_root / "history" / run_id
     hist.mkdir(parents=True, exist_ok=True)
     shutil.copy(audit / "run_manifest.json", hist / "run_manifest.json")
-    for rel in ["blockmodel/summary_by_info_class.csv", "blockmodel/summary_by_bench_4m.csv", "growth/period_reconciliation.csv"]:
+    for rel in ["blockmodel/summary_by_dominant_info_class.csv", "blockmodel/summary_by_bench_4m.csv", "growth/period_reconciliation.csv"]:
         src = outputs_root / rel
         if src.exists():
             shutil.copy(src, hist / src.name)

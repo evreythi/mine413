@@ -28,7 +28,7 @@ def md(df: pd.DataFrame, caption: str, fmt=None) -> str:
         elif pd.api.types.is_float_dtype(d[c]):
             d[c] = d[c].map(lambda v: "" if pd.isna(v) else f"{v:,.2f}")
     head = "| " + " | ".join(map(str, d.columns)) + " |\n|" + "---|" * len(d.columns) + "\n"
-    body = "\n".join("| " + " | ".join(str(v) for v in r) + " |" for r in d.values)
+    body = "\n".join("| " + " | ".join(str(v).replace("|", "\\|") for v in r) + " |" for r in d.values)
     return f"*{caption}*\n\n{head}{body}\n"
 
 
@@ -68,6 +68,7 @@ def values() -> dict:
         "TW_CPST": f"{base.cu_rmse:.2f}", "TW_R": f"{base.cu_corr:.2f}", "TW_PA": f"{pa.cu_rmse:.2f}", "TW_GM": f"{gm.cu_rmse:.2f}",
         "TW_IMPROVE": f"{(1 - base.cu_rmse / pa.cu_rmse) * 100:.0f}",
         "PRIOR_CU": f"{wq(loads['cu'].values, 0.1):.1f}-{wq(loads['cu'].values, 0.9):.1f}",
+        "AU3_F": f"{F.au_gpt:.3f}", "AU3_U": f"{U.au_gpt:.3f}", "AU3_L": f"{L.au_gpt:.3f}",
         "UNATT_VOL": f"{S['key_results']['unattributed_volume_m3']:,.0f}",
     }
     # ------------------------------------------------------------ tables
@@ -120,10 +121,23 @@ def values() -> dict:
     v["TABLE_TWIN"] = md(tw[["method", "blocks", "cu_rmse", "cu_mae", "cu_corr", "au_rmse", "au_corr", "tonnes_corr"]],
                          "Table 9.4 - Synthetic twin: block-level accuracy vs known truth (blocks with > 25 t of true FMS material)",
                          {"cu_rmse": "{:.2f}", "cu_mae": "{:.2f}", "cu_corr": "{:.2f}", "au_rmse": "{:.2f}", "au_corr": "{:.2f}", "tonnes_corr": "{:.2f}"})
+    ta = pd.read_csv(OUT / "validation" / "twin_alternative_truths.csv")
+    v["TABLE_TWIN_ALT"] = md(ta[["truth", "method", "blocks", "cu_rmse", "cu_corr", "au_rmse"]],
+                             "Table 9.5 - Twin stress tests: truth generated with placement rules CPST does not assume",
+                             {"cu_rmse": "{:.2f}", "cu_corr": "{:.2f}", "au_rmse": "{:.2f}"})
+    tai = ta.set_index(["truth", "method"])
+    rc = "random-crest (dump position uninformative)"
+    v["TWA_RC_CPST"] = f"{tai.loc[(rc, 'CPST eps=6 m (base)'), 'cu_rmse']:.2f}"
+    v["TWA_RC_R"] = f"{tai.loc[(rc, 'CPST eps=6 m (base)'), 'cu_corr']:.2f}"
+    v["TWA_RC_PA"] = f"{tai.loc[(rc, 'Baseline: period-average (eps=1e4)'), 'cu_rmse']:.2f}"
+    v["TWA_RC_GM"] = f"{tai.loc[(rc, 'Reference: global mean grade'), 'cu_rmse']:.2f}"
+    pu = "period-uniform mixing"
+    v["TWA_PU_CPST"] = f"{tai.loc[(pu, 'CPST eps=6 m (base)'), 'cu_rmse']:.2f}"
+    v["TWA_PU_PA"] = f"{tai.loc[(pu, 'Baseline: period-average (eps=1e4)'), 'cu_rmse']:.2f}"
     rb = pd.read_csv(OUT / "validation" / "robustness_numerical.csv")
     v["TABLE_ROBUST"] = md(rb[["variant", "total_tonnes", "fms_tonnes", "unattributed_tonnes", "legacy_tonnes", "tracked_blocks_cu_pct",
                                "top_bench_cu_pct", "mean_abs_block_cu_change"]],
-                           "Table 9.5 - Robustness to numerical settings",
+                           "Table 9.6 - Robustness to numerical settings",
                            {"total_tonnes": "{:,.0f}", "fms_tonnes": "{:,.0f}", "unattributed_tonnes": "{:,.0f}", "legacy_tonnes": "{:,.0f}",
                             "tracked_blocks_cu_pct": "{:.2f}", "top_bench_cu_pct": "{:.2f}", "mean_abs_block_cu_change": "{:.2f}"})
     m = mc.loc[[r for r in ["total_tonnes", "cu_t", "au_kg", "cu_pct", "au_gpt", "fms_tonnes", "class_fms_cu_pct", "class_fms_au_gpt",

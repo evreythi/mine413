@@ -146,18 +146,54 @@ def register_xlsx():
     return out
 
 
+def team_substitutions() -> dict:
+    """'[Member n]' -> name from config/team.yaml (only for names filled in)."""
+    import yaml
+    t = yaml.safe_load((ROOT / "config" / "team.yaml").read_text())
+    subs = {}
+    for i, m in enumerate(t.get("members", []), 1):
+        if m.get("name") and m["name"] != f"[Member {i}]":
+            subs[f"[Member {i}]"] = m["name"]
+    names = [m["name"] for m in t.get("members", [])]
+    if subs:
+        subs["[Member 1-5]"] = ", ".join(names)
+    return subs
+
+
+def with_names(md: Path, subs: dict) -> Path:
+    """Temporary copy of a Markdown source with team names substituted
+    (kept next to the source so relative figure paths still resolve)."""
+    if not subs:
+        return md
+    txt = md.read_text()
+    for k, v in subs.items():
+        txt = txt.replace(k, v)
+    tmp = md.with_name("_build_" + md.name)
+    tmp.write_text(txt)
+    return tmp
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-pdf", action="store_true")
     a = ap.parse_args()
     BUILD.mkdir(parents=True, exist_ok=True)
     ref = make_reference_docx()
-    for md in sorted(DOCS.glob("D*.md")) + sorted(DOCS.glob("Appendix*.md")):
+    subs = team_substitutions()
+    for src in sorted(DOCS.glob("D*.md")) + sorted(DOCS.glob("Appendix*.md")):
+        md = with_names(src, subs)
         docx = md_to_docx(md, ref)
+        if md != src:
+            docx = docx.rename(BUILD / (src.stem + ".docx"))
         style_tables(docx)
         print("docx", docx.name)
         if not a.no_pdf and shutil.which("node"):
-            print("pdf ", md_to_pdf(md).name)
+            pdf = md_to_pdf(md)
+            if md != src:
+                pdf = pdf.rename(BUILD / (src.stem + ".pdf"))
+            print("pdf ", pdf.name)
+        if md != src:
+            md.unlink()
     print("xlsx", register_xlsx().name)
     try:
         from make_presentation import build as build_ppt  # noqa

@@ -59,6 +59,8 @@ def build() -> Path:
         "geo": {k2: float(v) for k2, v in geo.items()},
         "figs": figs,
         "out": str(ROOT / "docs" / "build" / "D7_Presentation.pptx"),
+        "team": __import__("yaml").safe_load((ROOT / "config" / "team.yaml").read_text()),
+        "twin_alt": pd.read_csv(OUT / "validation" / "twin_alternative_truths.csv").to_dict("records"),
     }
     jp = ROOT / "tools" / "_deck_data.json"
     def clean(o):

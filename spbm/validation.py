@@ -195,93 +195,149 @@ def temporal_validation(rec, cfg, out: Path) -> dict:
 
 
 # ------------------------------------------------------- 4. synthetic twin
-def twin_experiment(rec, ds, cfg, out: Path, seed=7, drop_frac=0.15, gps_sigma=3.0, push_jitter=6.0) -> dict:
-    """Generate a known-truth stockpile with the physics model from the real
-    dump sequence, observe it like the real stockpile (survey change solids,
-    noisy GPS, 15% missing FMS records) and reconstruct it blind."""
-    rng = np.random.default_rng(seed)
+def _twin_truth(rec, ds, cfg, rng, push_jitter, crest_rule="nearest"):
+    """Known-truth stockpile from the real dump sequence. Returns the truth
+    column models ('loads': every load where the physics put it; 'uniform':
+    same geometry but each period's fill perfectly mixed) and synthetic
+    change solids observed like the real surveys."""
     g = ds.grid
     A = g.area
     loads = rec.loads.copy()
     loads = loads[loads.period.between(0, len(ds.surveys) - 1)].reset_index(drop=True)
     z = extend_outside(np.where(rec.domain, rec.legacy_top, np.nan), rec.domain)
-    z0 = z.copy()
-    truth = ColumnModel(g.ny, g.nx)
-    for c in range(g.ny * g.nx):
-        truth.start(c, z.ravel()[c])
+    truths = {k: ColumnModel(g.ny, g.nx) for k in ("loads", "uniform")}
+    for t in truths.values():
+        for c in range(g.ny * g.nx):
+            t.start(c, z.ravel()[c])
     fcfg = dict(cfg["forward"])
     surveys = []
     prev = z.copy()
     for s, sv in enumerate(ds.surveys):
         Ls = loads[loads.period == s]
         if len(Ls):
-            # the observed (real) fill guides where the face is: crest region = previously surveyed area
             creg = ndimage.binary_dilation(rec.diagnostics["snapshots"][s]["observed_before"], iterations=3) if s < len(rec.diagnostics["snapshots"]) else None
             if creg is not None and not creg.any():
                 creg = None
-            z, feet = fw.place_loads(z, Ls[["x", "y", "vol"]].values, g, fcfg, rng=rng, push_jitter=push_jitter, sequential=True, crest_region=creg)
-            for (_, ld), ft in zip(Ls.iterrows(), feet):
+            z, feet = fw.place_loads(z, Ls[["x", "y", "vol"]].values, g, fcfg, rng=rng, push_jitter=push_jitter,
+                                     sequential=True, crest_region=creg, crest_rule=crest_rule)
+            per_load = [load_props(ld.m, ld.cu, ld.au, ld.ag, ld.day) / ld.vol for _, ld in Ls.iterrows()]
+            uni = np.sum([p_ * v for p_, v in zip(per_load, Ls["vol"].values)], axis=0) / Ls["vol"].sum()
+            for (_, ld), ft, pr0 in zip(Ls.iterrows(), feet, per_load):
                 cells = np.nonzero(ft.ravel() > 1e-5)[0]
-                th = ft.ravel()[cells]
-                pr0 = load_props(ld.m, ld.cu, ld.au, ld.ag, ld.day) / ld.vol
-                for c, t in zip(cells, th):
-                    pr = pr0 * t * A
-                    pr[P["VOL"]] = t * A
-                    pr[P["MSQ_F"]] = (ld.m / ld.vol * t * A) ** 2
-                    truth.add(c, t, pr)
+                for c, t in zip(cells, ft.ravel()[cells]):
+                    for key, base in (("loads", pr0), ("uniform", uni)):
+                        pr = base * t * A
+                        pr[P["VOL"]] = t * A
+                        pr[P["MSQ_F"]] = (ld.m / ld.vol * t * A) ** 2
+                        truths[key].add(c, t, pr)
         d = z - prev
         mask = d > 0.03
         noise = rng.normal(0, 0.02, z.shape)
         top = np.where(mask, z + noise, np.nan)
-        bot = np.where(mask, prev + 0 * noise, np.nan)
+        bot = np.where(mask, prev, np.nan)
         surveys.append(Survey(s, f"SYN_{s:02d}", "synthetic", sv.datetime, top, bot, mask.astype(int) * 2, {}))
         prev = z.copy()
-    # reported FMS: GPS error, payload error, missing records
+    return truths, surveys, loads
+
+
+def _twin_observe(ds, loads, surveys, rng, drop_frac, gps_sigma):
     rep = ds.fms.copy()
     rep = rep[rep["cycle_id"].isin(loads["cycle_id"])]
+    # the reconstruction sees the (imputed) dump positions the truth was generated from, plus GPS noise
+    pos = loads.set_index("cycle_id")[["x", "y"]]
+    rep["x"] = rep["cycle_id"].map(pos["x"])
+    rep["y"] = rep["cycle_id"].map(pos["y"])
     keep = rng.random(len(rep)) >= drop_frac
     rep = rep[keep].copy()
     rep["x"] = rep["x"] + rng.normal(0, gps_sigma, len(rep))
     rep["y"] = rep["y"] + rng.normal(0, gps_sigma, len(rep))
     rep["payload_t"] = rep["payload_t"] * np.clip(1 + rng.normal(0, 0.05, len(rep)), 0.7, 1.3)
-    syn = Dataset(g, rep.reset_index(drop=True), ds.register, surveys, ds.files)
-    bg = bm.make_block_grid(rec, cfg)
-    tr = SimpleNamespace(grid=g, cols=truth)
-    agg_t = bm.aggregate(tr, bg).reshape(-1, NP)
+    return Dataset(ds.grid, rep.reset_index(drop=True), ds.register, surveys, ds.files)
+
+
+def _twin_score(name, truth_name, agg_t, a2, sel):
     TT = agg_t[:, P["T_F"]]
+    TF, TU = a2[:, P["T_F"]], a2[:, P["T_U"]]
+    tn = TF + TU
+    with np.errstate(invalid="ignore", divide="ignore"):
+        cu_r = (a2[:, P["CU_F"]] + a2[:, P["CU_U"]]) / tn * 100
+        au_r = (a2[:, P["AU_F"]] + a2[:, P["AU_U"]]) / tn * 1000
+        cu_t = agg_t[:, P["CU_F"]] / TT * 100
+        au_t = agg_t[:, P["AU_F"]] / TT * 1000
+    m = sel & (tn > 1)
+    return {"truth": truth_name, "method": name, "blocks": int(m.sum()),
+            "cu_rmse": float(np.sqrt(np.mean((cu_r[m] - cu_t[m]) ** 2))), "cu_mae": float(np.mean(np.abs(cu_r[m] - cu_t[m]))),
+            "cu_corr": float(np.corrcoef(cu_r[m], cu_t[m])[0, 1]) if np.std(cu_t[m]) > 1e-9 else np.nan,
+            "au_rmse": float(np.sqrt(np.mean((au_r[m] - au_t[m]) ** 2))),
+            "au_corr": float(np.corrcoef(au_r[m], au_t[m])[0, 1]) if np.std(au_t[m]) > 1e-9 else np.nan,
+            "tonnes_corr": float(np.corrcoef(tn[sel], TT[sel])[0, 1]),
+            "recovered_fms_tonnes_frac": float(TF.sum() / TT.sum())}, (cu_r, cu_t, m)
+
+
+def _global_mean_row(truth_name, agg_t, sel):
+    TT = agg_t[:, P["T_F"]]
+    cu_t = agg_t[:, P["CU_F"]] / np.where(TT > 0, TT, 1) * 100
+    gm = agg_t[:, P["CU_F"]].sum() / TT.sum() * 100
+    return {"truth": truth_name, "method": "Reference: global mean grade", "blocks": int(sel.sum()),
+            "cu_rmse": float(np.sqrt(np.mean((gm - cu_t[sel]) ** 2))), "cu_mae": float(np.mean(np.abs(gm - cu_t[sel]))),
+            "cu_corr": np.nan, "au_rmse": np.nan, "au_corr": np.nan, "tonnes_corr": np.nan, "recovered_fms_tonnes_frac": np.nan}
+
+
+def twin_experiment(rec, ds, cfg, out: Path, seed=7, drop_frac=0.15, gps_sigma=3.0, push_jitter=6.0) -> dict:
+    """Synthetic twins with known truth, observed like the real stockpile
+    (survey change solids, noisy GPS, payload error, 15% missing FMS records)
+    and reconstructed blind.
+
+    Main twin: truth generated by the forward physics (nearest crest + 6 m
+    random dozer deviation). Because the forward physics shares ideas with
+    CPST's cost, two stress tests use placement rules CPST does NOT assume:
+      * random-crest: every load is pushed to a random point of the active
+        crest - the dump position carries no information on its destination;
+      * period-uniform: each period's fill is perfectly mixed (the best case
+        for the period-average baseline, the worst for CPST's localisation).
+    """
+    bg = bm.make_block_grid(rec, cfg)
+    rng = np.random.default_rng(seed)
+    truths, surveys, loads = _twin_truth(rec, ds, cfg, rng, push_jitter)
+    syn = _twin_observe(ds, loads, surveys, rng, drop_frac, gps_sigma)
+    agg = {k: bm.aggregate(SimpleNamespace(grid=ds.grid, cols=t), bg).reshape(-1, NP) for k, t in truths.items()}
     variants = [("CPST eps=2 m", {"movement.epsilon": 2.0}), ("CPST eps=6 m (base)", {}),
                 ("CPST eps=15 m", {"movement.epsilon": 15.0}), ("CPST eps=6, no uphill penalty", {"movement.alpha_up": 0.0}),
                 ("Baseline: period-average (eps=1e4)", {"movement.epsilon": 1e4})]
-    rows = []
-    sel = TT > 25
+    rows, alt = [], []
+    sel = agg["loads"][:, P["T_F"]] > 25
+    recon = {}
     for name, ov in variants:
-        c2 = apply_overrides(cfg, ov)
-        r2 = reconstruct(syn, c2)
-        a2 = bm.aggregate(r2, bg).reshape(-1, NP)
-        TF, TU = a2[:, P["T_F"]], a2[:, P["T_U"]]
-        tn = TF + TU
-        with np.errstate(invalid="ignore", divide="ignore"):
-            cu_r = (a2[:, P["CU_F"]] + a2[:, P["CU_U"]]) / tn * 100
-            au_r = (a2[:, P["AU_F"]] + a2[:, P["AU_U"]]) / tn * 1000
-            cu_t = agg_t[:, P["CU_F"]] / TT * 100
-            au_t = agg_t[:, P["AU_F"]] / TT * 1000
-        m = sel & (tn > 1)
-        rows.append({"method": name, "blocks": int(m.sum()),
-                     "cu_rmse": float(np.sqrt(np.mean((cu_r[m] - cu_t[m]) ** 2))), "cu_mae": float(np.mean(np.abs(cu_r[m] - cu_t[m]))),
-                     "cu_corr": float(np.corrcoef(cu_r[m], cu_t[m])[0, 1]),
-                     "au_rmse": float(np.sqrt(np.mean((au_r[m] - au_t[m]) ** 2))), "au_corr": float(np.corrcoef(au_r[m], au_t[m])[0, 1]),
-                     "tonnes_corr": float(np.corrcoef(tn[sel], TT[sel])[0, 1]),
-                     "recovered_fms_tonnes_frac": float(TF.sum() / TT.sum())})
+        r2 = reconstruct(syn, apply_overrides(cfg, ov))
+        recon[name] = bm.aggregate(r2, bg).reshape(-1, NP)
+        row, sc = _twin_score(name, "physics", agg["loads"], recon[name], sel)
+        rows.append({k: v for k, v in row.items() if k != "truth"})
         if name.endswith("(base)"):
-            base_cu = (cu_r, cu_t, m)
-    # reference: every block given the global mean grade
-    cu_t = agg_t[:, P["CU_F"]] / np.where(TT > 0, TT, 1) * 100
-    gm = agg_t[:, P["CU_F"]].sum() / TT.sum() * 100
-    rows.append({"method": "Reference: global mean grade", "blocks": int(sel.sum()),
-                 "cu_rmse": float(np.sqrt(np.mean((gm - cu_t[sel]) ** 2))), "cu_mae": float(np.mean(np.abs(gm - cu_t[sel]))),
-                 "cu_corr": np.nan, "au_rmse": np.nan, "au_corr": np.nan, "tonnes_corr": np.nan, "recovered_fms_tonnes_frac": np.nan})
+            base_cu = sc
+    gm = _global_mean_row("physics", agg["loads"], sel)
+    rows.append({k: v for k, v in gm.items() if k != "truth"})
     tab = pd.DataFrame(rows)
     tab.to_csv(out / "twin_experiment.csv", index=False)
+
+    # ---- stress tests: truth placement rules CPST does not assume
+    key = ["CPST eps=6 m (base)", "Baseline: period-average (eps=1e4)"]
+    for name in key:
+        alt.append(_twin_score(name, "physics (nearest crest + 6 m jitter)", agg["loads"], recon[name], sel)[0])
+        alt.append(_twin_score(name, "period-uniform mixing", agg["uniform"], recon[name], sel)[0])
+    alt.append(_global_mean_row("physics (nearest crest + 6 m jitter)", agg["loads"], sel))
+    alt.append(_global_mean_row("period-uniform mixing", agg["uniform"], sel))
+    rng2 = np.random.default_rng(seed + 1)
+    truths2, surveys2, loads2 = _twin_truth(rec, ds, cfg, rng2, push_jitter, crest_rule="random")
+    syn2 = _twin_observe(ds, loads2, surveys2, rng2, drop_frac, gps_sigma)
+    agg2 = bm.aggregate(SimpleNamespace(grid=ds.grid, cols=truths2["loads"]), bg).reshape(-1, NP)
+    sel2 = agg2[:, P["T_F"]] > 25
+    for name in key:
+        a2 = bm.aggregate(reconstruct(syn2, apply_overrides(cfg, dict(variants)[name])), bg).reshape(-1, NP)
+        alt.append(_twin_score(name, "random-crest (dump position uninformative)", agg2, a2, sel2)[0])
+    alt.append(_global_mean_row("random-crest (dump position uninformative)", agg2, sel2))
+    alt_tab = pd.DataFrame(alt)
+    alt_tab.to_csv(out / "twin_alternative_truths.csv", index=False)
+
     import matplotlib.pyplot as plt
     cu_r, cu_tt, m = base_cu
     fig, ax = plt.subplots(figsize=(5.5, 5))
@@ -292,7 +348,7 @@ def twin_experiment(rec, ds, cfg, out: Path, seed=7, drop_frac=0.15, gps_sigma=3
     r = tab.iloc[1]
     ax.set_title(f"Synthetic twin: r = {r.cu_corr:.2f}, RMSE {r.cu_rmse:.2f} % Cu", loc="left")
     pl.save(fig, out / "fig_val_twin_scatter.png")
-    return {"table": tab}
+    return {"table": tab, "alternative": alt_tab}
 
 
 # --------------------------------------------------------- 5. robustness

@@ -1,0 +1,16 @@
+# Team details used when building the documents, the presentation and the
+# submission zip (tools/build_docs.py, tools/make_submission.py).
+# Replace the placeholders below; every "[Member n]" in the deliverables is
+# substituted at build time. Leave a placeholder unchanged to keep it visible.
+team_name: "TeamName"          # used in the zip name: MINE413_TermProject_<team_name>.zip
+members:
+  - name: "[Member 1]"
+    role: "Project lead and integrator"
+  - name: "[Member 2]"
+    role: "Data and QA/QC lead"
+  - name: "[Member 3]"
+    role: "Algorithm lead"
+  - name: "[Member 4]"
+    role: "Block model and validation lead"
+  - name: "[Member 5]"
+    role: "Platform and reproducibility lead"
