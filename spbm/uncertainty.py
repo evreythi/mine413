@@ -70,12 +70,16 @@ def monte_carlo(ds_loader, cfg, bg, base_df, out: Path, n=None, verbose=True) ->
         cu = np.where(T > 0, CU / T * 100, np.nan)
         au = np.where(T > 0, AU / T * 1000, np.nan)
     stats = {}
-    for name, arr in [("cu", cu), ("au", au), ("tonnes", T), ("t_fms", TF)]:
-        stats[name + "_mean"] = np.nanmean(arr, 0)
-        stats[name + "_p10"] = np.nanpercentile(arr, 10, axis=0)
-        stats[name + "_p50"] = np.nanpercentile(arr, 50, axis=0)
-        stats[name + "_p90"] = np.nanpercentile(arr, 90, axis=0)
-        stats[name + "_sd"] = np.nanstd(arr, 0)
+    import warnings
+    with warnings.catch_warnings():
+        # blocks that are empty in every realisation give all-NaN slices -> NaN stats (intended)
+        warnings.simplefilter("ignore", RuntimeWarning)
+        for name, arr in [("cu", cu), ("au", au), ("tonnes", T), ("t_fms", TF)]:
+            stats[name + "_mean"] = np.nanmean(arr, 0)
+            stats[name + "_p10"] = np.nanpercentile(arr, 10, axis=0)
+            stats[name + "_p50"] = np.nanpercentile(arr, 50, axis=0)
+            stats[name + "_p90"] = np.nanpercentile(arr, 90, axis=0)
+            stats[name + "_sd"] = np.nanstd(arr, 0)
     # global distributions
     tot = pd.DataFrame({"total_tonnes": T.sum((1, 2, 3)), "cu_t": CU.sum((1, 2, 3)), "au_kg": AU.sum((1, 2, 3)),
                         "fms_tonnes": TF.sum((1, 2, 3))})
