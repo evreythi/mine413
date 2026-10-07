@@ -28,6 +28,8 @@ python -m spbm run           # full analysis incl. Monte Carlo, validation, sens
 python tools/build_docs.py   # rebuild DOCX/PDF/XLSX/PPTX documents
 ```
 
+Document rebuilding additionally needs `pandoc`, Node.js (`cd tools && npm install` for pptxgenjs) and Playwright/Chromium for PDF rendering. The analysis itself needs only Python.
+
 New data: drop files into `data/inbox/` and run `python -m spbm update` (see D5).
 
 ## Repository layout
@@ -45,6 +47,25 @@ outputs/                            results of the submitted run (all reproducib
 docs/                               deliverables (Markdown sources) and docs/build/ (DOCX, PDF, XLSX, PPTX)
 ```
 
-## Key results (base case; see D6)
+## Key results (base case, run `20261007T075413`)
 
-See `outputs/summary.json` and `outputs/report_tables.md`. Every number in the report is traced to the run manifest `outputs/audit/run_manifest.json`.
+| Material class | Tonnes | Share | Cu % | Au g/t | Grade basis |
+|---|---|---|---|---|---|
+| FMS-tracked (survey-reconciled + provisional) | 44,650 | 22% | 8.42 | 8.00 | measured inputs |
+| Unattributed (surveyed volume, no FMS record) | 41,758 | 21% | 8.62 | 8.00 | imputed |
+| Legacy (pre-record pile) | 115,699 | 57% | 8.42 | 8.00 | assumed |
+| **Total** | **202,107** | | 8.46 | 8.00 | |
+
+* Monte Carlo P10/P50/P90: total 185 / 201 / 218 kt; contained Cu 15.4 / 17.0 / 19.0 kt.
+* FMS mass and metal balance: exact (relative error < 1e-9). Geometry RMSE vs survey: 0.026 m.
+* Synthetic known-truth test: block Cu RMSE 0.80% (r = 0.90) vs 1.18% for a period-average model.
+
+Every number is traced to `outputs/audit/run_manifest.json`; full tables in `outputs/report_tables.md`.
+
+## What the team still has to do before submission
+
+1. Put real names, roles and signatures into D1; keep the meeting log / contribution record (D1 §8) from what actually happens.
+2. Each member writes their own **D8** (reflection + confidential peer assessment) and **D9** (ethics/equity response) from the templates.
+3. Complete the verification log in **Appendix A** (AI/software disclosure) and confirm the course AI policy.
+4. Rehearse D7 (speaker notes assign each member's part).
+5. Re-run `python tools/build_docs.py` after any edit, then `python tools/make_submission.py --team <name>` to create the Canvas zip.

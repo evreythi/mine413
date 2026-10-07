@@ -245,10 +245,12 @@ const cols2 = [
 ];
 cols2.forEach((c, i) => {
   const x = 0.6 + i * 6.15;
-  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y: 1.5, w: 5.95, h: 5.2, fill: { color: H.lt2 }, line: { color: H.lt2 }, rectRadius: 0.08, objectName: `pp${i}_bg` });
-  s.addText(c[0], { x: x + 0.25, y: 1.65, w: 5.4, h: 0.6, fontSize: 20, bold: true, color: C.accent1, margin: 0, isTextBox: true, objectName: `pp${i}_h` });
-  bullets(s, c[1], x + 0.25, 2.35, 5.45, 4.2, 15, `pp${i}_b`);
+  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y: 1.5, w: 5.95, h: 4.3, fill: { color: H.lt2 }, line: { color: H.lt2 }, rectRadius: 0.08, objectName: `pp${i}_bg` });
+  s.addText(c[0], { x: x + 0.3, y: 1.7, w: 5.35, h: 0.6, fontSize: 22, bold: true, color: C.accent1, margin: 0, isTextBox: true, objectName: `pp${i}_h` });
+  bullets(s, c[1], x + 0.3, 2.45, 5.4, 3.2, 18, `pp${i}_b`);
 });
+s.addText("Scenario response: management asked for a definitive inventory. We provide it with ranges and information classes, and state what the data cannot yet support.",
+  { x: 0.6, y: 6.05, w: 12.1, h: 0.7, fontSize: 15, italic: true, color: C.text2, margin: 0, isTextBox: true, objectName: "pp_scenario" });
 s.addNotes("Presenter: Member 1 and Member 5. Response to the course scenario (Section 6.2): management asks for a definitive inventory. Our position: provide it with ranges and classes, and state clearly what we cannot yet support.");
 
 s = content("Limitations and recommendations", "Platform and practice");

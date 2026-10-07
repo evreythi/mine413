@@ -16,7 +16,7 @@ date: "November 2026 - model run {{RUN_ID}}"
 * Dump elevations are unreliable, and 14 records carry a default (stuck) position.
 * Two survey files carry the wrong year.
 * No survey exists for 03-17 or 03-23 to 03-26.
-* The FMS is silent for long periods (03-16 12:27 to 03-18 20:47, and 03-22 18:28 to 03-28 03:54) while the surveys show material being placed.
+* The FMS is silent for long periods (03-16 12:27 to 03-18 20:47, and 03-22 18:28 to 03-28 03:54, apart from one load on 03-25) while the surveys show material being placed.
 
 **Method.** We developed **CPST (Constrained Push-and-Settle Transport)**. For each survey period, the observed fill defines where material went. The FMS loads (plus material carried over on the platform, and dozer cuts) are the sources. A slope-aware dozer push cost and entropy-regularised optimal transport decide which source filled which part of the observed fill. The mixing length is ε = 6 m. Two dummy nodes make data mismatches explicit: fill without an FMS source becomes **unattributed** material with an imputed grade, and FMS volume not seen on the face is **retained** and carried to the next period. All operations act on extensive quantities (tonnes, metal), so **mass and metal are conserved exactly**. A separate forward physics model (dozer push to the crest + avalanche at the 37° angle of repose measured from the surveys) is used for prediction, nowcasting and known-truth testing.
 
@@ -252,7 +252,7 @@ Sixty Monte Carlo realisations jointly sampled the following (D3, Section 7):
 **Interpretation.**
 
 * **Total tonnage.** In the Monte Carlo the range is dominated by the density/swell basis (κ). In the tornado, κ = 0.9/1.1 moves the total by about ±20 kt (182-222 kt). The A-13b switch (toe fill treated as unattributed or as legacy) moves about 14.5 kt between those two classes, with little change in total. Grid resolution changes the total by about 1%. The movement parameters (ε, α, L_max), survey precision and survey time change it by less than 0.7%.
-* **Spatial grade field.** The grade field of the FMS-tracked material (mean absolute block Cu change) is most sensitive to the survey-time assumption (0.28% Cu when surveys are assumed at 21:00) and the A-13b switch (0.25% Cu). Next come the mixing length (ε = 2 m: 0.12%), the maximum push (50 m: 0.12%) and grid resolution (≤ 0.12%). Raising the maximum push to 130 m changes nothing, because no reconstructed push reaches 90 m. Monte Carlo block Cu CV for FMS-tracked blocks is typically 7-9% (maximum about 19%).
+* **Spatial grade field.** The grade field of the FMS-tracked material (mean absolute block Cu change) is most sensitive to the survey-time assumption (0.28% Cu when surveys are assumed at 21:00) and the A-13b switch (0.25% Cu). Next come the mixing length (ε = 2 m: 0.12%), the maximum push (50 m: 0.12%) and grid resolution (≤ 0.12%). Raising the maximum push to 130 m changes nothing, because no reconstructed push reaches 90 m. Monte Carlo block Cu CV for FMS-tracked blocks is typically 7-9% (maximum about 22%).
 * **What the Monte Carlo cannot quantify.** The legacy grade is an assumption, not a measurement. For blocks with less than 50% FMS-tracked material we therefore report a *prior* range: the load-scale P10-P90 of all FMS loads, {{PRIOR_CU}} % Cu. We do not report Monte Carlo precision for these blocks, because it would be false.
 
 Information types in the results: measured (survey solids, FMS inputs), inferred (survey timing, floor, pre-record surface, toe fill), assumed (legacy grade and density, κ, unattributed grade) and model-generated (load destinations, block grades, ranges). These are distinguished field by field in the block model (D4, Section 1.1).
@@ -275,7 +275,7 @@ Eight automated tests (including end-to-end conservation) guard every change. Th
 
 # Results and Discussion
 
-1. **Where the dumped material is.** FMS-tracked material forms a skin on the south and west faces and the upper benches. Its column thickness is typically 1.6-5.3 m (interquartile range; up to 10 m where the face advanced most), laid in daily layers that dip with the face (see the block model sections). The median reconstructed push is about 20 m per load (P90 about 54 m), and a typical load is spread over a 10-15 m patch of face (median spread 12 m). This reflects dozer spreading and rolling on the face.
+1. **Where the dumped material is.** FMS-tracked material forms a skin on the south and west faces and the upper benches. Its column thickness is typically 1.6-5.4 m (interquartile range; up to 8 m where the face advanced most), laid in daily layers that dip with the face (see the block model sections). The median reconstructed push is about 22 m per load (P90 about 54 m), and a typical load is spread over a 10-15 m patch of face (median spread 13 m). This reflects dozer spreading and rolling on the face.
 2. **Grade pattern.** Daily mean grade varies strongly (5.8-12.2% Cu and 5.8-10.1 g/t Au by day), so the tracked material is banded parallel to the face:
    * 03-16 material (about 10.1% Cu) lies furthest inside, under the north-central crest;
    * low-Cu material from 03-19 and 03-20 (5.8-6.4%) forms the middle band;

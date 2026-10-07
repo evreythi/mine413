@@ -2,7 +2,7 @@
 title: "Long-Term Stockpile Reconstruction and Block Modelling - Pit I HG Stockpile"
 subtitle: "D6 Final Engineering Report to Mine Management | MIN E 413 Surface Mining Methods and Operations Management, Fall 2026"
 author: "Long-Term Mine Planning Team: [Member 1], [Member 2], [Member 3], [Member 4], [Member 5]"
-date: "November 2026 - model run 20261007T073628"
+date: "November 2026 - model run 20261007T075413"
 ---
 
 # Executive Summary
@@ -13,10 +13,10 @@ date: "November 2026 - model run 20261007T073628"
 
 * Payloads are bucket-pass estimates; every value is a multiple of 38 t.
 * Grades are 21 source-block signatures, not load assays.
-* Dump elevations are unreliable.
+* Dump elevations are unreliable, and 14 records carry a default (stuck) position.
 * Two survey files carry the wrong year.
 * No survey exists for 03-17 or 03-23 to 03-26.
-* The FMS is silent for long periods (03-16 12:27 to 03-18 20:47, and 03-22 18:28 to 03-28 03:54) while the surveys show material being placed.
+* The FMS is silent for long periods (03-16 12:27 to 03-18 20:47, and 03-22 18:28 to 03-28 03:54, apart from one load on 03-25) while the surveys show material being placed.
 
 **Method.** We developed **CPST (Constrained Push-and-Settle Transport)**. For each survey period, the observed fill defines where material went. The FMS loads (plus material carried over on the platform, and dozer cuts) are the sources. A slope-aware dozer push cost and entropy-regularised optimal transport decide which source filled which part of the observed fill. The mixing length is ε = 6 m. Two dummy nodes make data mismatches explicit: fill without an FMS source becomes **unattributed** material with an imputed grade, and FMS volume not seen on the face is **retained** and carried to the next period. All operations act on extensive quantities (tonnes, metal), so **mass and metal are conserved exactly**. A separate forward physics model (dozer push to the crest + avalanche at the 37° angle of repose measured from the surveys) is used for prediction, nowcasting and known-truth testing.
 
@@ -29,12 +29,12 @@ date: "November 2026 - model run 20261007T073628"
 | Legacy (pre-record pile) | 115,699 | 57.2% | 8.42 | 8.00 | **Assumed** |
 | **Total modelled** | **202,107** | 100% | 8.46 | 8.00 | |
 
-* Monte Carlo (60 realisations) P10/P50/P90: total tonnes 186 / 204 / 217 kt; contained Cu 15.5 / 17.3 / 18.4 kt; contained Au 47.2 / 50.8 / 57.0 koz. The FMS-tracked class: Cu grade P10-P90 7.88 - 8.98 %.
+* Monte Carlo (60 realisations) P10/P50/P90: total tonnes 185 / 201 / 218 kt; contained Cu 15.4 / 17.0 / 19.0 kt; contained Au 46.9 / 51.7 / 56.9 koz. The FMS-tracked class: Cu grade P10-P90 8.05 - 8.88 %.
 * Validation:
   * FMS tonnes, Cu, Au and Ag balance to floating-point precision.
   * The reconstructed surface matches the latest surveys (RMSE 0.03 m; 100.0% of cells within the 0.14 m detection limit).
-  * On held-out periods the forward model's earth-mover error is 18.4 m, vs 20.2 m without dozer push.
-  * In a synthetic twin with known truth, CPST recovers block Cu with RMSE 0.72% (r = 0.92), vs 1.07% for a period-average model and 1.82% for a single mean grade.
+  * On held-out periods the forward model's earth-mover error is 18.6 m, vs 20.4 m without dozer push.
+  * In a synthetic twin with known truth, CPST recovers block Cu with RMSE 0.80% (r = 0.90), vs 1.18% for a period-average model and 1.83% for a single mean grade.
 
 **Key conclusions.**
 
@@ -68,7 +68,7 @@ Coordinates are a projected mine grid in metres (E ≈ 511,300, N ≈ 7,122,300,
 
 # Data Analysis and QA/QC
 
-The full QA/QC is in D2 Section 2 and `outputs/qaqc/`. No record was deleted. Thirteen flags were applied, each with a documented treatment (Table 4.1).
+The full QA/QC is in D2 Section 2 and `outputs/qaqc/`. No record was deleted. Fourteen flags were applied, each with a documented treatment (Table 4.1).
 
 *Table 4.1 - FMS flags (records retained; treatment as stated)*
 
@@ -87,6 +87,7 @@ The full QA/QC is in D2 Section 2 and `outputs/qaqc/`. No record was deleted. Th
 | F11_z_residual | |Dump Z - surface| > 3 m where surface known | 29 | Retained; Z not used by algorithm (XY only) |
 | F12_after_last_survey | Dump after the last survey | 1 | Placed provisionally (unreconciled) - updated when next survey arrives |
 | F13_survey_gap_period | Dump inside a period with a missing survey | 18 | Retained; period flagged in reconciliation |
+| F14_repeated_location | Identical X/Y/Z shared by >= 3 records (default / stuck FMS position) | 14 | Retained; X/Y imputed as tonnage-weighted centroid of the period's other dumps, GPS error x5 in Monte Carlo |
 
 
 **Principal findings and their influence on the model.**
@@ -97,6 +98,7 @@ The full QA/QC is in D2 Section 2 and `outputs/qaqc/`. No record was deleted. Th
 * **Elevation decreases hidden in solids (QA-S05)** and **toe-clipped solids (QA-S06)**. These are handled as dozer cuts and as unobserved toe fill respectively.
 * **Payload and grade (QA-F02, F03).** Payloads are estimated, not weighed, and grades are source-block values. Both enter the uncertainty analysis as correlated errors.
 * **Dump Z (QA-F06).** Z minus the surveyed surface at dump time has P10/P90 of −2.8/+2.0 m, so only X/Y is used.
+* **Default FMS position (QA-F11).** Fourteen records (2,356 t) share one identical position, below the floor and in front of the toe. This is a default or stuck position, not a dump location, so their X/Y is imputed from the other dumps of the same period (A-32). The originals are retained.
 * **Completeness (QA-F07).** FMS and survey coverage are uneven in time (daily coverage figure below).
 
 ![Dump locations (orange, by day) and survey change-solid footprints (blue, light = early).](../outputs/qaqc/fig_qaqc_dump_map.png)
@@ -198,10 +200,10 @@ The complete register (31 assumptions with need, justification, consequence and 
 
 | confidence | blocks | tonnes | cu_pct | au_gpt | cu_t | au_koz |
 |---|---|---|---|---|---|---|
-| High | 148 | 7,410 | 8.85 | 8.35 | 656 | 2.0 |
-| Medium | 500 | 35,462 | 8.25 | 7.89 | 2,924 | 9.0 |
-| Low | 428 | 35,351 | 8.39 | 7.93 | 2,965 | 9.0 |
-| Uninformed | 1,619 | 123,884 | 8.52 | 8.03 | 10,556 | 32.0 |
+| High | 172 | 8,971 | 8.62 | 8.18 | 773 | 2.4 |
+| Medium | 478 | 34,468 | 8.29 | 7.90 | 2,857 | 8.8 |
+| Low | 412 | 33,534 | 8.40 | 7.95 | 2,818 | 8.6 |
+| Uninformed | 1,633 | 125,134 | 8.51 | 8.03 | 10,654 | 32.3 |
 
 
 ![Block model Cu grade by 2 m bench.](../outputs/blockmodel/fig_bm_plans_cu_pct.png)
@@ -217,10 +219,10 @@ The complete register (31 assumptions with need, justification, consequence and 
 | bench | blocks | tonnes | cu_pct | au_gpt | cu_t | au_koz |
 |---|---|---|---|---|---|---|
 | 4490-4494 | 18 | 51 | 9.22 | 9.59 | 5 | 0.0 |
-| 4486-4490 | 459 | 20,958 | 8.74 | 8.10 | 1,832 | 5.5 |
-| 4482-4486 | 671 | 59,208 | 8.45 | 8.00 | 5,006 | 15.2 |
-| 4478-4482 | 755 | 68,506 | 8.46 | 7.99 | 5,797 | 17.6 |
-| 4474-4478 | 792 | 53,385 | 8.36 | 7.97 | 4,462 | 13.7 |
+| 4486-4490 | 459 | 20,958 | 8.76 | 8.10 | 1,836 | 5.5 |
+| 4482-4486 | 671 | 59,209 | 8.46 | 8.00 | 5,011 | 15.2 |
+| 4478-4482 | 755 | 68,506 | 8.46 | 7.99 | 5,794 | 17.6 |
+| 4474-4478 | 792 | 53,383 | 8.35 | 7.97 | 4,455 | 13.7 |
 
 
 # Validation and Reconciliation
@@ -231,10 +233,10 @@ The complete register (31 assumptions with need, justification, consequence and 
 
 | quantity | unit | FMS input | block model | difference |
 |---|---|---|---|---|
-| FMS tonnes | t | 44,650.000 | 44,650.000 | 7.3e-12 |
-| FMS Cu | t Cu | 3,760.423 | 3,760.423 | 9.1e-13 |
-| FMS Au | kg Au | 357.124 | 357.124 | -3.4e-13 |
-| FMS Ag | kg Ag | 8,824.138 | 8,824.138 | -4.0e-11 |
+| FMS tonnes | t | 44,650.000 | 44,650.000 | -2.9e-11 |
+| FMS Cu | t Cu | 3,760.423 | 3,760.423 | -2.7e-12 |
+| FMS Au | kg Au | 357.124 | 357.124 | -1.5e-12 |
+| FMS Ag | kg Ag | 8,824.138 | 8,824.138 | -5.5e-12 |
 
 
 FMS tonnes, Cu, Au and Ag entering the stockpile equal the block model inventory to floating-point precision. Volume reconciliation for the whole record:
@@ -245,14 +247,14 @@ FMS tonnes, Cu, Au and Ag entering the stockpile equal the block model inventory
 |---|---|
 | survey change-solid volume (m3) | 35,095.6 |
 | observed fill used by model (m3) | 42,352.8 |
-|   of which unobserved fill on first-surveyed cells (m3) | 7,231.59 |
+|   of which unobserved fill on first-surveyed cells (m3) | 7,231.56 |
 | cut / re-handled volume (m3) | 566.95 |
-| sub-threshold change not modelled (m3) | 96.2075 |
+| sub-threshold change not modelled (m3) | 96.2073 |
 | FMS volume (tonnes / density) (m3) | 21,640.5 |
 | FMS volume placed into observed fill (m3) | 22,092.2 |
-| unattributed fill volume (m3) | 20,261.1 |
+| unattributed fill volume (m3) | 20,261 |
 | FMS volume never reconciled (provisional) (m3) | 115.268 |
-| max Sinkhorn column residual (relative) | 7.82641e-07 |
+| max Sinkhorn column residual (relative) | 7.06308e-07 |
 
 
 ## Geometry
@@ -269,12 +271,12 @@ The forward physics model was calibrated (repose angle, deposit radius, release 
 
 | set | mode | W1 (m) | capture | centroid error (m) |
 |---|---|---|---|---|
-| calibration | no-push baseline | 21.0 | 0.28 | 17.2 |
-| calibration | push (calibrated) | 18.2 | 0.35 | 16.9 |
-| calibration | push (default) | 18.8 | 0.40 | 17.5 |
-| test (unseen) | no-push baseline | 20.2 | 0.34 | 16.0 |
-| test (unseen) | push (calibrated) | 18.4 | 0.39 | 14.1 |
-| test (unseen) | push (default) | 18.3 | 0.43 | 14.1 |
+| calibration | no-push baseline | 21.8 | 0.29 | 20.3 |
+| calibration | push (calibrated) | 19.0 | 0.34 | 17.8 |
+| calibration | push (default) | 20.0 | 0.37 | 18.8 |
+| test (unseen) | no-push baseline | 20.4 | 0.34 | 16.1 |
+| test (unseen) | push (calibrated) | 18.6 | 0.39 | 14.4 |
+| test (unseen) | push (default) | 18.6 | 0.43 | 14.3 |
 
 
 The dozer-push model improves on the no-push baseline in the unseen periods: lower earth-mover (W1) distance and centroid error, and higher capture. The absolute errors (about 14-18 m) are large compared with the block size. **Physics alone cannot say where on a 100 m face a day's fill will land; the surveys must constrain it.** This justifies the survey-constrained design of CPST, and the forward model is used only where no survey exists (nowcast of the 03-31 load).
@@ -289,15 +291,15 @@ A known-truth stockpile was generated from the real dump sequence with the forwa
 
 | method | blocks | cu_rmse | cu_mae | cu_corr | au_rmse | au_corr | tonnes_corr |
 |---|---|---|---|---|---|---|---|
-| CPST eps=2 m | 584 | 0.78 | 0.52 | 0.90 | 0.42 | 0.90 | 0.85 |
-| CPST eps=6 m (base) | 584 | 0.72 | 0.50 | 0.92 | 0.39 | 0.92 | 0.85 |
-| CPST eps=15 m | 584 | 0.73 | 0.52 | 0.92 | 0.40 | 0.92 | 0.85 |
-| CPST eps=6, no uphill penalty | 584 | 0.71 | 0.50 | 0.92 | 0.38 | 0.92 | 0.85 |
-| Baseline: period-average (eps=1e4) | 584 | 1.07 | 0.79 | 0.82 | 0.63 | 0.81 | 0.82 |
-| Reference: global mean grade | 584 | 1.82 | 1.48 |  |  |  |  |
+| CPST eps=2 m | 589 | 0.83 | 0.55 | 0.89 | 0.40 | 0.91 | 0.83 |
+| CPST eps=6 m (base) | 589 | 0.80 | 0.56 | 0.90 | 0.39 | 0.93 | 0.83 |
+| CPST eps=15 m | 589 | 0.83 | 0.60 | 0.89 | 0.42 | 0.91 | 0.83 |
+| CPST eps=6, no uphill penalty | 589 | 0.80 | 0.56 | 0.90 | 0.39 | 0.93 | 0.83 |
+| Baseline: period-average (eps=1e4) | 589 | 1.18 | 0.89 | 0.78 | 0.63 | 0.82 | 0.81 |
+| Reference: global mean grade | 589 | 1.83 | 1.51 |  |  |  |  |
 
 
-CPST recovers block Cu grade with RMSE 0.72% Cu (r = 0.92). This is a 33% lower error than allocating each period's loads uniformly over its fill, and far better than a single mean grade. The intermediate mixing length (ε = 6 m) performs best among those tested. The uphill penalty has little effect in this geometry.
+CPST recovers block Cu grade with RMSE 0.80% Cu (r = 0.90). This is a 32% lower error than allocating each period's loads uniformly over its fill, and far better than a single mean grade. The intermediate mixing length (ε = 6 m) performs best among those tested. The uphill penalty has little effect in this geometry.
 
 ![Twin experiment: true vs reconstructed block Cu.](../outputs/validation/fig_val_twin_scatter.png)
 
@@ -307,13 +309,13 @@ CPST recovers block Cu grade with RMSE 0.72% Cu (r = 0.92). This is a 33% lower 
 
 | variant | total_tonnes | fms_tonnes | unattributed_tonnes | legacy_tonnes | tracked_blocks_cu_pct | top_bench_cu_pct | mean_abs_block_cu_change |
 |---|---|---|---|---|---|---|---|
-| base (1 m cell, tol 1e-6) | 202,107 | 44,650 | 41,758 | 115,699 | 8.35 | 8.57 | 0.00 |
-| cell 0.5 m | 199,538 | 44,650 | 38,430 | 116,459 | 8.33 | 8.58 | 0.07 |
-| cell 2.5 m | 201,035 | 44,650 | 47,009 | 109,376 | 8.37 | 8.58 | 0.12 |
-| Sinkhorn tol 1e-4 | 202,107 | 44,650 | 41,758 | 115,699 | 8.35 | 8.57 | 0.00 |
-| Sinkhorn tol 1e-8 | 202,107 | 44,650 | 41,758 | 115,699 | 8.35 | 8.57 | 0.00 |
-| LoD k=1 (tau 0.07 m) | 202,181 | 44,650 | 41,765 | 115,767 | 8.35 | 8.57 | 0.01 |
-| LoD k=4 (tau 0.28 m) | 201,883 | 44,650 | 41,423 | 115,810 | 8.35 | 8.57 | 0.02 |
+| base (1 m cell, tol 1e-6) | 202,107 | 44,650 | 41,758 | 115,699 | 8.36 | 8.59 | 0.00 |
+| cell 0.5 m | 199,538 | 44,650 | 38,430 | 116,459 | 8.33 | 8.59 | 0.07 |
+| cell 2.5 m | 201,035 | 44,650 | 47,009 | 109,376 | 8.36 | 8.60 | 0.12 |
+| Sinkhorn tol 1e-4 | 202,107 | 44,650 | 41,758 | 115,699 | 8.36 | 8.59 | 0.00 |
+| Sinkhorn tol 1e-8 | 202,107 | 44,650 | 41,758 | 115,699 | 8.36 | 8.59 | 0.00 |
+| LoD k=1 (tau 0.07 m) | 202,181 | 44,650 | 41,764 | 115,767 | 8.36 | 8.59 | 0.01 |
+| LoD k=4 (tau 0.28 m) | 201,883 | 44,650 | 41,423 | 115,810 | 8.35 | 8.59 | 0.02 |
 
 
 Key results (class tonnages, tracked-block grade, top-bench grade) are stable under changes of grid resolution, solver tolerance and detection limit. They are not artefacts of a single numerical setting.
@@ -325,8 +327,8 @@ Key results (class tonnages, tracked-block grade, top-bench grade) are stable un
 | FMS mass / metal balance error | < 10⁻⁹ relative |
 | Geometry RMSE vs survey | 0.03 m |
 | Sinkhorn max column residual | ≤ 8×10⁻⁷ |
-| Forward model W1 (test periods) | 18.4 m (no-push 20.2 m) |
-| Twin block Cu RMSE / r | 0.72% / 0.92 |
+| Forward model W1 (test periods) | 18.6 m (no-push 20.4 m) |
+| Twin block Cu RMSE / r | 0.80% / 0.90 |
 
 # Uncertainty and Sensitivity Analysis
 
@@ -345,16 +347,16 @@ Sixty Monte Carlo realisations jointly sampled the following (D3, Section 7):
 
 | quantity | P10 | P50 | P90 | cv |
 |---|---|---|---|---|
-| total_tonnes | 186,346.38 | 204,278.89 | 216,739.30 | 0.058 |
-| cu_t | 15,530.54 | 17,283.04 | 18,429.81 | 0.073 |
-| au_kg | 1,467.19 | 1,579.98 | 1,771.68 | 0.073 |
-| cu_pct | 7.94 | 8.50 | 9.02 | 0.048 |
-| au_gpt | 7.40 | 7.91 | 8.30 | 0.049 |
-| fms_tonnes | 43,161.89 | 44,533.65 | 46,113.30 | 0.027 |
-| class_fms_cu_pct | 7.88 | 8.48 | 8.98 | 0.048 |
-| class_fms_au_gpt | 7.40 | 7.92 | 8.32 | 0.049 |
-| class_t_u | 35,577.93 | 42,715.58 | 48,492.20 | 0.115 |
-| class_t_l | 106,684.47 | 117,204.40 | 124,731.04 | 0.059 |
+| total_tonnes | 184,798.60 | 201,201.16 | 218,064.47 | 0.062 |
+| cu_t | 15,390.04 | 16,983.56 | 19,021.86 | 0.083 |
+| au_kg | 1,459.52 | 1,607.90 | 1,768.71 | 0.076 |
+| cu_pct | 8.09 | 8.52 | 8.94 | 0.042 |
+| au_gpt | 7.56 | 7.96 | 8.55 | 0.047 |
+| fms_tonnes | 43,147.57 | 44,784.94 | 46,217.64 | 0.029 |
+| class_fms_cu_pct | 8.05 | 8.49 | 8.88 | 0.042 |
+| class_fms_au_gpt | 7.58 | 7.99 | 8.56 | 0.047 |
+| class_t_u | 34,123.54 | 41,710.66 | 47,830.82 | 0.130 |
+| class_t_l | 105,774.89 | 115,492.81 | 124,970.66 | 0.063 |
 
 
 ![Monte Carlo distributions of total tonnes and contained metal.](../outputs/uncertainty/fig_unc_global_histograms.png)
@@ -366,7 +368,7 @@ Sixty Monte Carlo realisations jointly sampled the following (D3, Section 7):
 **Interpretation.**
 
 * **Total tonnage.** In the Monte Carlo the range is dominated by the density/swell basis (κ). In the tornado, κ = 0.9/1.1 moves the total by about ±20 kt (182-222 kt). The A-13b switch (toe fill treated as unattributed or as legacy) moves about 14.5 kt between those two classes, with little change in total. Grid resolution changes the total by about 1%. The movement parameters (ε, α, L_max), survey precision and survey time change it by less than 0.7%.
-* **Spatial grade field.** The grade field of the FMS-tracked material (mean absolute block Cu change) is most sensitive to the survey-time assumption (0.28% Cu when surveys are assumed at 21:00) and the A-13b switch (0.25% Cu). Next come the mixing length (ε = 2 m: 0.12%), the maximum push (50 m: 0.12%) and grid resolution (≤ 0.12%). Raising the maximum push to 130 m changes nothing, because no reconstructed push reaches 90 m. Monte Carlo block Cu CV for FMS-tracked blocks is typically 7-9% (maximum about 19%).
+* **Spatial grade field.** The grade field of the FMS-tracked material (mean absolute block Cu change) is most sensitive to the survey-time assumption (0.28% Cu when surveys are assumed at 21:00) and the A-13b switch (0.25% Cu). Next come the mixing length (ε = 2 m: 0.12%), the maximum push (50 m: 0.12%) and grid resolution (≤ 0.12%). Raising the maximum push to 130 m changes nothing, because no reconstructed push reaches 90 m. Monte Carlo block Cu CV for FMS-tracked blocks is typically 7-9% (maximum about 22%).
 * **What the Monte Carlo cannot quantify.** The legacy grade is an assumption, not a measurement. For blocks with less than 50% FMS-tracked material we therefore report a *prior* range: the load-scale P10-P90 of all FMS loads, 5.8-12.1 % Cu. We do not report Monte Carlo precision for these blocks, because it would be false.
 
 Information types in the results: measured (survey solids, FMS inputs), inferred (survey timing, floor, pre-record surface, toe fill), assumed (legacy grade and density, κ, unattributed grade) and model-generated (load destinations, block grades, ranges). These are distinguished field by field in the block model (D4, Section 1.1).
@@ -389,7 +391,7 @@ Eight automated tests (including end-to-end conservation) guard every change. Th
 
 # Results and Discussion
 
-1. **Where the dumped material is.** FMS-tracked material forms a skin on the south and west faces and the upper benches. Its column thickness is typically 1.6-5.3 m (interquartile range; up to 10 m where the face advanced most), laid in daily layers that dip with the face (see the block model sections). The median reconstructed push is about 20 m per load (P90 about 54 m), and a typical load is spread over a 10-15 m patch of face (median spread 12 m). This reflects dozer spreading and rolling on the face.
+1. **Where the dumped material is.** FMS-tracked material forms a skin on the south and west faces and the upper benches. Its column thickness is typically 1.6-5.4 m (interquartile range; up to 8 m where the face advanced most), laid in daily layers that dip with the face (see the block model sections). The median reconstructed push is about 22 m per load (P90 about 54 m), and a typical load is spread over a 10-15 m patch of face (median spread 13 m). This reflects dozer spreading and rolling on the face.
 2. **Grade pattern.** Daily mean grade varies strongly (5.8-12.2% Cu and 5.8-10.1 g/t Au by day), so the tracked material is banded parallel to the face:
    * 03-16 material (about 10.1% Cu) lies furthest inside, under the north-central crest;
    * low-Cu material from 03-19 and 03-20 (5.8-6.4%) forms the middle band;

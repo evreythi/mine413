@@ -93,7 +93,11 @@ python -m spbm qaqc      # data checks only, prints the flag summary
 python -m spbm status    # registered input files and run log
 python tools/make_diagrams.py   # redraw workflow/algorithm diagrams
 python tools/build_docs.py      # rebuild DOCX/PDF documents and the presentation
+python tools/fill_report.py     # refresh D4/D6 numbers from the latest run (templates in tools/templates)
+python tools/make_submission.py --team <name>   # Canvas zip in dist/
 ```
+
+Document tooling (optional; not needed for the analysis): pandoc, Node.js with `npm install` in `tools/` (pptxgenjs), and Playwright's Chromium for PDF rendering.
 
 # 5. Output reference
 

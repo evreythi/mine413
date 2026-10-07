@@ -61,7 +61,15 @@ def build() -> Path:
         "out": str(ROOT / "docs" / "build" / "D7_Presentation.pptx"),
     }
     jp = ROOT / "tools" / "_deck_data.json"
-    jp.write_text(json.dumps(data, indent=1, default=float))
+    def clean(o):
+        if isinstance(o, dict):
+            return {k_: clean(v_) for k_, v_ in o.items()}
+        if isinstance(o, list):
+            return [clean(v_) for v_ in o]
+        if isinstance(o, float) and o != o:
+            return None
+        return o
+    jp.write_text(json.dumps(clean(data), indent=1, default=float))
     subprocess.run(["node", str(ROOT / "tools" / "deck.js"), str(jp)], check=True, cwd=ROOT / "tools")
     jp.unlink()
     return Path(data["out"])
