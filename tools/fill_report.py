@@ -204,7 +204,8 @@ def values() -> dict:
     flags = pd.read_csv(OUT / "qaqc" / "fms_flag_summary.csv")
     v["TABLE_FLAGS"] = md(flags, "FMS record rules (records retained; treatment as stated)", {"records": "{:,.0f}", "tonnes": "{:,.0f}"})
     p = pd.read_csv(OUT / "growth" / "period_reconciliation.csv", parse_dates=["end"])
-    pt = pd.DataFrame({"period end": p["end"].dt.strftime("%m-%d"), "gap": np.where(p["gap_detected"], "yes", ""),
+    dmap = dict(zip(vt["survey"], vt["survey_date"].str[5:]))
+    pt = pd.DataFrame({"survey (D)": p["survey"].map(dmap), "gap": np.where(p["gap_detected"], "yes", ""),
                        "loads": p["n_loads"], "FMS t": p["fms_tonnes"], "FMS m³": p["fms_volume"] + p["carried_in_volume"],
                        "solid m³": p["solid_volume"], "fill m³": p["fill_volume"], "cut m³": p["cut_volume"],
                        "unattributed m³": p["unattributed_volume"], "retained m³": p["retained_volume"],

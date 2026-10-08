@@ -43,7 +43,7 @@ date: "November 2026 - platform version 2.0, model run {{RUN_ID}}"
 
   They **do not** cover the interpretation that the excess volume is **whole loads missing from the FMS** (scenario X2). The data cannot exclude it. Under X2, record-period tonnes would be **{{X2_RP}} t (+{{X2_UPLIFT}})**. *Not included in those ranges.* Confirming whether the FMS density is a bank or a loose density, and running a pile density test, would settle this (R-02).
 
-**Second: the pre-record core.** Below the earliest surveyed surfaces lies material placed before the record. Its geometry is inferred (floor plane, platform behind the crest) and its grade is assumed equal to the FMS mean. In the base case it holds {{T_L}} t. With it, the whole modelled pile is {{T_T}} t (Monte Carlo P10/P50/P90 {{MC_T}} kt). **{{S_L}} of the whole-pile tonnes have no measured grade basis**, so the whole-pile number must not be quoted without that qualification.
+**Second: the pre-record core.** Below the earliest surveyed surfaces lies material placed before the record. Its geometry is inferred (floor plane, platform behind the crest) and its grade is assumed equal to the FMS mean. In the base case it holds {{T_L}} t. With it, the whole modelled pile is {{T_T}} t (Monte Carlo P10/P50/P90 {{MC_T}} kt). **{{S_L}} of the whole-pile tonnes are this core, with an assumed grade**, so the whole-pile number must not be quoted without that qualification.
 
 **Validation.**
 
@@ -272,7 +272,7 @@ CPST recovers block Cu grade with RMSE {{TW_CPST}}% Cu (r = {{TW_R}}). That is a
 
 {{TABLE_TWIN_ALT}}
 
-When the dump position is uninformative, CPST's error rises from {{TW_CPST}}% to {{TWA_RC_CPST}}% Cu. It still beats the period-average model ({{TWA_RC_PA}}%) and the global mean ({{TWA_RC_GM}}%). Most of CPST's skill therefore comes from the survey constraint, which says which interval's material is where and in which layer. Under period-uniform mixing, CPST does not impose spurious structure ({{TWA_PU_CPST}}% vs {{TWA_PU_PA}}%).
+When the dump position is uninformative, CPST's error is {{TWA_RC_CPST}}% Cu, practically the same as in the main twin ({{TW_CPST}}%). It still beats the period-average model ({{TWA_RC_PA}}%) and the global mean ({{TWA_RC_GM}}%). Most of CPST's skill therefore comes from the survey constraint, which says which interval's material is where and in which layer. Under period-uniform mixing, CPST does not impose spurious structure ({{TWA_PU_CPST}}% vs {{TWA_PU_PA}}%).
 
 ## Robustness to numerical settings
 

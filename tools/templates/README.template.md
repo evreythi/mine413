@@ -79,7 +79,7 @@ docs/                               deliverables (Markdown sources) and docs/bui
 * FMS mass and metal balance: exact (relative error < 1e-9). Geometry RMSE vs survey: {{GEO_RMSE}} m.
 * Synthetic known-truth test: block Cu RMSE {{TW_CPST}}% (r = {{TW_R}}), vs {{TW_PA}}% for a period-average model.
 
-**Pre-record core and whole pile.** The core below the earliest surveyed surfaces holds {{T_L}} t. Its geometry is inferred and its grade assumed. The whole modelled pile is {{T_T}} t (P10/P50/P90 {{MC_T}} kt). {{S_L}} of that has no measured grade basis.
+**Pre-record core and whole pile.** The core below the earliest surveyed surfaces holds {{T_L}} t. Its geometry is inferred and its grade assumed. The whole modelled pile is {{T_T}} t (P10/P50/P90 {{MC_T}} kt). {{S_L}} of that is the pre-record core, with an assumed grade.
 
 > **Grade units are as supplied and unconfirmed.** 8.4% Cu / 8.0 g/t Au is roughly an order of magnitude above typical Cu-Au feed. Confirm with Geology before using any contained-metal figure. Pre-record and unattributed grades equal or derive from the FMS mean by assumption (A-22, A-21).
 

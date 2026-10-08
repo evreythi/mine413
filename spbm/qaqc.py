@@ -339,7 +339,7 @@ def _figures(ds, cfg, f, daily, sq, base, allsl, out):
     fig, axs = plt.subplots(int(np.ceil(n / ncol)), ncol, figsize=(17, 3.6 * np.ceil(n / ncol)))
     for ax, s in zip(axs.flat, ds.surveys):
         im = pl.raster(ax, np.where(s.mask, s.thickness, np.nan), g, vmin=0, vmax=6)
-        pl.plan_axes(ax, g, f"{s.file}\n{s.datetime:%Y-%m-%d}", ticks=False)
+        pl.plan_axes(ax, g, f"{s.file}\nsurvey {s.label} (interval ends {s.datetime:%m-%d %H:%M})", ticks=False)
         ax.set_xticks([]); ax.set_yticks([])
     for ax in list(axs.flat)[n:]:
         ax.axis("off")

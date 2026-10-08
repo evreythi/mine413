@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import copy
 import itertools
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -189,7 +190,8 @@ def temporal_validation(rec, cfg, out: Path) -> dict:
         L = rec.loads[rec.loads.period == s]
         ax.scatter(L.x, L.y, s=6, color=pl.CAT[1])
         r = tab[(tab.period == s) & (tab["mode"] == "push (calibrated)")].iloc[0]
-        pl.plan_axes(ax, g, f"{rec.periods.loc[s, 'end']:%m-%d}  W1 {r.w1_m:.1f} m", ticks=False)
+        lab = re.search(r"(\d{2})(\d{2})(\d{2})", str(rec.periods.loc[s, "survey"]))
+        pl.plan_axes(ax, g, (f"survey {lab.group(2)}-{lab.group(3)}" if lab else f"interval {s}") + f"  W1 {r.w1_m:.1f} m", ticks=False)
         ax.set_xticks([]); ax.set_yticks([])
     axs[0][0].plot([], [], color=pl.CAT[1], label="predicted deposit (push + avalanche)")
     axs[0][0].plot([], [], color=pl.INK, ls=":", label="no-push baseline")
@@ -240,7 +242,7 @@ def _twin_truth(rec, ds, cfg, rng, push_jitter, crest_rule="nearest"):
         noise = rng.normal(0, 0.02, z.shape)
         top = np.where(mask, z + noise, np.nan)
         bot = np.where(mask, prev, np.nan)
-        surveys.append(Survey(s, f"SYN_{s:02d}", "synthetic", sv.datetime, top, bot, mask.astype(int) * 2, {}))
+        surveys.append(Survey(s, f"SYN_{s:02d}", "synthetic", sv.datetime, top, bot, mask.astype(int) * 2, {}, sv.nominal))
         prev = z.copy()
     return truths, surveys, loads
 

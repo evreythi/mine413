@@ -28,6 +28,12 @@ class Survey:
     bot: np.ndarray        # (ny,nx) lower surface of the change solid
     count: np.ndarray      # triangles through each cell centre
     meta: dict = field(default_factory=dict)
+    nominal: pd.Timestamp | None = None   # nominal survey date D (the interval closes at `datetime`)
+
+    @property
+    def label(self) -> str:
+        """Nominal survey date as MM-DD (for figures and tables)."""
+        return f"{(self.nominal if self.nominal is not None else self.datetime):%m-%d}"
 
     @property
     def mask(self) -> np.ndarray:
@@ -112,5 +118,6 @@ def load_dataset(cfg: dict, until: str | None = None, verbose=True) -> Dataset:
         m["closed_solid_frac"] = float((cnt[hit] == 2).mean()) if hit.any() else 0.0
         m["open_cells"] = int((cnt == 1).sum())
         m["fold_cells"] = int((cnt > 2).sum())
-        surveys.append(Survey(int(r["index"]), name, by_name[name].sha256, r["survey_datetime"], top, bot, cnt, m))
+        surveys.append(Survey(int(r["index"]), name, by_name[name].sha256, r["survey_datetime"], top, bot, cnt, m,
+                              pd.Timestamp(r["assigned_date"]).normalize()))
     return Dataset(g, fms, reg, surveys, files, interventions)
