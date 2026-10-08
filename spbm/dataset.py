@@ -15,6 +15,8 @@ from . import io as sio
 from .config import resolve
 from .grid import Grid, rasterize_triangles, triangle_stats
 
+TRI_CACHE_VERSION = 2   # bump when read_dxf_triangles / triangle_stats metadata changes
+
 
 @dataclass
 class Survey:
@@ -43,19 +45,21 @@ class Dataset:
     register: pd.DataFrame
     surveys: list[Survey]
     files: list
+    interventions: pd.DataFrame = field(default_factory=pd.DataFrame)
 
     def survey_times(self):
         return [s.datetime for s in self.surveys]
 
 
 def load_dataset(cfg: dict, until: str | None = None, verbose=True) -> Dataset:
-    files = sio.scan_sources(cfg)
+    interventions = sio.load_interventions(cfg)
+    files = sio.scan_sources(cfg, interventions)
     fms_files = [f for f in files if f.kind == "fms"]
     srv_files = [f for f in files if f.kind == "survey"]
     if not fms_files or not srv_files:
         raise RuntimeError("No FMS or survey files found in configured sources")
     fms = sio.read_fms(fms_files)
-    reg = sio.survey_register(srv_files, cfg)
+    reg = sio.survey_register(srv_files, cfg, interventions)
     if until is not None:
         cut = pd.Timestamp(until)
         reg = reg[reg["survey_datetime"] <= cut].reset_index(drop=True)
@@ -70,7 +74,7 @@ def load_dataset(cfg: dict, until: str | None = None, verbose=True) -> Dataset:
     tri, meta = {}, {}
     for name in reg["file"]:
         f = by_name[name]
-        cp = cache / f"tri_{f.sha256[:16]}.npz"
+        cp = cache / f"tri{TRI_CACHE_VERSION}_{f.sha256[:16]}.npz"
         if cp.exists():
             z = np.load(cp, allow_pickle=False)
             tri[name] = z["T"]
@@ -109,4 +113,4 @@ def load_dataset(cfg: dict, until: str | None = None, verbose=True) -> Dataset:
         m["open_cells"] = int((cnt == 1).sum())
         m["fold_cells"] = int((cnt > 2).sum())
         surveys.append(Survey(int(r["index"]), name, by_name[name].sha256, r["survey_datetime"], top, bot, cnt, m))
-    return Dataset(g, fms, reg, surveys, files)
+    return Dataset(g, fms, reg, surveys, files, interventions)

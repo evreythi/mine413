@@ -14,23 +14,16 @@ from scipy import ndimage
 from . import plots as pl
 from .surfaces import fit_base_plane, model_domain, slope_deg
 
-FLAG_RULES = {
-    "F01_duplicate_id": ("Duplicate Cycle ID", "Second occurrence excluded from modelling, kept in register"),
-    "F02_missing_field": ("Missing mandatory field", "Excluded from modelling (cannot be placed/graded), kept in register"),
-    "F03_bad_timestamp": ("Unparseable timestamp", "Excluded from modelling, kept in register"),
-    "F04_id_out_of_order": ("Cycle ID not in chronological order", "Information only - timestamp governs ordering"),
-    "F05_low_payload": ("Payload < 50% of median (part load)", "Retained; higher payload uncertainty in Monte Carlo"),
-    "F06_high_payload": ("Payload > 150% of median", "Retained; checked against truck class; higher uncertainty"),
-    "F07_grade_outlier": ("Grade outside Q1-3IQR..Q3+3IQR or <=0", "Retained (source-block grade); flagged"),
-    "F08_density_range": ("Density outside 1.5-3.0 t/m3", "Retained; flagged"),
-    "F09_far_from_face": ("Dump > 60 m from any surveyed change", "Retained; push distance check"),
-    "F10_below_floor": ("Dump Z below fitted stockpile floor - 0.5 m", "Retained; XY used, Z not used by algorithm"),
-    "F11_z_residual": ("abs(Dump Z - surface) > 3 m where surface known", "Retained; Z not used by algorithm (XY only)"),
-    "F12_after_last_survey": ("Dump after the last survey", "Placed provisionally (unreconciled) - updated when next survey arrives"),
-    "F13_survey_gap_period": ("Dump inside a period with a missing survey", "Retained; period flagged in reconciliation"),
-    "F14_repeated_location": ("Identical X/Y/Z shared by >= 3 records (default / stuck FMS position)",
-                              "Retained; X/Y imputed as tonnage-weighted centroid of the period's other dumps, GPS error x5 in Monte Carlo"),
-}
+from .rules import RULES, record_rules
+
+
+def _catalogue(counts: dict) -> pd.DataFrame:
+    rows = []
+    for rid, (level, sev, desc, treat) in RULES.items():
+        c = counts.get(rid, {})
+        rows.append({"rule_id": rid, "level": level, "severity": sev, "description": desc, "count": int(c.get("count", 0)),
+                     "tonnes": c.get("tonnes", np.nan), "items": c.get("items", ""), "treatment": treat})
+    return pd.DataFrame(rows)
 
 
 def run_qaqc(ds, cfg, out: Path, rec=None) -> dict:
@@ -42,69 +35,67 @@ def run_qaqc(ds, cfg, out: Path, rec=None) -> dict:
     times = [s.datetime for s in ds.surveys]
 
     # ----------------------------------------------------------- FMS checks
-    f["F01_duplicate_id"] = f["cycle_id"].duplicated(keep="first")
-    req = ["cycle_id", "payload_t", "au_gpt", "ag_gpt", "cu_pct", "density", "x", "y", "z", "timestamp_raw"]
-    f["F02_missing_field"] = f[req].isna().any(axis=1)
-    f["F03_bad_timestamp"] = f["timestamp"].isna()
-    order = f.sort_values("timestamp")
-    out_of_order = order["cycle_id"].values[1:] < np.maximum.accumulate(order["cycle_id"].values)[:-1]
-    f["F04_id_out_of_order"] = False
-    f.loc[order.index[1:][out_of_order], "F04_id_out_of_order"] = True
-    med = f["payload_t"].median()
-    f["F05_low_payload"] = f["payload_t"] < 0.5 * med
-    f["F06_high_payload"] = f["payload_t"] > 1.5 * med
-    go = np.zeros(len(f), bool)
-    for c in ["cu_pct", "au_gpt", "ag_gpt"]:
-        q1, q3 = f[c].quantile([0.25, 0.75])
-        iqr = q3 - q1
-        go |= (f[c] <= 0) | (f[c] < q1 - 3 * iqr) | (f[c] > q3 + 3 * iqr)
-    f["F07_grade_outlier"] = go
-    f["F08_density_range"] = (f["density"] < 1.5) | (f["density"] > 3.0)
+    R = record_rules(f, cfg)
+    # LOC_OUTSIDE_SURVEYS / LOC_OUTSIDE_DOMAIN: position vs the union of all change solids
     obs = np.zeros((g.ny, g.nx), bool)
     for s in ds.surveys:
         obs |= s.mask
     dist = ndimage.distance_transform_edt(~obs) * g.cell
-    j, i, inside = g.index(f["x"].values, f["y"].values)
-    f["dist_to_survey_m"] = np.where(inside, dist[j, i], np.nan)
-    f["F09_far_from_face"] = f["dist_to_survey_m"] > 60
+    j, i, inside = g.index(f["x"].fillna(g.x0).values, f["y"].fillna(g.y0).values)
+    f["dist_to_survey_m"] = np.where(inside & f[["x", "y"]].notna().all(axis=1), dist[j, i], np.nan)
+    R["LOC_OUTSIDE_SURVEYS"] = (f["dist_to_survey_m"] > 0).values
+    R["LOC_OUTSIDE_DOMAIN"] = (f["dist_to_survey_m"] > 100).values | (f[["x", "y"]].notna().all(axis=1) & ~inside)
     f["floor_z"] = B[j, i]
-    f["F10_below_floor"] = f["z"] < f["floor_z"] - 0.5
-    # surface at the time of dump: latest surveyed top before the dump
-    zref = np.full(len(f), np.nan)
-    comp = np.full((g.ny, g.nx), np.nan)
+    # survey interval of each dump (same convention as the engine)
+    first_start = times[0] - pd.Timedelta(hours=float(cfg["time"].get("first_interval_hours", 24.0)))
+    edges = np.array([first_start] + times, dtype="datetime64[ns]")
     tt = f["timestamp"].values.astype("datetime64[ns]")
-    prev = np.datetime64("1900-01-01")
-    for s in ds.surveys:
-        m = (tt > prev) & (tt <= np.datetime64(s.datetime))
-        zref[m] = comp[j[m], i[m]]
-        comp = np.where(s.mask, s.top, comp)
-        prev = np.datetime64(s.datetime)
-    m = tt > prev
-    zref[m] = comp[j[m], i[m]]
-    f["surface_z_at_dump"] = zref
-    f["dz_dump_minus_surface"] = f["z"] - zref
-    f["F11_z_residual"] = f["dz_dump_minus_surface"].abs() > 3
-    f["F12_after_last_survey"] = f["timestamp"] > times[-1]
-    gap_periods = []
-    for k in range(1, len(times)):
-        if times[k] - times[k - 1] > pd.Timedelta("36h"):
-            gap_periods.append((times[k - 1], times[k]))
-    gp = np.zeros(len(f), bool)
-    for a, b in gap_periods:
-        gp |= (f["timestamp"] > a) & (f["timestamp"] <= b)
-    f["F13_survey_gap_period"] = gp
-    rep = f.groupby(["x", "y", "z"])["cycle_id"].transform("size")
-    f["F14_repeated_location"] = rep >= 3
-    flag_cols = list(FLAG_RULES)
-    f["n_flags"] = f[flag_cols].sum(axis=1)
-    f["exclude_from_model"] = f["F01_duplicate_id"] | f["F02_missing_field"] | f["F03_bad_timestamp"]
+    per = np.searchsorted(edges, tt, side="left") - 1
+    f["interval"] = np.where(f["timestamp"].notna(), per, -99)
+    R["TIME_BEFORE_FIRST_INTERVAL"] = (f["interval"] == -1).values
+    R["TIME_AFTER_LAST_SURVEY"] = (f["interval"] == len(times)).values
+    dur = np.diff(edges).astype("timedelta64[m]").astype(float) / 60.0
+    long_iv = [k for k in range(1, len(times)) if dur[k] > 36]
+    R["IN_SURVEY_GAP_INTERVAL"] = f["interval"].isin(long_iv).values
+    # LOC_Z_INCONSISTENT: envelope of the surface at the start and end of the dump's interval
+    zs, ze, zsv = np.full(len(f), np.nan), np.full(len(f), np.nan), np.full(len(f), np.nan)
+    comp = np.full((g.ny, g.nx), np.nan)
+    tol = float(cfg.get("fms", {}).get("dump_z_tolerance_m", 5.0))
+    for k, sv in enumerate(ds.surveys):
+        m = per == k
+        zsv[m] = comp[j[m], i[m]]
+        zs[m] = np.where(np.isfinite(zsv[m]), zsv[m], B[j[m], i[m]])   # unsurveyed: floor
+        comp = np.where(sv.mask, sv.top, comp)
+        ze[m] = comp[j[m], i[m]]
+    m = per == len(times)
+    zs[m] = comp[j[m], i[m]]
+    zsv[m] = comp[j[m], i[m]]
+    ze[m] = comp[j[m], i[m]]
+    f["surface_z_at_dump"] = zsv            # last surveyed surface before the dump (NaN if never surveyed)
+    f["surface_z_interval_end"] = ze
+    f["dz_dump_minus_surface"] = f["z"] - zsv
+    lo, hi = np.fmin(zs, ze) - tol, np.fmax(zs, ze) + tol
+    R["LOC_Z_INCONSISTENT"] = (np.isfinite(ze) & ((f["z"].values < lo) | (f["z"].values > hi)))
+    R = R[[k for k in RULES if RULES[k][0] == "record"]]
+    for k in R.columns:
+        f[k] = R[k].values
+    f["n_flags"] = R.sum(axis=1).values
+    from .rules import EXCLUDING
+    f["exclude_from_model"] = R[EXCLUDING + ["DUP_IDENTICAL", "TIME_BEFORE_FIRST_INTERVAL"]].any(axis=1).values
+    f["location_unknown"] = R[["LOC_DEFAULT", "LOC_OUTSIDE_DOMAIN"]].any(axis=1).values
     sig = f[["cu_pct", "au_gpt", "ag_gpt", "density"]].astype(str).agg("|".join, axis=1)
     f["grade_group"] = pd.factorize(sig)[0] + 1
     f.to_csv(out / "fms_records_with_flags.csv", index=False)
-    flag_summary = pd.DataFrame([
-        {"flag": k, "description": v[0], "records": int(f[k].sum()), "treatment": v[1]} for k, v in FLAG_RULES.items()
-    ])
+    counts = {k: {"count": int(R[k].sum()), "tonnes": float(f.loc[R[k].values, "payload_t"].sum())} for k in R.columns}
+    for k in ("LOC_DEFAULT", "TIME_DUPLICATE", "DUP_CONFLICT", "TIME_AFTER_LAST_SURVEY", "LOC_Z_INCONSISTENT", "PAYLOAD_PARTIAL", "PAYLOAD_HIGH"):
+        if counts[k]["count"]:
+            ids = f.loc[R[k].values, "cycle_id"].astype(str).tolist()
+            counts[k]["items"] = "cycle " + ", ".join(ids[:16]) + (" ..." if len(ids) > 16 else "")
+    flag_summary = pd.DataFrame([{"rule_id": k, "severity": RULES[k][1], "description": RULES[k][2],
+                                  "records": counts[k]["count"], "tonnes": counts[k]["tonnes"], "treatment": RULES[k][3]}
+                                 for k in R.columns])
     flag_summary.to_csv(out / "fms_flag_summary.csv", index=False)
+    gap_periods = [(times[k - 1], times[k]) for k in long_iv]
 
     # payload quantisation / grade signatures
     q = (f["payload_t"] % 38 == 0).mean()
@@ -117,18 +108,22 @@ def run_qaqc(ds, cfg, out: Path, rec=None) -> dict:
                                           first=("timestamp", "min"), last=("timestamp", "max"))
     groups.to_csv(out / "grade_signatures.csv")
 
-    # daily coverage table (FMS vs surveys)
-    days = pd.date_range(min(f["timestamp"].min(), times[0]).normalize(), max(f["timestamp"].max(), times[-1]).normalize())
+    # daily coverage table by PRODUCTION day: day D runs from D 00:00 + (cut-off - 24 h)
+    # to the cut-off of the survey labelled D (D+1 07:00 for a 31 h cut-off)
+    shift = pd.Timedelta(hours=float(cfg["time"]["survey_cutoff_hours"]) - 24.0)
+    nominal = pd.to_datetime(ds.register["assigned_date"]).dt.normalize()
+    pday = (f["timestamp"] - shift).dt.normalize()
+    days = pd.date_range(min(pday.min(), nominal.min()), max(pday.max(), nominal.max()))
     daily = pd.DataFrame(index=days)
-    daily.index.name = "date"
-    dd = f.groupby(f["timestamp"].dt.normalize())
+    daily.index.name = "production_day"
+    dd = f.groupby(pday)
     daily["loads"] = dd.size().reindex(days).fillna(0).astype(int)
     daily["tonnes"] = dd["payload_t"].sum().reindex(days).fillna(0)
     daily["cu_pct_wavg"] = (dd.apply(lambda d: np.average(d["cu_pct"], weights=d["payload_t"]), include_groups=False)).reindex(days)
     daily["au_gpt_wavg"] = (dd.apply(lambda d: np.average(d["au_gpt"], weights=d["payload_t"]), include_groups=False)).reindex(days)
     daily["first_dump"] = dd["timestamp"].min().reindex(days).dt.strftime("%H:%M")
     daily["last_dump"] = dd["timestamp"].max().reindex(days).dt.strftime("%H:%M")
-    sv_days = {pd.Timestamp(t).normalize(): s.file for t, s in zip(times, ds.surveys)}
+    sv_days = dict(zip(nominal, ds.register["file"]))
     daily["survey"] = [sv_days.get(d, "") for d in days]
     daily["status"] = np.where((daily["loads"] == 0) & (daily["survey"] != ""), "SURVEY CHANGE, NO FMS",
                        np.where((daily["loads"] == 0), "no FMS, no survey",
@@ -148,10 +143,12 @@ def run_qaqc(ds, cfg, out: Path, rec=None) -> dict:
         lay_date = layer[:6]
         rows.append({
             "file": s.file, "layer": layer, "date_from_file_name": r.date_from_name.date() if pd.notna(r.date_from_name) else "",
-            "assigned_datetime": s.datetime, "override": r.override_reason[:60] + ("..." if len(r.override_reason) > 60 else ""),
+            "nominal_date": pd.Timestamp(r.assigned_date).date(), "assigned_datetime": s.datetime, "override": r.override_reason[:60] + ("..." if len(r.override_reason) > 60 else ""),
             "layer_date_token": lay_date,
             "layer_vs_name_consistent": lay_date[2:] == s.file.split("_")[-1][2:6] and lay_date[:2] == s.file.split("_")[-1][:2],
             "entity_types": ";".join(f"{k}:{v}" for k, v in s.meta["entity_types"].items()),
+            "insunits": s.meta.get("insunits"), "measurement": s.meta.get("measurement"), "tdupdate": s.meta.get("tdupdate"),
+            "acadver": s.meta.get("acadver"), "zero_plan_area_faces": s.meta.get("zero_plan_area"),
             "n_triangles": s.meta["n_triangles"], "degenerate": s.meta["degenerate"],
             "duplicate_triangles": s.meta["duplicate_triangles"],
             "edge_median_m": round(s.meta["edge_median_m"], 2),
@@ -171,7 +168,29 @@ def run_qaqc(ds, cfg, out: Path, rec=None) -> dict:
         })
         prev_top = np.where(s.mask, s.top, prev_top)
     sq = pd.DataFrame(rows)
+    # survey-file rules
+    nom = pd.to_datetime(ds.register["assigned_date"]).dt.normalize()
+    ivs = ds.interventions
+    redated = set(ivs.loc[ivs["type"] == "survey_date", "target"]) if len(ivs) else set()
+    sq["DXF_UNITS_HEADER"] = (sq["insunits"] != 6) | (sq["measurement"] != 1)
+    sq["DXF_SAVED_BEFORE_SURVEY"] = pd.to_datetime(sq["tdupdate"], errors="coerce").values < nom.values
+    sq["SURVEY_NAME_YEAR"] = sq["file"].isin(redated)
+    sq["LAYER_DATE_MISMATCH"] = ~sq["layer_vs_name_consistent"]
+    sq["ZERO_PLAN_AREA_FACES"] = sq["zero_plan_area_faces"].fillna(0) > 0
+    sq["DEGENERATE_FACES"] = sq["degenerate"] > 0
+    sq["DUPLICATE_FACES"] = sq["duplicate_triangles"] > 0
+    sq["SOLID_NOT_CLOSED"] = sq["closed_solid_frac"] < 0.98
+    sq["NORMALS_INVERTED"] = sq["normals_inverted"]
+    sq["SOLID_BASE_MISMATCH"] = sq["frac_bottom_mismatch_gt_0.14"].fillna(0) > 0.2
     sq.to_csv(out / "survey_qaqc.csv", index=False)
+    for k in [r for r in RULES if RULES[r][0] == "survey"]:
+        hit = sq.loc[sq[k], "file"].tolist()
+        extra = ""
+        if k == "ZERO_PLAN_AREA_FACES" and hit:
+            extra = f" ({int(sq['zero_plan_area_faces'].min())}-{int(sq['zero_plan_area_faces'].max())} per file)"
+        if k == "DXF_SAVED_BEFORE_SURVEY" and hit:
+            extra = f" (TDUPDATE {', '.join(sorted(set(sq.loc[sq[k], 'tdupdate'])))})"
+        counts[k] = {"count": len(hit), "items": ("all files" if len(hit) == len(sq) else ", ".join(hit)) + extra if hit else ""}
 
     # repose angle from all surveyed face cells (upper part of the slope distribution)
     allsl = []
@@ -183,8 +202,24 @@ def run_qaqc(ds, cfg, out: Path, rec=None) -> dict:
     repose = {"face_cells": int(allsl.size), "p50": float(np.median(allsl)), "p75": float(np.percentile(allsl, 75)),
               "p90": float(np.percentile(allsl, 90)), "mode": float(np.histogram(allsl, bins=np.arange(25, 55, 0.5))[1][np.argmax(np.histogram(allsl, bins=np.arange(25, 55, 0.5))[0])])}
 
+    # dataset rules (FMS_SILENCE / VOLUME_RATIO_OUTLIER are added after the volume calibration)
+    counts["SURVEY_GAP"] = {"count": len(long_iv), "items": "; ".join(f"interval {k} ({times[k - 1]:%m-%d %H:%M} to {times[k]:%m-%d %H:%M}, {dur[k]:.0f} h)" for k in long_iv)}
+    late = f["timestamp"].min() > first_start
+    counts["FMS_PARTIAL_FIRST_INTERVAL"] = {"count": int(late), "items": f"first FMS record {f['timestamp'].min():%Y-%m-%d %H:%M}, interval 0 starts {first_start:%Y-%m-%d %H:%M}" if late else ""}
+    nf = daily.index[daily["status"] == "SURVEY CHANGE, NO FMS"]
+    counts["SURVEY_CHANGE_NO_FMS"] = {"count": len(nf), "items": ", ".join(nf.strftime("%Y-%m-%d"))}
+    allq = bool((f["payload_t"].dropna() % float(cfg.get("fms", {}).get("pass_quantum_t", 38.0)) == 0).all())
+    counts["PAYLOAD_QUANTISED"] = {"count": int(allq), "items": f"{len(f)} records" if allq else ""}
+    cu_m = float(np.average(f["cu_pct"].dropna(), weights=f.loc[f["cu_pct"].notna(), "payload_t"]))
+    au_m = float(np.average(f["au_gpt"].dropna(), weights=f.loc[f["au_gpt"].notna(), "payload_t"]))
+    counts["GRADE_UNITS_UNCONFIRMED"] = {"count": int(cu_m > 3 or au_m > 3), "items": f"mean Cu {cu_m:.2f} %, Au {au_m:.2f} g/t"}
+    cat = _catalogue(counts)
+    cat.to_csv(out / "qa_rule_catalogue.csv", index=False)
+
     summary = {
         "n_fms_records": int(len(f)), "n_excluded": int(f["exclude_from_model"].sum()),
+        "n_location_unknown": int(f["location_unknown"].sum()), "tonnes_location_unknown": float(f.loc[f["location_unknown"], "payload_t"].sum()),
+        "n_rules": len(RULES), "n_rules_triggered": int((cat["count"] > 0).sum()),
         "n_flagged_any": int((f["n_flags"] > 0).sum()), "payload_multiple_of_38_frac": float(q),
         "n_grade_signatures": int(f["grade_group"].nunique()),
         "fms_first": str(f["timestamp"].min()), "fms_last": str(f["timestamp"].max()),
@@ -200,7 +235,24 @@ def run_qaqc(ds, cfg, out: Path, rec=None) -> dict:
         "days_survey_no_fms": daily.index[daily["status"] == "SURVEY CHANGE, NO FMS"].strftime("%Y-%m-%d").tolist(),
     }
     _figures(ds, cfg, f, daily, sq, base, allsl, out)
-    return {"fms": f, "flags": flag_summary, "daily": daily, "surveys": sq, "summary": summary, "groups": groups, "payload": pay}
+    return {"fms": f, "flags": flag_summary, "daily": daily, "surveys": sq, "summary": summary, "groups": groups, "payload": pay,
+            "catalogue": cat, "counts": counts}
+
+
+def add_calibration_rules(q: dict, cal: dict, out: Path) -> pd.DataFrame:
+    """Dataset rules that need the interval volume budget (spbm.volume)."""
+    t = cal["table"]
+    sil = t[t["longest_fms_silence_h"] > 24]
+    q["counts"]["FMS_SILENCE"] = {"count": len(sil), "items": "; ".join(
+        f"interval {int(r.interval)} ({r.longest_fms_silence_h:.0f} h)" for r in sil.itertuples())}
+    exc = t[~t["consistent"]]
+    q["counts"]["VOLUME_RATIO_OUTLIER"] = {"count": len(exc), "items": "; ".join(
+        f"interval {int(r.interval)} (ratio {r.ratio:.2f})" for r in exc.itertuples())}
+    cat = _catalogue(q["counts"])
+    cat.to_csv(out / "qa_rule_catalogue.csv", index=False)
+    q["catalogue"] = cat
+    q["summary"]["n_rules_triggered"] = int((cat["count"] > 0).sum())
+    return cat
 
 
 def _figures(ds, cfg, f, daily, sq, base, allsl, out):
@@ -213,8 +265,10 @@ def _figures(ds, cfg, f, daily, sq, base, allsl, out):
     for s, c in zip(ds.surveys, cols):
         ax.contour(g.xc, g.yc, s.mask.astype(float), [0.5], colors=[c], linewidths=1.0)
     sc = ax.scatter(f["x"], f["y"], c=day, cmap=pl.SEQ_OR, s=16, edgecolor=pl.SURFACE, linewidth=0.6, zorder=3)
-    flagged = f[f["F10_below_floor"] | f["F09_far_from_face"]]
-    ax.scatter(flagged["x"], flagged["y"], s=80, facecolor="none", edgecolor=pl.INK, linewidth=1.0, zorder=4, label="flagged location (F09/F10)")
+    out_s = f[f["LOC_OUTSIDE_SURVEYS"]]
+    ax.scatter(out_s["x"], out_s["y"], s=70, facecolor="none", edgecolor=pl.INK, linewidth=0.9, zorder=4, label="LOC_OUTSIDE_SURVEYS")
+    dflt = f[f["LOC_DEFAULT"]].drop_duplicates(["x", "y"])
+    ax.scatter(dflt["x"], dflt["y"], s=110, marker="X", color=pl.CAT[1], edgecolor=pl.SURFACE, zorder=5, label="LOC_DEFAULT (location unknown)")
     pl.plan_axes(ax, g, "FMS dump locations and survey change-solid footprints")
     cb = fig.colorbar(sc, ax=ax, shrink=0.7)
     cb.set_label("days since first FMS record")
@@ -230,10 +284,10 @@ def _figures(ds, cfg, f, daily, sq, base, allsl, out):
         if st == "SURVEY CHANGE, NO FMS":
             a1.axvspan(k - 0.5, k + 0.5, color=pl.CAT[3], alpha=0.18, lw=0)
     a1.set_ylabel("FMS tonnes (kt)")
-    a1.set_title("Daily FMS tonnage (shaded = survey shows placement but no FMS record)", loc="left")
+    a1.set_title("FMS tonnage per production day (D 07:00 to D+1 07:00; shaded = survey change, no FMS record)", loc="left")
     vol = []
     for d in daily.index:
-        v = sq.loc[pd.to_datetime(sq["assigned_datetime"]).dt.normalize() == d, "volume_m3"]
+        v = sq.loc[pd.to_datetime(sq["nominal_date"]) == d, "volume_m3"]
         vol.append(v.sum() if len(v) else np.nan)
     a2.bar(x, np.array(vol) / 1000, color=pl.CAT[2], width=0.7)
     a2.set_ylabel("survey solid volume (k m³)")

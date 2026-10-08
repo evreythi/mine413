@@ -184,16 +184,60 @@ def sinkhorn(a, b, C, eps, tol=1e-6, max_iter=5000):
 
 
 # ------------------------------------------------------------------ loads
+def density_factors(cfg, perturb=None, ds=None):
+    """A-06: (volume factor f_v, payload factor f_pay). In-pile volume of a
+    load = T * f_v / Dens; true tonnes = T * f_pay; in-pile density =
+    Dens * f_pay / f_v. f_v = "auto" is resolved by spbm.volume.calibrate."""
+    d = cfg["density"]
+    fpay = float(d.get("payload_factor", 1.0))
+    if perturb and perturb.get("payload_factor") is not None:
+        fpay = float(perturb["payload_factor"])
+    if perturb and perturb.get("volume_factor") is not None:
+        return float(perturb["volume_factor"]), fpay
+    fv = d["volume_factor"]
+    if fv == "auto":
+        fv = d.get("volume_factor_resolved")
+        if fv is None or d.get("volume_factor_cutoff") != cfg["time"]["survey_cutoff_hours"]:
+            if ds is None:
+                raise ValueError("density.volume_factor is 'auto' but not resolved - call spbm.volume.resolve_density first")
+            from .volume import resolve_density
+            fv = resolve_density(ds, cfg)["density"]["volume_factor_resolved"]
+    return float(fv), fpay
+
+
+def _outside_domain(ds, x, y, limit_m=100.0):
+    """LOC_OUTSIDE_DOMAIN: dump more than `limit_m` from every survey solid."""
+    from scipy import ndimage
+    g = ds.grid
+    obs = np.zeros((g.ny, g.nx), bool)
+    for s in ds.surveys:
+        obs |= s.mask
+    dist = ndimage.distance_transform_edt(~obs) * g.cell
+    j, i, inside = g.index(x, y)
+    d = np.where(inside, dist[np.clip(j, 0, g.ny - 1), np.clip(i, 0, g.nx - 1)], np.inf)
+    return d > limit_m
+
+
 def prepare_loads(ds, cfg, rng=None, perturb=None, exclude_ids=()):
     """Standardised load table used by the engine. `perturb` (Monte Carlo)
-    may contain gps_sigma, payload_cv, payload_bias, assay_mult (by grade
-    signature), compaction."""
+    may contain gps_sigma, payload_cv, assay_cv, volume_factor, payload_factor."""
+    from .rules import model_exclusions
     f = ds.fms.copy()
-    f = f[f["timestamp"].notna() & f[["x", "y", "payload_t"]].notna().all(axis=1)]
-    f = f[~f["cycle_id"].isin(exclude_ids)]
-    f = f.drop_duplicates("cycle_id", keep="first")
-    kappa = cfg["density"]["compaction_factor"]
-    m = f["payload_t"].values.astype(float)
+    f = f[~model_exclusions(f, cfg).values]          # QA error rules (spbm/rules.py)
+    iv = getattr(ds, "interventions", None)
+    excl = set(exclude_ids)
+    unknown_ids = set()
+    if iv is not None and len(iv):
+        excl |= {int(float(t)) for t in iv.loc[iv["type"] == "fms_exclude", "target"]}
+        unknown_ids = {int(float(t)) for t in iv.loc[iv["type"] == "fms_location_unknown", "target"]}
+    f = f[~f["cycle_id"].isin(excl)]
+    # TIME_BEFORE_FIRST_INTERVAL: belongs to the pre-record pile
+    times = [s.datetime for s in ds.surveys]
+    first_start = times[0] - pd.Timedelta(hours=float(cfg["time"].get("first_interval_hours", 24.0)))
+    f = f[f["timestamp"] > first_start]
+    fv, fpay = density_factors(cfg, perturb, ds)
+    kappa = fpay / fv
+    m = f["payload_t"].values.astype(float) * fpay
     cu, au, ag = f["cu_pct"].values.astype(float), f["au_gpt"].values.astype(float), f["ag_gpt"].values.astype(float)
     x, y = f["x"].values.astype(float), f["y"].values.astype(float)
     if perturb:
@@ -204,7 +248,6 @@ def prepare_loads(ds, cfg, rng=None, perturb=None, exclude_ids=()):
             y = y + rng.normal(0, perturb["gps_sigma"], n)
         if perturb.get("payload_cv"):
             m = m * np.clip(1 + rng.normal(0, perturb["payload_cv"], n), 0.5, 1.5)
-        m = m * (1 + perturb.get("payload_bias", 0.0))
         if perturb.get("assay_cv"):
             sig = f["grade_group"].values if "grade_group" in f else pd.factorize(
                 f[["cu_pct", "au_gpt", "ag_gpt"]].astype(str).agg("|".join, axis=1))[0]
@@ -212,43 +255,37 @@ def prepare_loads(ds, cfg, rng=None, perturb=None, exclude_ids=()):
             mult = {k: np.clip(1 + rng.normal(0, perturb["assay_cv"], 3), 0.5, 1.5) for k in ug}
             M = np.array([mult[k] for k in sig])
             cu, au, ag = cu * M[:, 0], au * M[:, 1], ag * M[:, 2]
-        kappa = perturb.get("compaction", kappa)
-    # A-32: records sharing an identical X/Y/Z with >= 2 others are a default /
-    # stuck FMS position (QA flag F14). Their X/Y is imputed after period
-    # assignment (below); originals are kept in x_raw / y_raw.
+    # A-32: an X/Y/Z shared by >= repeated_location_min records is a default /
+    # stuck FMS position (QA rule LOC_DEFAULT): the location is UNKNOWN.
     rep = f.groupby(["x", "y", "z"])["cycle_id"].transform("size").values >= cfg.get("fms", {}).get("repeated_location_min", 3)
+    rep |= f["cycle_id"].isin(unknown_ids).values
+    rep |= _outside_domain(ds, f["x"].values.astype(float), f["y"].values.astype(float))   # LOC_OUTSIDE_DOMAIN
     rho = f["density"].values.astype(float) * kappa
     t0 = pd.Timestamp(ds.surveys[0].datetime.normalize())
-    out_x0, out_y0 = x.copy(), y.copy()
     out = pd.DataFrame({
         "cycle_id": f["cycle_id"].values, "time": f["timestamp"].values,
-        "x": x, "y": y, "z": f["z"].values, "m": m, "cu": cu, "au": au, "ag": ag, "rho": rho,
+        "x": x, "y": y, "z": f["z"].values, "m": m, "m_recorded": f["payload_t"].values.astype(float),
+        "cu": cu, "au": au, "ag": ag, "rho": rho, "dens_fms": f["density"].values.astype(float),
     })
     out["vol"] = out["m"] / out["rho"]
     out["day"] = (pd.to_datetime(out["time"]) - t0).dt.total_seconds() / 86400.0
-    times = [s.datetime for s in ds.surveys]
-    first_start = times[0] - (times[1] - times[0] if len(times) > 1 else pd.Timedelta("1D"))
     edges = [first_start] + times
     per = np.searchsorted(np.array(edges, dtype="datetime64[ns]"), out["time"].values.astype("datetime64[ns]"), side="left") - 1
     # per == -1 : before record ; per == len(times) : after last survey (provisional)
     out["period"] = per
     out["x_raw"], out["y_raw"] = f["x"].values.astype(float), f["y"].values.astype(float)
-    out["loc_imputed"] = rep
+    out["loc_unknown"] = rep
     if rep.any():
+        # placeholder position (period centroid of located dumps) - used only to
+        # index a graph node; the push cost of these loads is set uniform.
         good = ~rep
         for i in np.nonzero(rep)[0]:
             same = good & (per == per[i])
-            if same.sum() < 3:   # too few in the period: 10 nearest-in-time good loads
-                dt = np.abs((out["time"].values - out["time"].values[i]).astype("timedelta64[s]").astype(float))
-                dt[~good] = np.inf
-                same = np.zeros(len(out), bool)
-                same[np.argsort(dt)[:10]] = True
+            if same.sum() == 0:
+                same = good
             wgt = out["m"].values[same]
-            out.loc[i, "x"] = np.average(out_x0[same], weights=wgt)
-            out.loc[i, "y"] = np.average(out_y0[same], weights=wgt)
-            if perturb and perturb.get("gps_sigma"):
-                out.loc[i, "x"] += rng.normal(0, 4 * perturb["gps_sigma"])
-                out.loc[i, "y"] += rng.normal(0, 4 * perturb["gps_sigma"])
+            out.loc[i, "x"] = np.average(out["x"].values[same], weights=wgt)
+            out.loc[i, "y"] = np.average(out["y"].values[same], weights=wgt)
     return out.sort_values("time").reset_index(drop=True)
 
 
@@ -435,6 +472,15 @@ def reconstruct(ds, cfg, loads=None, rng=None, survey_bias=None, keep_plans=Fals
             D = geodesic_cost(surf_full, domain, g.cell, mv["alpha_up"], np.asarray(src_cell), mv["max_push"])
             C[:nS, :nF] = D[:, fill_cells]
             C[:nS, nF] = mv["retain_cost"]
+            # A-32: loads with an unknown dump location (default FMS position)
+            # get a uniform push cost: they fill whatever part of the period's
+            # fill the located loads do not claim.
+            unk = np.array([src_kind[i] in ("load", "carried") and bool(loads["loc_unknown"].values[src_load[i]])
+                            for i in range(nS)])
+            if unk.any():
+                known_c = C[:nS, :nF][~unk]
+                fin = known_c[np.isfinite(known_c)]
+                C[np.nonzero(unk)[0], :nF] = float(np.median(fin)) if fin.size else 0.5 * mv["max_push"]
         C[nS, :nF] = mv["unattributed_cost"]
         C[nS, nF] = 0.0
         a = np.r_[np.asarray(src_vol, float), max(V_fill, 1e-9)]
@@ -487,7 +533,7 @@ def reconstruct(ds, cfg, loads=None, rng=None, survey_bias=None, keep_plans=Fals
             tot = w_.sum()
             ld = loads.iloc[src_load[i]]
             d_ = C[i, :nF]
-            rec = {"cycle_id": ld.cycle_id, "period": s, "kind": src_kind[i], "volume_in": src_vol[i],
+            rec = {"cycle_id": ld.cycle_id, "period": s, "kind": src_kind[i], "loc_unknown": bool(ld.loc_unknown), "volume_in": src_vol[i],
                    "placed_volume": tot, "retained_volume": ret[i], "dump_x": ld.x, "dump_y": ld.y}
             if tot > 1e-9:
                 fin = np.isfinite(d_)

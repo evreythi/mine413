@@ -128,9 +128,13 @@ def _forward_metrics(rec, s, fcfg, mode="push"):
     xyv = L[["x", "y", "vol"]].values
     if mode == "push":
         zp, _ = fw.place_loads(z0, xyv, g, fcfg, crest_region=creg)
+        dp = zp - z0
+    elif mode == "uniform":
+        # no-information baseline: the period's volume spread evenly over the model domain
+        dp = np.where(rec.domain, xyv[:, 2].sum() / (rec.domain.sum() * g.area), 0.0)
     else:
         zp = fw.place_at_dump(z0, xyv, g, fcfg)
-    dp = zp - z0
+        dp = zp - z0
     ob = snap["fill"]
     X, Y = g.mesh()
     cen = lambda w: np.array([(w * X).sum() / w.sum(), (w * Y).sum() / w.sum()])  # noqa: E731
@@ -158,8 +162,9 @@ def temporal_validation(rec, cfg, out: Path) -> dict:
     res = []
     keep = {}
     for s in calib + test:
-        for mode, f in [("push (calibrated)", fbest), ("push (default)", dict(fc, release_offset=2.0)), ("no-push baseline", fbest)]:
-            m = _forward_metrics(rec, s, f, "dump" if "baseline" in mode else "push")
+        for mode, f in [("push (calibrated)", fbest), ("push (default)", dict(fc, release_offset=2.0)), ("no-push baseline", fbest),
+                        ("uniform baseline", fbest)]:
+            m = _forward_metrics(rec, s, f, "uniform" if mode.startswith("uniform") else "dump" if "baseline" in mode else "push")
             if m is None:
                 continue
             keep[(s, mode)] = m.pop("pred")
@@ -381,7 +386,8 @@ def _key_metrics(name, r, df, base_df=None, top_bench=4484.0):
     top = df[df["zc"] > top_bench]
     trk = df[df["frac_fms"] >= 0.5]
     row = {"variant": name, "total_tonnes": t, "fms_tonnes": tf, "unattributed_tonnes": df["t_unattributed"].sum(),
-           "legacy_tonnes": df["t_legacy"].sum(), "cu_t_total": df["cu_t"].sum(), "au_kg_total": df["au_kg"].sum(),
+           "legacy_tonnes": df["t_legacy"].sum(), "record_period_tonnes": tf + df["t_unattributed"].sum(),
+           "cu_t_total": df["cu_t"].sum(), "au_kg_total": df["au_kg"].sum(),
            "tracked_blocks_tonnes": trk["tonnes"].sum(),
            "tracked_blocks_cu_pct": trk["cu_t"].sum() / max(trk["tonnes"].sum(), 1) * 100,
            "top_bench_cu_pct": top["cu_t"].sum() / max(top["tonnes"].sum(), 1) * 100,

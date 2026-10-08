@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 rm -rf outputs_demo
-python -m spbm run --fast --until "2026-03-22 23:59" --out outputs_demo
+python -m spbm run --fast --until "2026-03-23 07:00" --out outputs_demo
 python -m spbm run --fast --out outputs_demo
 echo "---- change report ----"
 cat outputs_demo/audit/change_report.md

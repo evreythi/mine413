@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import audit, blockmodel as bm, bmviz, growth, qaqc, uncertainty, validation
+from . import audit, blockmodel as bm, bmviz, growth, qaqc, uncertainty, validation, volume
 from .config import resolve
 from .dataset import load_dataset
 from .movement import reconstruct
@@ -27,9 +27,11 @@ def _md(df: pd.DataFrame, floatfmt="{:,.2f}") -> str:
     return "\n".join(lines)
 
 
-def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do_sens=True, do_align=True, do_temporal=True, verbose=True):
+def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do_sens=True, do_align=True, do_temporal=True,
+        do_scen=True, verbose=True):
     started = datetime.now()
     t0 = time.time()
+    cfg_loaded = cfg      # configuration as supplied (hashed in the manifest); cfg gains resolved values below
     root = resolve(cfg["outputs"]["root"])
     dirs = {k: root / k for k in ["qaqc", "growth", "movement", "blockmodel", "validation", "uncertainty", "audit"]}
     for d in dirs.values():
@@ -47,16 +49,26 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
     new = audit.update_registry(ds.files, dirs["audit"])
     log(f"    {len(ds.fms)} FMS records, {len(ds.surveys)} surveys; {len(new)} newly registered files")
     ds.register.to_csv(dirs["audit"] / "survey_register.csv", index=False)
+    ds.interventions.to_csv(dirs["audit"] / "manual_interventions_applied.csv", index=False)
+    store_log = resolve(cfg["inputs"]["raw_store"]) / "ingest_log.csv"
+    if store_log.exists():
+        pd.read_csv(store_log).to_csv(dirs["audit"] / "ingest_log.csv", index=False)
     # 3 QA/QC ---------------------------------------------------------------
     log("3   data-quality checks")
     q = qaqc.run_qaqc(ds, cfg, dirs["qaqc"])
     # 4 periods / alignment --------------------------------------------------
     if do_align:
-        log("4   temporal alignment of FMS and surveys")
-        al = growth.temporal_alignment(cfg, dirs["growth"], until=until)
-        best = al.loc[al["pearson_r"].idxmax(), "survey_time"]
-        if best != cfg["time"]["survey_time"]:
-            notes.append(f"Temporal alignment prefers survey time {best} but config uses {cfg['time']['survey_time']} - review A-05")
+        log("4   survey cut-off scan (temporal alignment of FMS and surveys)")
+        al = growth.temporal_alignment(ds, cfg, dirs["growth"])
+        best = float(al.loc[al["r_daily"].idxmax(), "cutoff_hours"])
+        if abs(best - float(cfg["time"]["survey_cutoff_hours"])) > 1.0:
+            notes.append(f"Cut-off scan peaks at {best:g} h but config uses {cfg['time']['survey_cutoff_hours']} h - review A-05")
+    log("4b  volume factor calibration (A-06)")
+    cfg = volume.resolve_density(ds, cfg)
+    cal = volume.calibrate(ds, cfg)
+    volume.write_outputs(cal, cfg, dirs["growth"])
+    qaqc.add_calibration_rules(q, cal, dirs["qaqc"])
+    log(f"    f_v = {cal['f_v']:.3f} on intervals {cal['consistent_intervals']}; hold-out MAE {cal['holdout_mae_fv'] * 100:.1f}%")
     # 5 movement -------------------------------------------------------------
     log("5   material-movement reconstruction (CPST)")
     rec = reconstruct(ds, cfg, keep_plans=True, verbose=verbose)
@@ -132,6 +144,10 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
     if do_robust:
         log("    numerical robustness")
         validation.robustness(loader, cfg, dirs["validation"], df)
+    scen = None
+    if do_scen:
+        log("    volume-gap scenarios (A-06)")
+        scen = uncertainty.scenarios(ds, cfg, bg, dirs["uncertainty"], verbose=verbose)
     if do_sens:
         log("    one-at-a-time sensitivity")
         uncertainty.sensitivity_oat(loader, cfg, df, rec, dirs["uncertainty"], verbose=verbose)
@@ -146,34 +162,54 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
         "geometry_rmse_m": geo["rmse_m"], "survey_volume_m3": float(rec.periods["solid_volume"].sum()),
         "unattributed_volume_m3": float(rec.periods["unattributed_volume"].sum()),
         "blocks": int(len(df)), "block_size": cfg["blockmodel"]["block"],
+        "survey_cutoff_hours": float(cfg["time"]["survey_cutoff_hours"]),
+        "volume_factor": float(cal["f_v"]), "volume_factor_p10_p90": [cal["f_v_p10"], cal["f_v_p90"]],
+        "volume_factor_consistent_intervals": cal["consistent_intervals"],
+        "volume_factor_holdout_mae": float(cal["holdout_mae_fv"]),
+        "payload_factor": float(cfg["density"]["payload_factor"]),
+        "in_pile_density_t_m3": float(np.average(rec.loads["rho"], weights=rec.loads["m"])),
+        "tonnes_record_period": float(df["t_fms"].sum() + df["t_unattributed"].sum()),
+        "cu_t_record_period": float(inv.loc[:1, "cu_t"].sum()),
     }
     if tw is not None:
         summary["twin_cu_rmse_base"] = float(tw["table"].iloc[1]["cu_rmse"])
         summary["twin_cu_corr_base"] = float(tw["table"].iloc[1]["cu_corr"])
+    for r in (scen.itertuples() if scen is not None else []):
+        summary[f"scenario_{r.scenario}_record_period_tonnes"] = float(r.record_period_tonnes)
+        summary[f"scenario_{r.scenario}_total_tonnes"] = float(r.total_tonnes)
     if mc is not None:
+        summary["mc_record_period_tonnes_p10_p50_p90"] = mc["global"].loc["record_period_tonnes", ["P10", "P50", "P90"]].tolist()
+        summary["mc_record_period_cu_t_p10_p50_p90"] = mc["global"].loc["record_period_cu_t", ["P10", "P50", "P90"]].tolist()
         summary["mc_total_tonnes_p10_p50_p90"] = mc["global"].loc["total_tonnes", ["P10", "P50", "P90"]].tolist()
         summary["mc_cu_t_p10_p50_p90"] = mc["global"].loc["cu_t", ["P10", "P50", "P90"]].tolist()
         summary["mc_au_kg_p10_p50_p90"] = mc["global"].loc["au_kg", ["P10", "P50", "P90"]].tolist()
     with open(root / "summary.json", "w") as fh:
         json.dump({"key_results": summary, "qaqc": q["summary"], "geometry": geo, "forward_best": tv["best"] if tv else None}, fh, indent=2, default=str)
-    _tables_md(root, q, ptab, st, vb, inv, vr, geo, tv, tw, mc)
+    _tables_md(root, q, ptab, st, vb, inv, vr, geo, tv, tw, mc, cal, scen)
     used = [f for f in ds.files if f.kind == "fms" or f.name in set(ds.register["file"])]
     if until:
         notes.append(f"Data restricted to records/surveys up to {until}")
-    man = audit.write_manifest(cfg, used, root, summary, started, notes)
+    man = audit.write_manifest(cfg_loaded, used, root, summary, started, notes)
     rep = audit.change_report(root)
     log(f"done - run {man['run_id']}" + (" (change report written)" if rep else ""))
     return {"rec": rec, "df": df, "bg": bg, "summary": summary}
 
 
-def _tables_md(root, q, ptab, st, vb, inv, vr, geo, tv, tw, mc):
+def _tables_md(root, q, ptab, st, vb, inv, vr, geo, tv, tw, mc, cal=None, scen=None):
     parts = ["# Key result tables (auto-generated - do not edit)", ""]
-    parts += ["## FMS flags", _md(q["flags"]), ""]
+    parts += ["## QA rule catalogue", _md(q["catalogue"].drop(columns=["treatment"]), "{:,.0f}"), ""]
+    parts += ["## FMS record rules", _md(q["flags"], "{:,.0f}"), ""]
     parts += ["## Survey QA", _md(q["surveys"][["file", "assigned_datetime", "footprint_m2", "volume_m3", "slope_p50", "reaches_floor",
                                                  "normals_inverted", "frac_bottom_mismatch_gt_0.14"]]), ""]
     cols = ["period", "survey", "end", "gap_detected", "n_loads", "fms_tonnes", "fms_volume", "carried_in_volume", "solid_volume",
             "fill_volume", "cut_volume", "unobserved_fill_new_cells", "placed_volume", "unattributed_volume", "retained_volume", "apparent_density_t_m3"]
     parts += ["## Period reconciliation", _md(ptab[cols]), ""]
+    if cal is not None:
+        parts += ["## Volume factor calibration (A-06)", _md(cal["table"][["interval", "survey", "end", "fill_m3", "inferred_toe_fill_m3", "cut_m3",
+                                                                            "net_m3", "fms_t", "vdens_m3", "longest_fms_silence_h", "ratio",
+                                                                            "consistent", "role", "err_fv_first_half"]]), ""]
+    if scen is not None:
+        parts += ["## Volume-gap scenarios", _md(scen.drop(columns=["description"])), ""]
     parts += ["## Volume reconciliation", _md(vr), ""]
     parts += ["## Mass / metal balance", _md(vb), ""]
     parts += ["## Inventory by information class", _md(inv), ""]

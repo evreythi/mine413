@@ -15,25 +15,33 @@ project:
   crs_note: "Mine grid, projected metres (assumed UTM, southern hemisphere); FMS and surveys on the same grid"
 
 inputs:
-  # Sources scanned (in order) for FMS *.csv and survey *.dxf files.
-  # Zip archives are read in place (never modified). New data can be
-  # dropped into data/inbox/ and picked up by `python -m spbm update`.
+  # Sources scanned for FMS *.csv and survey *.dxf files. Every new file is
+  # copied once into the managed raw store (SHA-256 named, ingest_log.csv);
+  # the analysis reads only from the store. New data: drop files into
+  # data/inbox/ (or `python -m spbm ingest <path>`) and run `python -m spbm update`.
   sources:
     - "Data_Topo 2026.zip"
     - "data/inbox"
+  raw_store: "data/raw_store"
   fms_pattern: "*.csv"
   survey_pattern: "*.dxf"
-  survey_overrides: "config/survey_overrides.csv"   # manual corrections, each with a reason
+  # The ONLY supported way to override data (id, type, target, value, reason,
+  # author, date required; rows without them are rejected).
+  manual_interventions: "config/manual_interventions.csv"
   cache_dir: "data/cache"
 
 outputs:
   root: "outputs"
 
 time:
-  # A-05: survey acquisition time of day (not supplied). Selected by the
-  # temporal-alignment analysis (outputs/growth/temporal_alignment.csv).
-  survey_time: "23:59"
-  survey_time_candidates: ["00:00", "03:00", "05:00", "06:00", "07:00", "08:00", "09:00", "10:00", "12:00", "15:00", "18:00", "21:00", "22:00", "23:00", "23:59"]
+  # A-05: a survey labelled day D closes its interval at D 00:00 + this many
+  # hours. Not supplied: chosen by the cut-off scan (0-36 h, outputs/growth/
+  # temporal_alignment.csv): FMS volume vs surveyed volume peaks at 30-31 h,
+  # i.e. D+1 06:00-07:00, which coincides with the dump-free shift-change
+  # window in the FMS times (06:00-07:30). 31 h = D+1 07:00 (production day).
+  survey_cutoff_hours: 31.0
+  cutoff_scan_hours: [0.0, 36.0, 0.5]   # start, stop, step of the scan
+  first_interval_hours: 24.0            # A-11: length of the first interval (no earlier survey)
 
 grid:
   cell: 1.0          # A-24 horizontal simulation resolution (m)
@@ -56,21 +64,39 @@ infill:
   repose_deg: 37.0      # A-03 angle of repose (measured: median face slope 34-36 deg, P75 38 deg)
   platform_rule: "nearest_crest"  # behind-crest cells take the nearest surveyed crest elevation
   domain: "hull"        # model domain = convex hull of surveyed cells + dump points
-  # A-13b: first-surveyed cells in FRONT of an earlier surveyed face are assumed
-  # to have been at the repose-angle extrapolation of that face (floor beyond the
-  # toe); a solid bottom above that is fill not captured by any solid
-  # (toe-clipped solids / missing surveys). false = trust solid bottoms (legacy).
-  front_unobserved_fill: true
+  # A-13b: first-surveyed cells in FRONT of an earlier surveyed face could have
+  # been at the repose-angle extrapolation of that face, i.e. a solid bottom
+  # above it would be fill that no solid captured (toe-clipped solids, missing
+  # surveys). Base case FALSE (trust the surveyed solid bottoms): with the
+  # calibrated volume factor, recorded loads already explain the measured fill
+  # of complete intervals to ~3%, so the extra ~7,200 m3 would have to be
+  # unrecorded material on days with complete FMS records. TRUE is tested in
+  # the sensitivity analysis (moves that volume from legacy to unattributed).
+  front_unobserved_fill: false
 
 fms:
-  # A-32: an X/Y/Z shared by this many records is treated as a default/stuck
-  # FMS position; X/Y is imputed from the period's other dumps (QA flag F14)
+  # A-32: an X/Y/Z shared by this many records is a default/stuck FMS
+  # position (QA rule LOC_DEFAULT). The location is treated as UNKNOWN: the
+  # load is spread over its interval's fill where located loads do not claim it.
   repeated_location_min: 3
+  pass_quantum_t: 38.0                  # A-10: payload = passes x 38 t (QA rule PAYLOAD_OFF_QUANTUM)
+  dump_z_tolerance_m: 5.0               # QA rule LOC_Z_INCONSISTENT (outside interval surface envelope)
 
 density:
-  # A-06: in-pile bulk density = FMS 'Dens' (t/m3) x compaction factor
-  compaction_factor: 1.0
-  legacy_density: null  # null -> tonnage-weighted mean FMS density
+  # A-06: in-pile volume of a load = payload x payload_factor / (Dens / volume_factor ...)
+  # Formally: recorded tonnes T, true tonnes T*f_pay, in-pile density
+  # rho = Dens * f_pay / f_v, so in-pile volume = T * f_v / Dens for ANY split.
+  #  * volume_factor f_v: "auto" = calibrated on internally consistent intervals
+  #    (robust pooled ratio of measured net fill to sum(T/Dens), spbm/volume.py).
+  #  * payload_factor f_pay: share of f_v due to payload under-recording.
+  #    1.0 = recorded tonnes taken as measured, the excess is bulking (base case).
+  #    Upper plausible bound 1.19 (largest recorded load 304 t x 1.19 = 362 t =
+  #    rated payload of the largest haul trucks). f_pay = f_v (Dens is the in-pile
+  #    density, all excess is under-recording) is reported as an EXCLUDED scenario.
+  volume_factor: auto
+  payload_factor: 1.0
+  calibration_outlier_k_mad: 3.0
+  legacy_density: null  # null -> tonnage-weighted mean in-pile density of FMS loads
 
 movement:
   # A-15..A-19 - see docs/D3 for equations
@@ -116,23 +142,24 @@ uncertainty:
   seed: 413
   gps_sigma: 3.0            # A-07 m, horizontal GPS error (1 sigma)
   payload_cv: 0.08          # A-10 per-load payload error (pass-count estimate)
-  payload_bias_sd: 0.03     # A-10 systematic scale error per realization
+  payload_factor_range: [1.0, 1.19]  # A-06: systematic payload under-recording; triangular, mode 1.0 (recorded payloads most likely)
+  volume_factor_bootstrap: true      # A-06: f_v drawn from its bootstrap distribution
   assay_cv: 0.10            # A-11 per-source-signature grade error
-  compaction_range: [0.90, 1.10]
   epsilon_range: [2.0, 15.0]
   alpha_range: [1.0, 10.0]
   max_push_range: [50.0, 130.0]
   survey_bias_sd: 0.05      # m, per-survey vertical datum error
-  survey_time_choices: ["21:00", "22:00", "23:00", "23:59"]
+  survey_cutoff_range: [29.0, 32.0]  # A-05: hours; window where the scan is within 0.02 of its maximum
 
 sensitivity:
   # one-at-a-time ranges (low, high) for the tornado chart
   epsilon: [2.0, 15.0]
   alpha_up: [1.0, 10.0]
   max_push: [50.0, 130.0]
-  compaction_factor: [0.90, 1.10]
+  payload_factor: [1.0, 1.19]
+  volume_factor: [1.35, 1.60]
   sigma_z: [0.025, 0.15]
-  survey_time: ["21:00", "23:59"]
+  survey_cutoff_hours: [29.0, 32.0]
   cell: [0.5, 2.5]
   front_unobserved_fill: [false, true]
   block: [[2.0, 2.0, 1.0], [10.0, 10.0, 4.0]]

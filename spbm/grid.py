@@ -119,6 +119,9 @@ def triangle_stats(T: np.ndarray) -> dict:
     return {
         "n_triangles": int(len(T)),
         "degenerate": int((area3d < 1e-6).sum()),
+        # faces with (near) zero plan area but real 3-D area: vertical walls of
+        # the closed change solid; they carry no top/bottom elevation
+        "zero_plan_area": int(((0.5 * np.abs(n[:, 2]) < 1e-6) & (area3d >= 1e-6)).sum()),
         "duplicate_triangles": int((counts > 1).sum()),
         "edge_median_m": float(np.median(edges)),
         "edge_p95_m": float(np.percentile(edges, 95)),

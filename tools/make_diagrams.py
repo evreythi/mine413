@@ -34,7 +34,7 @@ def workflow():
     ax.set_xlim(0, 11); ax.set_ylim(-0.4, 7.4); ax.axis("off")
     box(ax, 1.6, 6.7, 2.6, 0.7, "FMS records (*.csv)\nnew files -> data/inbox", "data")
     box(ax, 1.6, 5.7, 2.6, 0.7, "Survey change solids (*.dxf)\nnew files -> data/inbox", "data")
-    box(ax, 1.6, 4.6, 2.6, 0.8, "config/project.yaml\nsurvey_overrides.csv\n(assumptions A-xx)", "dec")
+    box(ax, 1.6, 4.6, 2.6, 0.8, "config/project.yaml\nmanual_interventions.csv\n(assumptions A-xx)", "dec")
     box(ax, 4.7, 6.2, 2.6, 0.9, "1-2 IMPORT\nscan sources, SHA-256 registry,\nstandardise, rasterise (cache)", "proc")
     box(ax, 4.7, 4.9, 2.6, 0.9, "3 QA/QC\n14 FMS flags, survey checks,\ncoverage, alignment", "proc")
     box(ax, 4.7, 3.6, 2.6, 0.9, "4 PERIODS\nsurvey times, gap detection,\nloads -> periods", "proc")

@@ -96,15 +96,21 @@ Buffer: the 48 h before the deadline are reserved for review only, not new analy
 | ID | Decision | Rationale (see D2/D3) | Proposed by | Approved by / date |
 |---|---|---|---|---|
 | DEC-01 | Survey files `Topo_250328`/`Topo_250329` re-dated to 2026-03-28/29 | QA-S02: FMS dates, face progression, layer naming | | |
-| DEC-02 | Survey surfaces represent the end of the day (23:59) | Temporal alignment r = 0.96 vs ≤ 0.21 for morning times | | |
+| DEC-02 | ~~Survey surfaces represent the end of the day (23:59)~~ **Superseded by DEC-11** | The 21:00-23:59 search range ended at its own optimum | | |
 | DEC-03 | Treat each DXF as a closed change solid (bottom = previous surface) | 100% of cells hit by exactly two faces; bottoms match previous tops | | |
 | DEC-04 | Use FMS dump XY only, not dump Z | Z residual vs surface sd ≈ 2.5 m | | |
 | DEC-05 | No record deleted; flags + documented treatment | Traceability requirement | | |
 | DEC-06 | Allocation by entropy-regularised optimal transport (CPST) | Survey-constrained, mass-conserving, mixing parameter explicit | | |
-| DEC-07 | Base-case density = FMS density (κ = 1.0); κ tested 0.80-1.05 | Measured value preferred; confounded with missing FMS | | |
+| DEC-07 | ~~Base-case density = FMS density (κ = 1.0); κ tested 0.80-1.05~~ **Superseded by DEC-12** | The range stopped at κ = 0.80 (f_v = 1.25) and never reached the bulking hypothesis (κ ≈ 0.68) | | |
 | DEC-08 | Block size 5 × 5 × 2 m | Survey/GPS resolution, reclaim equipment, sensitivity tested | | |
-| DEC-10 | Impute X/Y of 14 records with an identical default position (A-32) | QA-F11: physically impossible location | | |
+| DEC-10 | ~~Impute X/Y of 14 records with an identical default position (A-32)~~ **Superseded by DEC-13** | QA-F11: physically impossible location | | |
 | DEC-09 | Legacy material reported separately with assumed grade, never mixed into "measured" totals | Professional accountability (Section 6.2 of brief) | | |
+| DEC-11 | Survey labelled D closes its interval at D+1 07:00 (cut-off 31 h after 00:00 of D) | 0-36 h scan: plateau 30-31.5 h (r 0.992 vs 0.961 at midnight); no dumps 06:00-07:30 (shift change) (A-05) | | |
+| DEC-12 | In-pile volume = T × f_v / Dens with f_v calibrated on consistent intervals (1.47); base case payloads as recorded (f_pay = 1, i.e. bulking); f_pay 1.00-1.19 in the Monte Carlo; missing-load interpretation reported as a scenario outside the ranges | Hold-out error 3.5% vs 32% for f_v = 1 (A-06) | | |
+| DEC-13 | Dump location of LOC_DEFAULT records treated as unknown (uniform push cost) instead of imputed | An imputed centroid is still an invented position (A-32) | | |
+| DEC-14 | A-13b (inferred toe fill) off in the base case; kept as a sensitivity | With f_v calibrated, complete days have no room for 7,200 m³ of unrecorded fill | | |
+| DEC-15 | Headline inventory = record-period material (FMS-tracked + unattributed), tied to surveyed solids; pre-record core and whole-pile total reported second | 65% of the whole-pile tonnes rest on inferred geometry and assumed grade | | |
+| DEC-16 | Merge of the independent implementation B: adopt its timing scan, volume-factor calibration and hold-out, unknown-location treatment, hashed raw store with interventions, QA rule catalogue and test philosophy; keep A's CPST engine, twin tests, 5 × 5 × 2 m blocks and built deliverables | Cross-implementation review (Appendix A, D6 Section 9.8) | | |
 
 # 9. Agreement
 

@@ -37,18 +37,25 @@ def build() -> Path:
         "twin": "validation/fig_val_twin_scatter.png", "tornado": "uncertainty/fig_sens_tornado.png",
         "mchist": "uncertainty/fig_unc_global_histograms.png", "uncmap": "uncertainty/fig_unc_block_maps.png",
         "geometry": "validation/fig_val_geometry.png", "push": "growth/fig_growth_push_distance.png",
-        "repose": "qaqc/fig_qaqc_repose.png",
+        "repose": "qaqc/fig_qaqc_repose.png", "volfac": "growth/fig_volume_factor.png",
+        "scen": "uncertainty/fig_scenarios.png", "mcscatter": "uncertainty/fig_unc_param_scatter.png",
     }.items():
         p = (OUT / rel).resolve()
         if p.exists():
             w, h = Image.open(p).size
             figs[name] = {"path": str(p), "w": w, "h": h}
-    best_align = al.loc[al["pearson_r"].idxmax()]
-    morning = al[al["survey_time"] <= "10:00"]["pearson_r"].max()
+    al = al.set_index("cutoff_hours")
+    vf = pd.read_csv(OUT / "growth" / "volume_factor_summary.csv", index_col=0).iloc[:, 0]
+    scen = pd.read_csv(OUT / "uncertainty" / "scenarios.csv")
+    cat = pd.read_csv(OUT / "qaqc" / "qa_rule_catalogue.csv")
     data = {
         "k": k, "repose": q["repose"], "base": q["base_plane"],
         "n_sig": q["n_grade_signatures"], "payload38": q["payload_multiple_of_38_frac"],
-        "align_best": best_align["survey_time"], "align_r": float(best_align["pearson_r"]), "align_morning_r": float(morning),
+        "align_best": float(al["r_daily"].idxmax()), "align_r": float(al.loc[31.0, "r_daily"]), "align_r24": float(al.loc[24.0, "r_daily"]),
+        "align_rcv": float(al.loc[31.0, "ratio_rcv_daily"]), "align_rcv24": float(al.loc[24.0, "ratio_rcv_daily"]),
+        "vf": {k_: (float(v_) if k_ not in ("consistent_intervals", "excluded_intervals") else v_) for k_, v_ in vf.items()},
+        "scen": scen.to_dict("records"),
+        "qa": {"n_rules": int(len(cat)), "n_trig": int((cat["count"] > 0).sum())},
         "inv": inv.to_dict("records"),
         "periods": [{"label": f"{e:%m-%d}" + ("*" if g else ""), "fill": float(f), "fms": float(v + c), "unatt": float(u)}
                     for e, g, f, v, c, u in zip(per["end"], per["gap_detected"], per["fill_volume"], per["fms_volume"],

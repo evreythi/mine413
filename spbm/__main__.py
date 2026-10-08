@@ -1,6 +1,7 @@
 """Command line interface.
 
     python -m spbm run      [--config C] [--until DATE] [--mc N] [--fast]
+    python -m spbm ingest   PATH [PATH ...]       # copy new files into the managed raw store
     python -m spbm update   [--config C]          # pick up new files in data/inbox and re-run
     python -m spbm qaqc     [--config C]          # data checks only
     python -m spbm status   [--config C]          # registered data and last run
@@ -17,9 +18,11 @@ from .config import load_config, resolve
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="spbm", description="Stockpile reconstruction & block model platform")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ["run", "update", "qaqc", "status"]:
+    for name in ["run", "update", "ingest", "qaqc", "status"]:
         p = sub.add_parser(name)
         p.add_argument("--config", default="config/project.yaml")
+        if name == "ingest":
+            p.add_argument("paths", nargs="+", help="files, folders or zip archives to add to the raw store")
         if name in ("run", "update"):
             p.add_argument("--until", default=None, help="only use data up to this date-time (re-run history / demonstrate updating)")
             p.add_argument("--mc", type=int, default=None, help="number of Monte Carlo realisations (default from config)")
@@ -30,12 +33,19 @@ def main(argv=None):
     if getattr(a, "out", None):
         cfg["outputs"]["root"] = a.out
 
+    if a.cmd == "ingest":
+        from . import io as sio
+        new = sio.ingest(cfg, extra=a.paths, interventions=sio.load_interventions(cfg))
+        print(f"ingest: {len(new)} new file(s) stored in {cfg['inputs']['raw_store']}")
+        if len(new):
+            print(new[["name", "kind", "status", "stored_as"]].to_string(index=False))
+        return 0
     if a.cmd in ("run", "update"):
         from .pipeline import run
         if a.cmd == "update":
             from . import io as sio
             from .audit import update_registry
-            files = sio.scan_sources(cfg)
+            files = sio.scan_sources(cfg, sio.load_interventions(cfg))
             reg = resolve(cfg["outputs"]["root"]) / "audit" / "data_registry.csv"
             import pandas as pd
             known = set(pd.read_csv(reg)["sha256"]) if reg.exists() else set()

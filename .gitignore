@@ -9,3 +9,6 @@ outputs_demo/
 tools/node_modules/
 tools/package-lock.json
 dist/
+data/raw_store/
+data/inbox/*
+!data/inbox/.gitkeep

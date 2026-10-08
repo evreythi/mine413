@@ -16,7 +16,7 @@ subtitle: "Pit I HG stockpile - current state after the 2026-03-29 survey (provi
 
 **Block definition.** Origin (lower-left-bottom corner) E 511,290, N 7,122,280, Z 4,474.0. Blocks 5 × 5 × 2 m; 27 × 26 × 10 blocks. Partial blocks are exported with `fill_frac` and their true material volume. Coordinates are in the mine grid (see D2, A-01).
 
-**Units.** Tonnes are as reported by the FMS (moisture basis not stated, A-26). Cu is in %, Au and Ag in g/t (as supplied, see QA-F04). Contained Cu is in tonnes, Au and Ag in kg (1 koz = 31.1035 kg).
+**Units.** Tonnes are as reported by the FMS (moisture basis not stated, A-26). Block volumes use the in-pile volume T × f_v / Dens with the calibrated volume factor f_v = {{F_V}}. In the base case the in-pile density is {{RHO_PILE}} t/m³ (A-06; D2 Section 2.5). Cu is in %, Au and Ag in g/t (as supplied, see QA-F04). Contained Cu is in tonnes, Au and Ag in kg (1 koz = 31.1035 kg).
 
 ## 1.1 Block fields
 
@@ -24,10 +24,10 @@ subtitle: "Pit I HG stockpile - current state after the 2026-03-29 survey (provi
 |---|---|---|
 | `ix, iy, iz, xc, yc, zc, dx, dy, dz` | Block index, centroid, size | - |
 | `volume_m3`, `fill_frac` | Material volume in block; fraction of block filled | Measured geometry + inferred where unsurveyed |
-| `tonnes`, `density` | Total tonnes; derived bulk density | Measured / assumed by class |
+| `tonnes`, `density` | Total tonnes; derived in-pile density (tonnes ÷ volume) | Measured tonnes, calibrated volume (FMS); assumed by class otherwise |
 | `cu_pct, au_gpt, ag_gpt` | Best-estimate grade (all classes) | Mixed: see class fractions |
 | `cu_t, au_kg, ag_kg` | Contained metal | Mixed |
-| `t_fms, t_unattributed, t_legacy, t_provisional` | Tonnes by information class | - |
+| `t_fms, t_unattributed, t_legacy, t_provisional` | Tonnes by information class (`t_legacy` = pre-record core) | - |
 | `frac_fms, frac_unattributed, frac_legacy` | Class fractions | - |
 | `cu_pct_fms, au_gpt_fms` | Grade of the FMS-tracked part only | Measured inputs, model-generated placement |
 | `cu_sd_within, au_sd_within` | Grade heterogeneity among the loads mixed into the block | Model-generated |
@@ -44,13 +44,17 @@ subtitle: "Pit I HG stockpile - current state after the 2026-03-29 survey (provi
 
 {{TABLE_INV}}
 
+> **Read the record-period total first.** It is the material placed during the FMS record (15-31 March) and is tied to surveyed fill. The pre-record core has inferred geometry and an assumed grade. The whole-pile total includes it.
+>
+> **Not included in any range in this table:** the interpretation that the 47% volume excess is loads missing from the FMS. In that case record-period tonnes would be {{X2_RP}} t (scenario X2, D6 Section 10.2).
+>
 > **Two class tables.** This table is the *exact* split: every block's tonnes are divided among the classes. `summary_by_dominant_info_class.csv` instead counts each whole block under its dominant class, for maps and reclaim planning, so its class totals differ even though the grand total is the same.
 >
 > **Identical grades across classes** follow from the assumptions: legacy grade = FMS mean (A-22), and unattributed grade is imputed from the same loads (A-21).
 >
 > **Grade units are as supplied and unconfirmed (QA-F04).**
 
-> **Reading this table.** Only the first two rows rest on measured grade data. The grades of the unattributed and legacy rows are imputed or assumed, and their *volumes* depend on assumptions A-13, A-13b and A-14. They must not be summed with the FMS-tracked inventory without that caveat.
+> **Reading this table.** Only the first two rows rest on measured grade data. The unattributed row has a measured volume but an imputed grade. The pre-record core's grade is assumed, and its volume depends on assumptions A-13 and A-14.
 
 ## 2.2 By confidence class
 
@@ -85,6 +89,6 @@ Source: `outputs/blockmodel/summary_by_bench_4m.csv` (model run {{RUN_ID}}).
 # 4. How to use the model
 
 * **Reclaim sequencing / blending.** Filter `confidence ∈ {High, Medium}` for material whose grade rests on FMS data. Use `cu_p10` and `cu_p90` to test blends against plant constraints. Treat `Legacy-assumed` blocks as unknown-grade material until sampled.
-* **Plant-feed / metal forecasting.** Use the bench summaries with their P10-P90 ranges. Report the FMS-tracked inventory separately from imputed and assumed inventories (D6, Section 13).
+* **Plant-feed / metal forecasting.** Use the bench summaries with their P10-P90 ranges. Report the record-period inventory first and separately from the pre-record core (D6, Section 13). Quote the scenario X2 next to any tonnage range.
 * **Reconciliation.** `top_loads` and `load_destinations.csv` let mill or stacker grade measurements be compared with the loads predicted to be in a reclaimed block. This is how ε and the push parameters should be calibrated in operation.
 * **Updating.** After each new survey run `python -m spbm update`. Provisional blocks will be re-reconciled.

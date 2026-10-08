@@ -29,26 +29,33 @@ def monte_carlo(ds_loader, cfg, bg, base_df, out: Path, n=None, verbose=True) ->
     rows = []
     cls_tot = []
     t0 = time.time()
+    from .volume import calibrate
+    lo, hi = u["survey_cutoff_range"]
+    cutoffs = np.arange(lo, hi + 1e-9, 0.5)
     for r in range(n):
         prm = {
-            "survey_time": str(rng.choice(u["survey_time_choices"])),
+            "survey_cutoff_hours": float(rng.choice(cutoffs)),
             "epsilon": float(rng.uniform(*u["epsilon_range"])),
             "alpha_up": float(rng.uniform(*u["alpha_range"])),
             "max_push": float(rng.uniform(*u["max_push_range"])),
-            "compaction": float(rng.uniform(*u["compaction_range"])),
-            "payload_bias": float(rng.normal(0, u["payload_bias_sd"])),
+            # A-06: recorded payloads most likely (mode = lower bound); under-recording
+            # up to the truck-rating bound with linearly decreasing likelihood
+            "payload_factor": float(rng.triangular(u["payload_factor_range"][0], u["payload_factor_range"][0], u["payload_factor_range"][1])),
         }
-        c2 = apply_overrides(cfg, {"time.survey_time": prm["survey_time"], "movement.epsilon": prm["epsilon"],
+        c2 = apply_overrides(cfg, {"time.survey_cutoff_hours": prm["survey_cutoff_hours"], "movement.epsilon": prm["epsilon"],
                                    "movement.alpha_up": prm["alpha_up"], "movement.max_push": prm["max_push"],
                                    "movement.retain_cost": max(prm["max_push"], cfg["movement"]["retain_cost"]),
-                                   "density.compaction_factor": prm["compaction"]})
+                                   "density.payload_factor": prm["payload_factor"]})
         c2["_mc_impute"] = True
-        if prm["survey_time"] not in ds_cache:
-            ds_cache[prm["survey_time"]] = ds_loader(c2)
-        ds = ds_cache[prm["survey_time"]]
+        if prm["survey_cutoff_hours"] not in ds_cache:
+            ds_cache[prm["survey_cutoff_hours"]] = ds_loader(c2)
+        ds = ds_cache[prm["survey_cutoff_hours"]]
+        # A-06: f_v drawn from the bootstrap distribution calibrated at this cut-off
+        cal = calibrate(ds, c2)
+        prm["volume_factor"] = float(rng.choice(cal["boot"])) if u.get("volume_factor_bootstrap", True) else float(cal["f_v"])
+        c2 = apply_overrides(c2, {"density.volume_factor": prm["volume_factor"]})
         loads = prepare_loads(ds, c2, rng=rng, perturb={"gps_sigma": u["gps_sigma"], "payload_cv": u["payload_cv"],
-                                                         "payload_bias": prm["payload_bias"], "assay_cv": u["assay_cv"],
-                                                         "compaction": prm["compaction"]})
+                                                         "assay_cv": u["assay_cv"]})
         bias = rng.normal(0, u["survey_bias_sd"], len(ds.surveys) + 1)
         rec = reconstruct(ds, c2, loads=loads, rng=rng, survey_bias=bias)
         a = bm.aggregate(rec, bg)
@@ -88,6 +95,9 @@ def monte_carlo(ds_loader, cfg, bg, base_df, out: Path, n=None, verbose=True) ->
     ct = pd.DataFrame(cls_tot)
     for c in ct.columns:
         tot["class_" + c] = ct[c].values
+    tot["record_period_tonnes"] = tot["class_t_f"] + tot["class_t_u"]
+    tot["record_period_cu_t"] = tot["class_cu_f"] + tot["class_cu_u"]
+    tot["record_period_au_kg"] = tot["class_au_f"] + tot["class_au_u"]
     tot["class_fms_cu_pct"] = tot["class_cu_f"] / tot["class_t_f"] * 100
     tot["class_fms_au_gpt"] = tot["class_au_f"] / tot["class_t_f"] * 1000
     q = tot.quantile([0.1, 0.5, 0.9]).T
@@ -142,8 +152,8 @@ def apply_prior_ranges(df: pd.DataFrame, loads: pd.DataFrame, min_tracked=0.5) -
 def sensitivity_oat(ds_loader, cfg, base_df, base_rec, out: Path, verbose=True) -> pd.DataFrame:
     s = cfg["sensitivity"]
     keymap = {"epsilon": "movement.epsilon", "alpha_up": "movement.alpha_up", "max_push": "movement.max_push",
-              "compaction_factor": "density.compaction_factor", "sigma_z": "survey.sigma_z",
-              "survey_time": "time.survey_time", "cell": "grid.cell",
+              "payload_factor": "density.payload_factor", "volume_factor": "density.volume_factor",
+              "sigma_z": "survey.sigma_z", "survey_cutoff_hours": "time.survey_cutoff_hours", "cell": "grid.cell",
               "front_unobserved_fill": "infill.front_unobserved_fill"}
     rows = [dict(_key_metrics("base", base_rec, base_df, base_df), parameter="base", level="base", value="")]
     for name, (lo, hi) in s.items():
@@ -157,8 +167,12 @@ def sensitivity_oat(ds_loader, cfg, base_df, base_rec, out: Path, verbose=True) 
                 ov = {keymap[name]: val}
                 if name == "max_push":
                     ov["movement.retain_cost"] = max(val, cfg["movement"]["retain_cost"])
+                if name in ("survey_cutoff_hours", "cell", "sigma_z", "front_unobserved_fill"):
+                    ov.update({"density.volume_factor": "auto", "density.volume_factor_resolved": None})  # re-calibrate f_v
                 c2 = apply_overrides(cfg, ov)
                 ds = ds_loader(c2)
+                from .volume import resolve_density
+                c2 = resolve_density(ds, c2)
                 rec = reconstruct(ds, c2)
                 bg = bm.make_block_grid(rec, c2)
             a = bm.aggregate(rec, bg)
@@ -210,8 +224,9 @@ def mc_figures(mc, base_df, out: Path):
     import matplotlib.pyplot as plt
     tot = mc["totals"]
     fig, axs = plt.subplots(1, 3, figsize=(14, 3.8))
-    for ax, (col, lab, sc) in zip(axs, [("total_tonnes", "total modelled tonnes (kt)", 1e-3), ("cu_t", "contained Cu (kt)", 1e-3),
-                                         ("au_kg", "contained Au (koz)", 1 / 31.1035)]):
+    for ax, (col, lab, sc) in zip(axs, [("record_period_tonnes", "record-period tonnes (kt)", 1e-3),
+                                         ("record_period_cu_t", "record-period contained Cu (kt)", 1e-3),
+                                         ("total_tonnes", "whole pile incl. pre-record core (kt)", 1e-3)]):
         v = tot[col] * sc
         ax.hist(v, bins=15, color=pl.CAT[0])
         for p, ls in [(10, ":"), (50, "-"), (90, ":")]:
@@ -220,9 +235,70 @@ def mc_figures(mc, base_df, out: Path):
     pl.save(fig, out / "fig_unc_global_histograms.png")
     real = mc["realizations"]
     fig, axs = plt.subplots(1, 3, figsize=(14, 3.8))
-    for ax, (x, lab) in zip(axs, [("epsilon", "mixing length ε (m)"), ("compaction", "compaction factor κ"), ("max_push", "max push (m)")]):
-        ax.scatter(real[x], real["top_bench_cu_pct"], s=14, color=pl.CAT[0])
+    for ax, (x, lab) in zip(axs, [("volume_factor", "volume factor f_v"), ("payload_factor", "payload factor f_pay"), ("epsilon", "mixing length ε (m)")]):
+        ax.scatter(real[x], real["record_period_tonnes"] / 1000, s=14, color=pl.CAT[0])
         ax.set_xlabel(lab)
-        ax.set_ylabel("top-bench Cu (%)")
-    fig.suptitle("Monte Carlo: top-bench Cu grade vs sampled parameters", x=0.01, ha="left", fontsize=10)
+        ax.set_ylabel("record-period tonnes (kt)")
+    fig.suptitle("Monte Carlo: record-period inventory vs sampled parameters", x=0.01, ha="left", fontsize=10)
     pl.save(fig, out / "fig_unc_param_scatter.png")
+
+
+def scenarios(ds, cfg, bg, out: Path, verbose=True) -> pd.DataFrame:
+    """A-06 interpretations of the volume gap. The calibrated volume factor f_v
+    fixes the in-pile VOLUME of every load (T * f_v / Dens) in all of them;
+    they differ in how many TONNES that volume holds, which the data cannot
+    identify. S0/S1 bound the Monte Carlo range; X1 is excluded on physical
+    grounds; X2 cannot be excluded from these data and is reported separately
+    ("not included in those ranges")."""
+    from .validation import class_inventory
+    fv = float(cfg["density"]["volume_factor_resolved"])
+    fpay_hi = float(cfg["uncertainty"]["payload_factor_range"][1])
+    pmax = float(pd.to_numeric(ds.fms["payload_t"], errors="coerce").max())
+    defs = [
+        ("S0", "base case", "Recorded tonnes correct; the volume excess is bulking (Dens read as bank density, f_v as swell).",
+         {}),
+        ("S1", "inside the Monte Carlo range (upper end)",
+         f"Payloads under-recorded by {fpay_hi - 1:.0%} (largest load {pmax:.0f} t -> {pmax * fpay_hi:.0f} t, the rated payload of the largest haul trucks); rest is bulking.",
+         {"density.payload_factor": fpay_hi}),
+        ("S2", "sensitivity (not in Monte Carlo)", "A-13b on: fill inferred in front of earlier faces is counted as unrecorded material.",
+         {"infill.front_unobserved_fill": True}),
+        ("X1", "EXCLUDED", f"All of the excess is payload under-recording (f_pay = f_v = {fv:.2f}): largest load would be {pmax * fv:.0f} t, above any haul-truck rating.",
+         {"density.payload_factor": fv}),
+        ("X2", "NOT INCLUDED in the ranges (cannot be excluded)",
+         f"Dens is the in-pile density and the excess volume is loads missing from the FMS: about {1 - 1 / fv:.0%} of the volume on days with otherwise complete records.",
+         {"density.volume_factor": 1.0, "density.volume_factor_resolved": None}),
+    ]
+    rows = []
+    for sid, status, desc, ov in defs:
+        c2 = apply_overrides(cfg, ov) if ov else cfg
+        rec = reconstruct(ds, c2)
+        inv = class_inventory(rec, bm.aggregate(rec, bg)).set_index("class")
+        f_, u_, l_ = inv.iloc[0], inv.iloc[1], inv.iloc[2]
+        L = rec.loads
+        fpay = float(c2["density"].get("payload_factor", 1.0))
+        rows.append({"scenario": sid, "status": status, "description": desc,
+                     "volume_factor": float(L["vol"].sum() / (L["m_recorded"] / L["dens_fms"]).sum()), "payload_factor": fpay,
+                     "in_pile_density_t_m3": float(np.average(L["rho"], weights=L["m"])), "largest_load_t": pmax * fpay,
+                     "fms_tonnes": f_.tonnes, "unattributed_tonnes": u_.tonnes,
+                     "record_period_tonnes": f_.tonnes + u_.tonnes, "record_period_cu_t": f_.cu_t + u_.cu_t,
+                     "record_period_au_kg": f_.au_kg + u_.au_kg, "unattributed_volume_m3": float(rec.periods["unattributed_volume"].sum()),
+                     "pre_record_tonnes": l_.tonnes, "total_tonnes": inv.loc["TOTAL", "tonnes"], "total_cu_t": inv.loc["TOTAL", "cu_t"]})
+        if verbose:
+            print(f"    scenario {sid}: record-period {rows[-1]['record_period_tonnes']:,.0f} t, total {rows[-1]['total_tonnes']:,.0f} t")
+    tab = pd.DataFrame(rows)
+    tab.to_csv(out / "scenarios.csv", index=False)
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(10.5, 3.9))
+    y = np.arange(len(tab))[::-1]
+    ax.barh(y, tab["fms_tonnes"] / 1e3, color=pl.CAT[0], label="FMS-tracked")
+    ax.barh(y, tab["unattributed_tonnes"] / 1e3, left=tab["fms_tonnes"] / 1e3, color=pl.CAT[2], label="unattributed (surveyed, no FMS record)")
+    ax.barh(y, tab["pre_record_tonnes"] / 1e3, left=tab["record_period_tonnes"] / 1e3, color=pl.GRID, label="pre-record core (inferred geometry, assumed grade)")
+    for yy, (_, r) in zip(y, tab.iterrows()):
+        ax.text(r["record_period_tonnes"] / 1e3, yy, f" {r['record_period_tonnes'] / 1e3:,.1f} kt", va="center", fontsize=8, color=pl.INK)
+    ax.set_yticks(y)
+    ax.set_yticklabels([f"{r.scenario}  {r.status.split(' (')[0]}" for r in tab.itertuples()])
+    ax.set_xlabel("kt")
+    ax.set_title("Volume-gap interpretations: tonnes held by the same surveyed volume", loc="left")
+    ax.legend(loc="lower right", fontsize=7.5)
+    pl.save(fig, out / "fig_scenarios.png")
+    return tab
