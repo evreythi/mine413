@@ -284,7 +284,7 @@ def _figures(ds, cfg, f, daily, sq, base, allsl, out):
         if st == "SURVEY CHANGE, NO FMS":
             a1.axvspan(k - 0.5, k + 0.5, color=pl.CAT[3], alpha=0.18, lw=0)
     a1.set_ylabel("FMS tonnes (kt)")
-    a1.set_title("FMS tonnage per production day (D 07:00 to D+1 07:00; shaded = survey change, no FMS record)", loc="left")
+    a1.set_title("FMS tonnage per production day (D 07:00 to D+1 07:00; shaded = survey change but no FMS record)", loc="left")
     vol = []
     for d in daily.index:
         v = sq.loc[pd.to_datetime(sq["nominal_date"]) == d, "volume_m3"]
@@ -339,7 +339,7 @@ def _figures(ds, cfg, f, daily, sq, base, allsl, out):
     fig, axs = plt.subplots(int(np.ceil(n / ncol)), ncol, figsize=(17, 3.6 * np.ceil(n / ncol)))
     for ax, s in zip(axs.flat, ds.surveys):
         im = pl.raster(ax, np.where(s.mask, s.thickness, np.nan), g, vmin=0, vmax=6)
-        pl.plan_axes(ax, g, f"{s.file}\nsurvey {s.label} (interval ends {s.datetime:%m-%d %H:%M})", ticks=False)
+        pl.plan_axes(ax, g, f"{s.file}\nsurvey {s.label}", ticks=False)
         ax.set_xticks([]); ax.set_yticks([])
     for ax in list(axs.flat)[n:]:
         ax.axis("off")

@@ -337,8 +337,8 @@ Sixty Monte Carlo realisations jointly sampled the following (D3, Section 7):
 
 **Interpretation.**
 
-* **Record-period tonnage** is driven by the payload factor and the volume factor (scatter plot above). Moving the survey cut-off to 29 or 32 h changes record-period tonnes by {{CUT_SENS_T}}, mostly through the recalibrated f_v. It still moves block grades by up to {{CUT_SENS_CU}}% Cu on average, because loads dumped within an hour or two of the cut-off change interval.
-* **Whole-pile tonnage** is driven by the in-pile density applied to the pre-record core, which follows the volume factor. The A-13b switch moves about {{S2_SHIFT}} kt from the core to the unattributed class.
+* **Record-period tonnage** is driven by the payload factor, the volume factor (scatter plot above) and the A-13b switch. Moving the survey cut-off to 29 or 32 h changes record-period tonnes by {{CUT_SENS_T}}, mostly through the recalibrated f_v. It still moves block grades by up to {{CUT_SENS_CU}}% Cu on average, because loads dumped within an hour or two of the cut-off change interval.
+* **Whole-pile tonnage** is driven by the payload and volume factors, because they set the in-pile density that converts the pre-record core's volume into tonnes. The A-13b switch moves about {{S2_SHIFT}} kt from the core to the unattributed class.
 * **Spatial grade field.** The survey cut-off, the movement parameters, the grid and the A-13b switch drive the grade field of the FMS-tracked material (mean absolute block Cu change in the tornado). The Monte Carlo block Cu CV for FMS-tracked blocks has a median of {{BLK_CV_P50}} (P90 {{BLK_CV_P90}}).
 * **What the Monte Carlo cannot quantify.** The pre-record core grade is an assumption, not a measurement. For blocks with less than 50% FMS-tracked material we therefore report a *prior* range: the load-scale P10-P90 of all FMS loads, {{PRIOR_CU}} % Cu. We do not report Monte Carlo precision for these blocks, because it would be false.
 

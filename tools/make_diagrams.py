@@ -35,12 +35,12 @@ def workflow():
     box(ax, 1.6, 6.7, 2.6, 0.7, "FMS records (*.csv)\nnew files -> data/inbox", "data")
     box(ax, 1.6, 5.7, 2.6, 0.7, "Survey change solids (*.dxf)\nnew files -> data/inbox", "data")
     box(ax, 1.6, 4.6, 2.6, 0.8, "config/project.yaml\nmanual_interventions.csv\n(assumptions A-xx)", "dec")
-    box(ax, 4.7, 6.2, 2.6, 0.9, "1-2 IMPORT\nscan sources, SHA-256 registry,\nstandardise, rasterise (cache)", "proc")
-    box(ax, 4.7, 4.9, 2.6, 0.9, "3 QA/QC\n14 FMS flags, survey checks,\ncoverage, alignment", "proc")
-    box(ax, 4.7, 3.6, 2.6, 0.9, "4 PERIODS\nsurvey times, gap detection,\nloads -> periods", "proc")
+    box(ax, 4.7, 6.2, 2.6, 0.9, "1-2 IMPORT\nhashed raw store + ingest log,\ninterventions, rasterise (cache)", "proc")
+    box(ax, 4.7, 4.9, 2.6, 0.9, "3 QA/QC\n40-rule catalogue (record,\nsurvey file, dataset)", "proc")
+    box(ax, 4.7, 3.6, 2.6, 0.9, "4 INTERVALS + VOLUME\ncut-off scan (D+1 07:00), loads ->\nintervals, f_v calibration + hold-out", "proc")
     box(ax, 4.7, 2.2, 2.6, 1.1, "5 MATERIAL MOVEMENT (CPST)\ncuts, push cost, partial OT,\ndeposit layers, carry-over", "core")
     box(ax, 8.0, 6.2, 2.7, 0.9, "6-7 BLOCK MODEL\n5x5x2 m, tonnes, Cu, Au, Ag,\nmetal, class, provenance", "core")
-    box(ax, 8.0, 4.9, 2.7, 0.9, "8 UNCERTAINTY\nMonte Carlo (60) + tornado;\nP10/P50/P90, CV, confidence", "proc")
+    box(ax, 8.0, 4.9, 2.7, 0.9, "8 UNCERTAINTY\nMonte Carlo (60), tornado,\nvolume-gap scenarios", "proc")
     box(ax, 8.0, 3.6, 2.7, 0.9, "9 VALIDATION\nmass/metal balance, geometry,\nforward test, twin, robustness", "proc")
     box(ax, 8.0, 2.2, 2.7, 1.0, "10 OUTPUTS\nCSV / VTK / ASC exports,\nfigures, report tables", "out")
     box(ax, 8.0, 0.8, 2.7, 0.9, "11 AUDIT\nrun manifest, config hash, versions,\nhistory + change report", "out")
@@ -63,10 +63,10 @@ def algorithm():
     x = 5
     steps = [
         (10.5, "State at survey s-1: column stacks (legacy + earlier period layers), model surface z_m,\ncarried platform parcels", "data"),
-        (9.4, "Read change solid s: top_s, bot_s.  First-surveyed cells -> create legacy column to prior surface\n(bot_s, or repose extrapolation if in front of an earlier face: A-13b)", "proc"),
+        (9.4, "Read change solid s: top_s, bot_s.  First-surveyed cells -> create legacy column to prior surface\n(bot_s; optional repose extrapolation in front of an earlier face, A-13b, off in base case)", "proc"),
         (8.3, "Cut detection: bot_s < z_m - tau on previously surveyed cells -> remove top of column\n-> cut sources (re-handled material, A-20)", "proc"),
         (7.2, "Fill field: dZ = top_s - z_m > tau  ->  sink capacity  b_c = dZ_c * A  (m3)", "proc"),
-        (6.1, "Sources: loads of period s (v_k = m_k / rho_k), carried parcels, cut cells\n+ dummy source U (unattributed); sinks: fill cells + dummy sink R (retained)", "proc"),
+        (6.1, "Sources: loads of period s (v_k = T_k f_v / Dens_k; unknown-location loads get a uniform cost),\ncarried parcels, cut cells + dummy source U (unattributed); sinks: fill cells + dummy sink R", "proc"),
         (5.0, "Push cost C_kc = slope-aware geodesic distance on pre-period surface\n(w = l + alpha * uphill rise; C = inf beyond L_max); C_kR = c_R, C_Uc = c_U, C_UR = 0", "core"),
         (3.9, "Entropic optimal transport (log-domain Sinkhorn, mixing length eps):\nmin <P,C> - eps H(P) s.t. P1 = a, P^T 1 = b ; rows rescaled -> exact mass", "core"),
         (2.8, "Deposit: layer_c = sum_k P_kc * pi_k  (volume, tonnes, Cu, Au, Ag, age),\nlayer top = surveyed top_s  (gravity / repose honoured by the survey)", "core"),
