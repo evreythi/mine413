@@ -306,7 +306,7 @@ See Section 5 and D2 Section 2.5. f_v is calibrated on the first half of the rec
 | Volume factor hold-out error | {{HO_MAE}} (f_v = 1: {{HO_DENS}}) |
 | Forward model W1 (test intervals) | {{FWD_P}} m (no-push {{FWD_B}} m; uniform {{FWD_U}} m) |
 | Twin block Cu RMSE / r | {{TW_CPST}}% / {{TW_R}} (flat cost {{TW_FLAT}}%) |
-| Automated tests | 66 (unit, real-data, platform) |
+| Automated tests | 67 (unit, real-data, platform) |
 
 ## Cross-implementation check
 
@@ -389,7 +389,7 @@ The platform (`spbm`, D5) performs the eleven required steps with one command:
   * the applied manual interventions, each with reason, author and date;
   * model history, and an automatic change report between versions.
 
-Manual corrections are possible only through `config/manual_interventions.csv`. A row without a reason, author or date stops the run. Sixty-six automated tests guard every change. They cover synthetic unit cases, real-data facts (for example the calibrated f_v, the cut-off optimum and the rule counts) and the platform end to end. The update workflow is demonstrated in `examples/demo_update.sh`: a model built to the 03-22 survey, then updated with the later data.
+Manual corrections are possible only through `config/manual_interventions.csv`. A row without a reason, author or date stops the run. Sixty-seven automated tests guard every change. They cover synthetic unit cases, real-data facts (for example the calibrated f_v, the cut-off optimum and the rule counts) and the platform end to end. The update workflow is demonstrated in `examples/demo_update.sh`: a model built to the 03-22 survey, then updated with the later data.
 
 ![Platform workflow.](figures/fig_workflow.png)
 

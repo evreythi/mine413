@@ -470,7 +470,7 @@ See Section 5 and D2 Section 2.5. f_v is calibrated on the first half of the rec
 | Volume factor hold-out error | 3.5% (f_v = 1: 32%) |
 | Forward model W1 (test intervals) | 14.1 m (no-push 14.3 m; uniform 30.6 m) |
 | Twin block Cu RMSE / r | 0.68% / 0.93 (flat cost 0.75%) |
-| Automated tests | 66 (unit, real-data, platform) |
+| Automated tests | 67 (unit, real-data, platform) |
 
 ## Cross-implementation check
 
@@ -502,7 +502,7 @@ Where the two answer the same question, they agree:
 | DXF header units | $INSUNITS = 1 (inches) in all files; ignored | $INSUNITS = 1 in all files; ignored |
 | Forward model, held-out earth-mover distance: push / no push / uniform (m) | 14.1 / 14.3 / 30.6 | 12.2 / 14.5 / 27.9 |
 | Block size | 5 × 5 × 2 m | 2 × 2 × 1 m |
-| Automated tests | 66 | 65 |
+| Automated tests | 67 | 65 |
 
 
 The agreement on f_v and on the consistent intervals matters most. Two different codes, with different rasterisation and cut detection, measure the same physical ratio from the same data. Both find the unattributed volume in the same four intervals (0, 7, 8, 9). The record-period inventories differ by about 2%, mainly because the unattributed volumes differ: B books fill within a survey tolerance band to its pad buffer. B's numbers are quoted from B's report and were not re-run.
@@ -609,7 +609,7 @@ The platform (`spbm`, D5) performs the eleven required steps with one command:
   * the applied manual interventions, each with reason, author and date;
   * model history, and an automatic change report between versions.
 
-Manual corrections are possible only through `config/manual_interventions.csv`. A row without a reason, author or date stops the run. Sixty-six automated tests guard every change. They cover synthetic unit cases, real-data facts (for example the calibrated f_v, the cut-off optimum and the rule counts) and the platform end to end. The update workflow is demonstrated in `examples/demo_update.sh`: a model built to the 03-22 survey, then updated with the later data.
+Manual corrections are possible only through `config/manual_interventions.csv`. A row without a reason, author or date stops the run. Sixty-seven automated tests guard every change. They cover synthetic unit cases, real-data facts (for example the calibrated f_v, the cut-off optimum and the rule counts) and the platform end to end. The update workflow is demonstrated in `examples/demo_update.sh`: a model built to the 03-22 survey, then updated with the later data.
 
 ![Platform workflow.](figures/fig_workflow.png)
 

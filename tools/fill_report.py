@@ -181,7 +181,7 @@ def values() -> dict:
         ["Forward model, held-out earth-mover distance: push / no push / uniform (m)",
          f"{v['FWD_P']} / {v['FWD_B']} / {v['FWD_U']}", "12.2 / 14.5 / 27.9"],
         ["Block size", "5 × 5 × 2 m", "2 × 2 × 1 m"],
-        ["Automated tests", "66", "65"],
+        ["Automated tests", "67", "65"],
     ]
     v["TABLE_XIMPL"] = md(pd.DataFrame(rows, columns=["quantity", "A (this platform, v2.0)", "B (independent implementation)"]),
                           "Table 9.7 - Cross-implementation comparison (B's values from its own report)")

@@ -72,7 +72,7 @@ The reviewer's comparison identified where B was stronger. Each point was re-imp
 | `$INSUNITS = 1` (inches) DXF header finding, and a rule catalogue with IDs | `rules.py`, `qaqc.py` | Counts reconciled with B (D6 Section 9.8) |
 | Default-position records as location-unknown | `movement.prepare_loads`, `reconstruct` | `test_unknown_location_loads*` |
 | Hashed raw store; manual interventions that require reason/author/date | `io.ingest`, `io.load_interventions` | `test_ingest_is_idempotent_and_refuses_conflicts`, `test_intervention_without_reason_*` |
-| Testing philosophy: pin real-data facts, test the platform end to end | `tests/` (66 tests, previously 10) | `python -m pytest` |
+| Testing philosophy: pin real-data facts, test the platform end to end | `tests/` (67 tests, previously 10) | `python -m pytest` |
 
 What A kept from version 1: the CPST engine (survey-constrained entropic optimal transport with exact conservation), the forward physics model, the synthetic twin and its stress twins, 5 × 5 × 2 m blocks, and the built deliverables (report, presentation, register workbook, submission package).
 

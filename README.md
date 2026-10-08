@@ -12,7 +12,7 @@ This project reconstructs how truck-dumped material moved through the Pit I copp
 * the DXF unit-header finding and a 40-rule QA catalogue;
 * unknown-location treatment of default-position loads;
 * a hashed raw store, and manual interventions that require a reason, author and date;
-* 66 tests (previously 10).
+* 67 tests (previously 10).
 
 See Appendix A and D1 (DEC-11 to DEC-17).
 
@@ -34,7 +34,7 @@ See Appendix A and D1 (DEC-11 to DEC-17).
 
 ```bash
 pip install -r requirements.txt
-python -m pytest -q          # 66 tests (unit, real data, platform), about 2 min
+python -m pytest -q          # 67 tests (unit, real data, platform), about 3 min
 python -m spbm run --fast    # base reconstruction and block model (~1.5 min)
 python -m spbm run           # full analysis incl. Monte Carlo, validation, sensitivity, scenarios (~40 min)
 python tools/fill_report.py  # refresh numbers in D2/D4/D6/README from the latest run

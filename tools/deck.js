@@ -260,7 +260,7 @@ s.addNotes(`Presenter: ${MEMBER(5)}. Distinguish measured, inferred, assumed and
 
 s = content("A repeatable, auditable in-house platform", "Uncertainty and platform");
 fitImg(s, "workflow", 0.4, 1.3, 8.0, 5.6);
-bullets(s, ["One command: python -m spbm update", "Managed raw store: every input SHA-256 named and logged; a changed file needs a supersede intervention", "Manual interventions need a reason, author and date, or the run stops", "40-rule QA catalogue; 66 automated tests", "Run manifest, model history and automatic change report", "Open formats: CSV, VTK, ESRI grids"], 8.6, 1.5, 4.2, 5.3, 14, "platform");
+bullets(s, ["One command: python -m spbm update", "Managed raw store: every input SHA-256 named and logged; a changed file needs a supersede intervention", "Manual interventions need a reason, author and date, or the run stops", "40-rule QA catalogue; 67 automated tests", "Run manifest, model history and automatic change report", "Open formats: CSV, VTK, ESRI grids"], 8.6, 1.5, 4.2, 5.3, 14, "platform");
 s.addNotes(`Presenter: ${MEMBER(5)}. Demonstrate (or show the recorded demo of) examples/demo_update.sh: build the model to the 03-22 survey cut-off, then update with the later data and read the change report. Mention that version 2 combines our platform with the stronger ideas of an independent implementation (B), disclosed in Appendix A.`);
 
 s = content("Two independent implementations agree", "Uncertainty and platform");

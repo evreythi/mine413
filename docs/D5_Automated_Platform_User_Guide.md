@@ -32,7 +32,7 @@ git clone <repository>            # or unzip the submission
 cd mine413
 python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python -m pytest -q               # 66 tests, about 2 min; must all pass
+python -m pytest -q               # 67 tests, about 3 min; must all pass
 python -m pytest -q -m "not slow" # skip the end-to-end pipeline test (about 40 s)
 ```
 
@@ -154,7 +154,7 @@ Document tooling (optional; not needed for the analysis): pandoc, Node.js with `
 * **Manual interventions**: only through `manual_interventions.csv`. Each row has an id, a type, a reason, an author and a date, and the file is rejected otherwise. Interventions are copied into the manifest. Raw files are never edited.
 * **No silent deletion**: FMS records are flagged, never removed. Each QA rule states its treatment. Only error-severity rules (missing or invalid fields, repeated copies, dumps before the record) exclude a record from modelling, and the record stays in `fms_records_with_flags.csv`.
 * **Model versions**: `history/` keeps each version's manifest and key tables; `change_report.md` documents differences.
-* **Verification**: `python -m pytest` runs 66 tests in three files.
+* **Verification**: `python -m pytest` runs 67 tests in three files.
   * `tests/test_units.py` covers synthetic inputs: rasterisation, the transport solver, column operations, avalanche, DXF reading, every QA record rule, ingest idempotence and conflict refusal, intervention validation, the survey cut-off, robust volume-factor estimation and the density identity.
   * `tests/test_real_data.py` pins the facts the report relies on: record counts, rule counts, DXF header units, the cut-off scan optimum, the shift-change lull, the calibrated f_v and its hold-out error, mass and metal conservation, and the record-period inventory.
   * `tests/test_platform.py` covers the command line, interventions in the engine, the manifest and change report, the incremental update, and an end-to-end run in a temporary folder.
