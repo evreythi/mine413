@@ -191,9 +191,9 @@ def sensitivity_oat(ds_loader, cfg, base_df, base_rec, out: Path, verbose=True) 
 def _tornado(tab, out):
     import matplotlib.pyplot as plt
     base = tab[tab.parameter == "base"].iloc[0]
-    metrics = [("top_bench_cu_pct", "Cu grade of top bench (>4484 m), %"),
-               ("tracked_blocks_cu_pct", "Cu grade of FMS-tracked blocks, %"),
-               ("total_tonnes", "Total modelled tonnes"),
+    metrics = [("record_period_tonnes", "Record-period tonnes (FMS-tracked + unattributed)"),
+               ("total_tonnes", "Whole-pile tonnes (incl. pre-record core)"),
+               ("top_bench_cu_pct", "Cu grade of top bench (>4484 m), %"),
                ("mean_abs_block_cu_change", "Mean |block Cu change| vs base, % Cu")]
     fig, axs = plt.subplots(2, 2, figsize=(13, 9))
     fig.subplots_adjust(hspace=0.42, wspace=0.45)

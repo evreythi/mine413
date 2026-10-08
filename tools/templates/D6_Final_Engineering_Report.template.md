@@ -251,7 +251,7 @@ The forward physics model was calibrated on intervals 1-5: repose angle, deposit
 
 {{TABLE_FORWARD}}
 
-On the unseen intervals the dozer-push model ({{FWD_P}} m) beats both the no-push baseline ({{FWD_B}} m, material left at the dump point) and the no-information baseline ({{FWD_U}} m, volume spread evenly over the pile). The absolute errors are still large compared with the block size. **Physics alone cannot say where on a 100 m face a day's fill will land; the surveys must constrain it.** This justifies the survey-constrained design of CPST. The forward model is used only where no survey exists (nowcast of the 03-31 load).
+On the unseen intervals the dozer-push model ({{FWD_P}} m) is far better than the no-information baseline ({{FWD_U}} m, volume spread evenly over the pile). It is only marginally better than leaving material at the dump point ({{FWD_B}} m), although it captures more of the observed fill. The absolute errors are large compared with the block size. **Physics alone cannot say where on a 100 m face a day's fill will land; the surveys must constrain it.** This justifies the survey-constrained design of CPST. The forward model is used only where no survey exists (nowcast of the 03-31 load).
 
 ![Unseen test intervals: observed fill vs prediction.](../outputs/validation/fig_val_forward_test.png)
 
@@ -261,7 +261,7 @@ A known-truth stockpile was generated from the real dump sequence with the forwa
 
 {{TABLE_TWIN}}
 
-CPST recovers block Cu grade with RMSE {{TW_CPST}}% Cu (r = {{TW_R}}). That is a {{TW_IMPROVE}}% lower error than allocating each interval's loads uniformly over its fill, and far better than a single mean grade.
+CPST recovers block Cu grade with RMSE {{TW_CPST}}% Cu (r = {{TW_R}}). That is a {{TW_IMPROVE}}% lower error than allocating each interval's loads uniformly over its fill, and far better than a single mean grade. In this twin a larger mixing length (ε = 15 m, {{TW_E15}}%) does slightly better than the base 6 m, which suggests the base case may under-mix somewhat. ε is therefore sampled over 2-15 m in the Monte Carlo, and calibrating it with tracers is recommended (R-06).
 
 ![Twin experiment: true vs reconstructed block Cu.](../outputs/validation/fig_val_twin_scatter.png)
 
@@ -337,9 +337,9 @@ Sixty Monte Carlo realisations jointly sampled the following (D3, Section 7):
 
 **Interpretation.**
 
-* **Record-period tonnage** is driven by the payload factor and the volume factor. Survey timing hardly matters any more, because the cut-off lies inside a dump-free window.
+* **Record-period tonnage** is driven by the payload factor and the volume factor (scatter plot above). Moving the survey cut-off to 29 or 32 h changes record-period tonnes by {{CUT_SENS_T}}, mostly through the recalibrated f_v. It still moves block grades by up to {{CUT_SENS_CU}}% Cu on average, because loads dumped within an hour or two of the cut-off change interval.
 * **Whole-pile tonnage** is driven by the in-pile density applied to the pre-record core, which follows the volume factor. The A-13b switch moves about {{S2_SHIFT}} kt from the core to the unattributed class.
-* **Spatial grade field.** The movement parameters, the grid and the A-13b switch drive the grade field of the FMS-tracked material (mean absolute block Cu change in the tornado). Monte Carlo block Cu CV for FMS-tracked blocks is typically below 10%.
+* **Spatial grade field.** The survey cut-off, the movement parameters, the grid and the A-13b switch drive the grade field of the FMS-tracked material (mean absolute block Cu change in the tornado). The Monte Carlo block Cu CV for FMS-tracked blocks has a median of {{BLK_CV_P50}} (P90 {{BLK_CV_P90}}).
 * **What the Monte Carlo cannot quantify.** The pre-record core grade is an assumption, not a measurement. For blocks with less than 50% FMS-tracked material we therefore report a *prior* range: the load-scale P10-P90 of all FMS loads, {{PRIOR_CU}} % Cu. We do not report Monte Carlo precision for these blocks, because it would be false.
 
 ## Interpretations of the volume gap (scenarios)

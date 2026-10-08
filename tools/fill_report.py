@@ -67,6 +67,7 @@ def values() -> dict:
         "FWD_P": f"{ft.loc['push (calibrated)', 'w1_m']:.1f}", "FWD_B": f"{ft.loc['no-push baseline', 'w1_m']:.1f}",
         "TW_CPST": f"{base.cu_rmse:.2f}", "TW_R": f"{base.cu_corr:.2f}", "TW_PA": f"{pa.cu_rmse:.2f}", "TW_GM": f"{gm.cu_rmse:.2f}",
         "TW_IMPROVE": f"{(1 - base.cu_rmse / pa.cu_rmse) * 100:.0f}",
+        "TW_E15": f"{twi.loc['CPST eps=15 m', 'cu_rmse']:.2f}" if "CPST eps=15 m" in twi.index else "n/a",
         "PRIOR_CU": f"{wq(loads['cu'].values, 0.1):.1f}-{wq(loads['cu'].values, 0.9):.1f}",
         "AU3_F": f"{F.au_gpt:.3f}", "AU3_U": f"{U.au_gpt:.3f}", "AU3_L": f"{L.au_gpt:.3f}",
         "UNATT_VOL": f"{S['key_results']['unattributed_volume_m3']:,.0f}",
@@ -89,6 +90,8 @@ def values() -> dict:
               "HO_DENS": f"{float(vf['holdout_mae_dens_as_inpile']):.0%}", "LOO": f"{float(vf['loo_mae']):.1%}",
               "RHO_PILE": f"{float(vf['in_pile_density_base']):.2f}", "X2_SHARE": f"{1 - 1 / fv:.0%}"})
     vt = pd.read_csv(OUT / "growth" / "volume_factor_calibration.csv")
+    if "survey_date" not in vt:                       # outputs from before the column existed
+        vt["survey_date"] = (pd.to_datetime(vt["end"]) - pd.Timedelta(hours=31)).dt.strftime("%Y-%m-%d")
     v.update({"FILL_VOL": f"{vt['fill_m3'].sum():,.0f}", "CUT_VOL": f"{vt['cut_m3'].sum():,.0f}", "NET_VOL": f"{vt['net_m3'].sum():,.0f}",
               "VDENS": f"{vt['vdens_m3'].sum():,.0f}",
               "UNATT_SHARE": f"{k['unattributed_volume_m3'] / vt['fill_m3'].sum():.0%}"})
@@ -137,6 +140,12 @@ def values() -> dict:
                          {"f_v": "{:.3f}", "f_pay": "{:.2f}", "in-pile t/m³": "{:.2f}", "largest load t": "{:,.0f}", "FMS t": "{:,.0f}",
                           "unattributed t": "{:,.0f}", "record-period t": "{:,.0f}", "record-period Cu t": "{:,.0f}",
                           "pre-record core t": "{:,.0f}", "whole pile t": "{:,.0f}"})
+    # one-at-a-time sensitivity of the survey cut-off
+    so = pd.read_csv(OUT / "uncertainty" / "sensitivity_oat.csv")
+    b0 = so.loc[so["parameter"] == "base", "record_period_tonnes"].iloc[0]
+    sc_ = so[so["parameter"] == "survey_cutoff_hours"]
+    ch = (sc_["record_period_tonnes"] / b0 - 1).abs()
+    v.update({"CUT_SENS_T": f"{ch.min():.0%}-{ch.max():.0%}", "CUT_SENS_CU": f"{sc_['mean_abs_block_cu_change'].max():.2f}"})
     # push distances
     dst = pd.read_csv(OUT / "movement" / "load_destinations.csv")
     dl = dst[dst["kind"] == "load"]
@@ -189,6 +198,9 @@ def values() -> dict:
                         "Inventory by information class (FMS grades/metal shown for the whole FMS class)",
                         {"tonnes": "{:,.0f}", "share": "{:.1%}", "Cu %": "{:.2f}", "Au g/t": "{:.2f}", "Cu (t)": "{:,.0f}", "Au (koz)": "{:,.1f}"})
     v["N_BLOCKS"] = f"{len(bm):,}"
+    trk = bm[(bm["frac_fms"] >= 0.5) & bm["cu_cv"].notna()]
+    v["BLK_CV_P50"] = f"{trk['cu_cv'].median():.0%}" if len(trk) else "n/a"
+    v["BLK_CV_P90"] = f"{trk['cu_cv'].quantile(0.9):.0%}" if len(trk) else "n/a"
     flags = pd.read_csv(OUT / "qaqc" / "fms_flag_summary.csv")
     v["TABLE_FLAGS"] = md(flags, "FMS record rules (records retained; treatment as stated)", {"records": "{:,.0f}", "tonnes": "{:,.0f}"})
     p = pd.read_csv(OUT / "growth" / "period_reconciliation.csv", parse_dates=["end"])
