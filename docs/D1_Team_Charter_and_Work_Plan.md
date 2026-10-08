@@ -14,8 +14,8 @@ The team has five members. Each member owns one technical work package. Every me
 | [Member 1] | Project lead and integrator | Overall workflow, final report (D6), presentation (D7) | WP5 | Meeting chair (weeks 1-3) |
 | [Member 2] | Data and QA/QC lead | Task 1 data investigation, Task 2 growth analysis, Data and Assumption Register (D2) | WP3 | Minute-taker (weeks 1-3) |
 | [Member 3] | Algorithm lead | Task 3 material-movement algorithm, Task 4 assumptions (D3) | WP4 | AI/software verification officer (weeks 1-4) |
-| [Member 4] | Block model and validation lead | Task 5 block model, Task 6 validation, Task 7 uncertainty (D4) | WP2 | Meeting chair (weeks 4-6) |
-| [Member 5] | Platform and reproducibility lead | Task 8 automated platform, tests, audit trail (D5) | WP1 | EDI and professional-practice champion |
+| [Member 4] | Block model and validation lead | Task 5 block model, Task 6 validation (D4) | WP2 | Meeting chair (weeks 4-6) |
+| [Member 5] | Platform, uncertainty and reproducibility lead | Task 7 uncertainty and sensitivity, Task 8 automated platform, tests, audit trail (D5) | WP1 | EDI and professional-practice champion |
 
 Roles rotate where indicated, so that leadership and administrative load are shared fairly. The **AI/software verification officer** keeps the AI-use log (D6 appendix) and checks that every AI-assisted code change has a recorded test or hand check. The **EDI and professional-practice champion** leads the ethics/equity scenario discussion and checks that the report states its limitations.
 
@@ -79,7 +79,7 @@ Decisions made in chat are copied into the decision log (Section 8) by the perso
 | Oct 19 | Task 2 growth and FMS-survey reconciliation; density/swell discussion | M2, M4 | Period reconciliation table |
 | Oct 26 | Task 3 algorithm prototype; forward physics model; Task 4 register v1 | M3 | Algorithm notebook, D2 draft |
 | Nov 2 | Block model v1; mass/metal balance verified; unit tests | M4, M5 | D4 draft, test log |
-| Nov 9 | Validation (temporal, twin experiment), Monte Carlo and sensitivity | M4, M3 | Validation tables |
+| Nov 9 | Validation (temporal, twin experiment), Monte Carlo and sensitivity | M4, M3, M5 | Validation tables |
 | Nov 16 | Platform hardening (update workflow, audit trail); report draft; ethics/equity discussion | M5, M1, all | D5, D6 draft |
 | Nov 23 | Final review, presentation rehearsal, submission zip (Thursday Nov 26, 23:59) | All | D1-D9 |
 
@@ -111,6 +111,7 @@ Buffer: the 48 h before the deadline are reserved for review only, not new analy
 | DEC-14 | A-13b (inferred toe fill) off in the base case; kept as a sensitivity | With f_v calibrated, complete days have no room for 7,200 m³ of unrecorded fill | | |
 | DEC-15 | Headline inventory = record-period material (FMS-tracked + unattributed), tied to surveyed solids; pre-record core and whole-pile total reported second | 65% of the whole-pile tonnes rest on inferred geometry and assumed grade | | |
 | DEC-16 | Merge of the independent implementation B: adopt its timing scan, volume-factor calibration and hold-out, unknown-location treatment, hashed raw store with interventions, QA rule catalogue and test philosophy; keep A's CPST engine, twin tests, 5 × 5 × 2 m blocks and built deliverables | Cross-implementation review (Appendix A, D6 Section 9.8) | | |
+| DEC-17 | Keep the slope-aware push cost in the base case, report the flat-cost ablation, and sample both cost forms in the Monte Carlo | Twins: the push cost helps only when the truth follows the same physics (D6 Section 6) | | |
 
 # 9. Agreement
 

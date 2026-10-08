@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
+FLAT = "CPST eps=6, flat cost (no push term)"
 OUT = ROOT / "outputs"
 TPL = ROOT / "tools" / "templates"
 
@@ -68,6 +69,9 @@ def values() -> dict:
         "TW_CPST": f"{base.cu_rmse:.2f}", "TW_R": f"{base.cu_corr:.2f}", "TW_PA": f"{pa.cu_rmse:.2f}", "TW_GM": f"{gm.cu_rmse:.2f}",
         "TW_IMPROVE": f"{(1 - base.cu_rmse / pa.cu_rmse) * 100:.0f}",
         "TW_E15": f"{twi.loc['CPST eps=15 m', 'cu_rmse']:.2f}" if "CPST eps=15 m" in twi.index else "n/a",
+        "TW_FLAT": f"{twi.loc[FLAT, 'cu_rmse']:.2f}", "TW_NOUP": f"{twi.loc['CPST eps=6, no uphill penalty', 'cu_rmse']:.2f}",
+        "PUSH_GAIN": f"{twi.loc[FLAT, 'cu_rmse'] - base.cu_rmse:.2f}", "TW_TCORR": f"{base.tonnes_corr:.2f}",
+        "FWD_GAIN": f"{ft.loc['no-push baseline', 'w1_m'] - ft.loc['push (calibrated)', 'w1_m']:.1f}",
         "PRIOR_CU": f"{wq(loads['cu'].values, 0.1):.1f}-{wq(loads['cu'].values, 0.9):.1f}",
         "AU3_F": f"{F.au_gpt:.3f}", "AU3_U": f"{U.au_gpt:.3f}", "AU3_L": f"{L.au_gpt:.3f}",
         "UNATT_VOL": f"{S['key_results']['unattributed_volume_m3']:,.0f}",
@@ -148,6 +152,8 @@ def values() -> dict:
     sc_ = so[so["parameter"] == "survey_cutoff_hours"]
     ch = (sc_["record_period_tonnes"] / b0 - 1).abs()
     v.update({"CUT_SENS_T": f"{ch.min():.0%}-{ch.max():.0%}", "CUT_SENS_CU": f"{sc_['mean_abs_block_cu_change'].max():.2f}"})
+    fl = so[(so["parameter"] == "cost") & (so["value"] == "flat")]
+    v["FLAT_BLK"] = f"{fl['mean_abs_block_cu_change'].iloc[0]:.2f}" if len(fl) else "n/a"
     # push distances
     dst = pd.read_csv(OUT / "movement" / "load_destinations.csv")
     dl = dst[dst["kind"] == "load"]
@@ -251,7 +257,9 @@ def values() -> dict:
     v["TWA_RC_R"] = f"{tai.loc[(rc, 'CPST eps=6 m (base)'), 'cu_corr']:.2f}"
     v["TWA_RC_PA"] = f"{tai.loc[(rc, 'Baseline: period-average (eps=1e4)'), 'cu_rmse']:.2f}"
     v["TWA_RC_GM"] = f"{tai.loc[(rc, 'Reference: global mean grade'), 'cu_rmse']:.2f}"
+    v["TWA_RC_FLAT"] = f"{tai.loc[(rc, FLAT), 'cu_rmse']:.2f}"
     pu = "period-uniform mixing"
+    v["TWA_PU_FLAT"] = f"{tai.loc[(pu, FLAT), 'cu_rmse']:.2f}"
     v["TWA_PU_CPST"] = f"{tai.loc[(pu, 'CPST eps=6 m (base)'), 'cu_rmse']:.2f}"
     v["TWA_PU_PA"] = f"{tai.loc[(pu, 'Baseline: period-average (eps=1e4)'), 'cu_rmse']:.2f}"
     rb = pd.read_csv(OUT / "validation" / "robustness_numerical.csv")

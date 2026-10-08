@@ -103,7 +103,15 @@ $$w_{ij} = \ell_{ij} + \alpha \max(0,\, z_j - z_i)$$
 
 where $\ell_{ij}$ = 1 or √2 m and α = 4 is the uphill penalty (A-16). The push cost is the geodesic (Dijkstra) distance $C_{kc} = \min_{\text{paths}} \sum w$, with $C_{kc} = \infty$ if $C_{kc} > L_{\max}$ = 90 m (A-17). Dummy costs: $C_{kR} = c_R$ = 90 m, $C_{Uc} = c_U$ = 90 m, $C_{UR} = 0$. Because $c_R + c_U > L_{\max}$, a load is always sent to reachable fill before being retained. U fills only the volume that available sources cannot (*partial optimal transport*).
 
-*Direction* (B) is therefore the least-work route over the actual terrain: down-slope pushes are cheap, pushing over a crest and down the face is cheap, uphill is expensive. The survey decides which face sector actually received fill. *Distance* (C) is set by the capacity constraint: material stops where observed accommodation space exists, and the least-cost assignment is used. Movement beyond $L_{\max}$ is not allowed. Material that finds no reachable fill stays on the platform (R) and is carried to the next period (dozer lag).
+*Direction* (B) is therefore the least-work route over the actual terrain: down-slope pushes are cheap, pushing over a crest and down the face is cheap, uphill is expensive. The survey decides which face sector actually received fill.
+
+**What the push cost contributes (evidence).** The platform can replace the push cost by a flat cost (`movement.cost: flat`, $C_{kc} = 0$ for every fill cell of the interval, dummy costs unchanged). That leaves only the survey constraint: each interval's sources fill that interval's measured fill, and unrecorded and retained volume stay in their own classes. In the synthetic twins (D6, Sections 6 and 9.4), the results depend on the truth:
+
+* when the truth follows our own push physics, the push cost lowers block Cu RMSE by about 0.07% Cu;
+* when it does not (random crest, or uniform mixing within each interval), the push cost raises the error, and the flat variant wins by 0.15-0.2% Cu;
+* dropping only the uphill penalty (α = 0) is no worse than α = 4.
+
+On the real data, the two forms change block grades by about 0.2% Cu on average and leave all totals unchanged. **The push cost is physically motivated and costs nothing, but on these two weeks of data it cannot be shown to improve the answer.** It stays in the base case, the Monte Carlo samples both forms (Section 7), and tracer trials are the way to settle it. *Distance* (C) is set by the capacity constraint: material stops where observed accommodation space exists, and the least-cost assignment is used. Movement beyond $L_{\max}$ is not allowed. Material that finds no reachable fill stays on the platform (R) and is carried to the next period (dozer lag).
 
 ## 3.6 Allocation: entropic optimal transport (questions E, F, G, H)
 
@@ -237,9 +245,10 @@ These are internal planning classes, **not** JORC/NI 43-101 resource categories.
 | Degree of mixing | ε ~ U(2, 15) m |
 | Unknown dozer trajectories | α ~ U(1, 10) |
 | Movement distance | L_max ~ U(50, 130) m |
+| Push-cost form (structural) | geodesic or flat, 50/50 |
 | Missing data | unattributed grade drawn by tonnage-weighted bootstrap of the period's loads |
 
-Blocks are accumulated on the base block grid. For each block we report P10/P50/P90 and the coefficient of variation of Cu, Au and tonnes. For the record-period inventory (FMS-tracked + unattributed) and for the whole pile we report P10/P50/P90 totals. **One-at-a-time sensitivity** (tornado) varies ε, α, $L_{\max}$, $f_{pay}$, $f_v$, σz, survey cut-off, grid cell, block size and the A-13b switch individually. The cut-off, grid and σz variants re-calibrate $f_v$.
+Blocks are accumulated on the base block grid. For each block we report P10/P50/P90 and the coefficient of variation of Cu, Au and tonnes. For the record-period inventory (FMS-tracked + unattributed) and for the whole pile we report P10/P50/P90 totals. **One-at-a-time sensitivity** (tornado) varies ε, α, $L_{\max}$, the push-cost form, $f_{pay}$, $f_v$, σz, survey cut-off, grid cell, block size and the A-13b switch individually. The cut-off, grid and σz variants re-calibrate $f_v$.
 
 **Scenarios outside the ranges.** The interpretations of the volume gap that the data cannot exclude (X2: missing loads) or that physics excludes (X1: all under-recording) are run as separate deterministic scenarios (`uncertainty.scenarios`). They are reported next to the ranges with an explicit "not included in those ranges" statement.
 
@@ -252,7 +261,7 @@ Blocks are accumulated on the base block grid. For each block we report P10/P50/
 | Metal balance | Cu, Au, Ag in vs block model |
 | Volume conversion | $f_v$ calibrated on the first half of the record, predicting the second half; leave-one-out (Section 2.4) |
 | Temporal | Forward model calibrated on periods 1-5, tested on 6-9 (unseen). Metrics: Wasserstein-1 (earth mover's) distance between predicted and observed fill (m), capture ratio (share of predicted volume inside observed fill), centroid error. Baselines: no dozer push (deposit at the dump point), and uniform spreading over the model domain |
-| Inversion skill | Synthetic twin: truth generated with the forward model (push jitter 6 m), observed with GPS noise (3 m), payload noise (5%), 15% missing FMS records and survey noise. Block Cu/Au RMSE and correlation vs truth for CPST variants and baselines |
+| Inversion skill | Synthetic twin: truth generated with the forward model (push jitter 6 m), observed with GPS noise (3 m), payload noise (5%), 15% missing FMS records and survey noise. Block Cu/Au RMSE and correlation vs truth for CPST variants (ε, α = 0, flat cost) and baselines; stress twins with random-crest and interval-uniform truths |
 | Robustness | Grid 0.5/1/2.5 m, Sinkhorn tolerance, detection limit: totals, top-bench grade, mean absolute block change |
 
 # 9. Implementation map

@@ -166,12 +166,12 @@ bullets(s, [
 s.addNotes(`Presenter: ${MEMBER(2)}. f_v fixes the in-pile volume of each load. What it means in tonnes is the open question: bulking (base case, in-pile density ${fmt(D.vf.in_pile_density_base, 2)} t/m³), under-recorded payloads, or missing loads. See the scenario slide.`);
 
 // ------------------------------------------------------------ algorithm
-sectionSlide("2  Material-movement algorithm", `Presenter: ${MEMBER(3)} (algorithm lead)`, "Algorithm");
-s = content("CPST: surveys say where, FMS says what, push work says which", "Algorithm");
+sectionSlide("2  Algorithm, and how far it can be trusted", `Presenter: ${MEMBER(3)} (algorithm lead)`, "Algorithm");
+s = content("CPST: surveys say where, FMS says what, transport decides which", "Algorithm");
 fitImg(s, "algo", 0.5, 1.3, 6.2, 5.6);
 bullets(s, [
   "Sinks = observed fill per 1 m column; sources = truck loads, carried platform parcels, cut material",
-  "Cost = dozer push work: slope-aware geodesic distance (uphill penalised, ≤ 90 m)",
+  "Cost = dozer push work: slope-aware geodesic distance (uphill penalised, ≤ 90 m), a weak preference inside the measured fill (see the ablation)",
   "Entropy-regularised optimal transport (Sinkhorn): mixing length ε = 6 m",
   "Dummy nodes keep it honest: U = fill with no FMS source, R = FMS volume not yet on the face",
   "Every operation is linear in tonnes and metal, so conservation is exact",
@@ -184,8 +184,45 @@ fitImg(s, "push", 7.1, 1.4, 5.7, 3.4);
 bullets(s, ["Crest advanced about 30 m south in two weeks", "Reconstructed pushes are mostly tens of metres, well inside the dozer economic range"], 7.1, 5.0, 5.7, 1.8, 14, "adv_facts");
 s.addNotes(`Presenter: ${MEMBER(3)}. Growth characterisation (Task 2): when each cell first received fill.`);
 
-// ------------------------------------------------------------ block model, validation, uncertainty
-sectionSlide("3  Block model, validation and uncertainty", `Presenter: ${MEMBER(4)} (block model and validation lead)`, "Block model");
+s = content("Independent tests: prediction and known-truth twin", "Algorithm");
+fitImg(s, "fwdtest", 0.4, 1.35, 8.2, 2.8);
+const tw = D.twin.filter(r => r.method && !String(r.method).startsWith("Reference"));
+s.addChart(pres.charts.BAR, [{ name: "Cu RMSE", labels: D.twin.map(r => String(r.method).replace("Baseline: ", "").replace("Reference: ", "")), values: D.twin.map(r => r.cu_rmse) }],
+  { x: 0.5, y: 4.25, w: 8.0, h: 2.6, barDir: "bar", chartColors: [H.accent3], showValue: true, dataLabelPosition: "outEnd", dataLabelFormatCode: "0.00",
+    dataLabelFontSize: 10, dataLabelFontFace: "+mn-lt", dataLabelColor: "33424A", showLegend: false, catAxisLabelFontSize: 10, valAxisLabelFontSize: 9,
+    catAxisLabelFontFace: "+mn-lt", valAxisLabelFontFace: "+mn-lt", valGridLine: { color: "E3E6E8", size: 0.5 }, catGridLine: { style: "none" },
+    catAxisLabelColor: "33424A", valAxisLabelColor: "33424A", showTitle: true, title: "Twin experiment: block Cu RMSE vs truth (% Cu)", titleFontSize: 12, titleFontFace: "+mn-lt", titleColor: "33424A" });
+const ft = D.fwd.filter(r => r.set.startsWith("test"));
+const fp = ft.find(r => r.mode.startsWith("push (cal")), fb = ft.find(r => r.mode.startsWith("no-push")), fu = ft.find(r => r.mode.startsWith("uniform"));
+bullets(s, [
+  `Forward model on unseen intervals: earth-mover error ${fmt(fp.w1_m, 1)} m vs ${fmt(fb.w1_m, 1)} m without dozer push and ${fu ? fmt(fu.w1_m, 1) : "-"} m for uniform spreading`,
+  "Physics alone predicts where fill lands only moderately well, which is why the surveys must constrain the allocation",
+  `Twin: CPST block Cu r = ${fmt(D.twin[1].cu_corr, 2)}; block tonnage r = ${fmt(D.twin[1].tonnes_corr, 2)} (measured by the survey)`,
+  (() => { const r = D.twin_alt.find(x => x.truth.startsWith("random") && x.method.startsWith("CPST")); const b = D.twin_alt.find(x => x.truth.startsWith("random") && x.method.startsWith("Baseline")); return `Stress test with a truth rule CPST does not assume (random crest): ${fmt(r.cu_rmse, 2)}% Cu RMSE, the same as the main twin`; })(),
+], 8.8, 1.5, 4.0, 5.3, 13, "test_facts");
+s.addNotes(`Presenter: ${MEMBER(3)}. Temporal validation uses periods never used for calibration. The twin experiment generates a stockpile with known truth (forward physics with random dozer deviations), observes it like the real one (GPS noise, 15% missing FMS records, survey noise) and reconstructs it blind.`);
+
+s = content("What the push cost buys: an honest ablation", "Algorithm");
+const truths = [["physics", "our push physics"], ["random", "random crest"], ["period-uniform", "uniform within interval"]];
+const pick = (t, m) => { const r = D.twin_alt.find(x => x.truth.startsWith(t) && x.method.startsWith(m)); return r ? r.cu_rmse : null; };
+s.addChart(pres.charts.BAR, [
+  { name: "CPST (push cost)", labels: truths.map(t => t[1]), values: truths.map(t => pick(t[0], "CPST eps=6 m")) },
+  { name: "flat cost (survey constraint only)", labels: truths.map(t => t[1]), values: truths.map(t => pick(t[0], "CPST eps=6, flat")) },
+], { x: 0.5, y: 1.4, w: 7.4, h: 5.3, barDir: "col", barGrouping: "clustered", chartColors: [H.accent1, H.accent3], showValue: true, dataLabelFormatCode: "0.00",
+  dataLabelFontSize: 11, dataLabelFontFace: "+mn-lt", dataLabelColor: "33424A", showLegend: true, legendPos: "b", legendFontSize: 11, legendFontFace: "+mn-lt",
+  catAxisLabelFontSize: 12, valAxisLabelFontSize: 10, catAxisLabelFontFace: "+mn-lt", valAxisLabelFontFace: "+mn-lt", valGridLine: { color: "E3E6E8", size: 0.5 },
+  catGridLine: { style: "none" }, catAxisLabelColor: "33424A", valAxisLabelColor: "33424A", valAxisTitle: "block Cu RMSE vs truth (% Cu)", showValAxisTitle: true,
+  valAxisTitleFontSize: 11, valAxisTitleFontFace: "+mn-lt", showTitle: true, title: "Synthetic twins: which truth generated the stockpile", titleFontSize: 13, titleFontFace: "+mn-lt", titleColor: "33424A" });
+bullets(s, [
+  `Push term helps by ${fmt(pick("physics", "CPST eps=6, flat") - pick("physics", "CPST eps=6 m"), 2)}% Cu only when the truth follows the same physics; it hurts otherwise`,
+  `On the real data it moves block grades by ${fmt(D.flat_blk, 2)}% Cu on average; totals unchanged`,
+  "Almost all of CPST's skill comes from the survey constraint and from keeping unrecorded volume apart",
+  "Physically motivated and costs nothing, but on two weeks of data it cannot be shown to improve the answer: kept in the base case, both forms sampled in the Monte Carlo, tracers to settle it",
+], 8.1, 1.45, 4.7, 5.4, 13, "abl_facts");
+s.addNotes(`Presenter: ${MEMBER(3)}. Be direct: the ablation removes the push term entirely, so every load is spread over its interval's measured fill. The survey constraint survives every truth we tried; the push cost does not. We say so rather than leave it for the examiner to find.`);
+
+// ------------------------------------------------------------ block model and validation
+sectionSlide("3  Block model and validation", `Presenter: ${MEMBER(4)} (block model and validation lead)`, "Block model");
 s = content("Block model: 5 × 5 × 2 m, Cu grade by bench", "Block model");
 fitImg(s, "plans", 0.4, 1.3, 12.5, 5.6);
 s.addNotes(`Presenter: ${MEMBER(4)}. Block size justified by GPS error plus mixing length (~5 m) horizontally and daily layer thickness vertically. Partial blocks keep their fill fraction. Grades are composited from metal over tonnes.`);
@@ -210,67 +247,35 @@ s = content("Validation: exact balances, survey-matched geometry", "Block model"
 card(s, 0.6, 1.5, 3.0, 1.9, "< 10⁻⁹", "relative mass and Cu/Au/Ag balance error (FMS in vs block model)", C.accent6, "v1");
 card(s, 0.6, 3.6, 3.0, 1.9, `${fmt(D.geo.rmse_m, 2)} m`, `RMSE model vs latest survey; ${fmt(D.geo.frac_within_tau * 100, 1)}% of cells within 0.14 m`, C.accent6, "v2");
 fitImg(s, "geometry", 3.9, 1.4, 8.9, 3.9);
-bullets(s, ["Geometry is constrained by design, so it is a check on numerics. Independent tests are on the next slide", "Automated test enforces conservation on every code change"], 3.9, 5.5, 8.9, 1.3, 14, "val_facts");
+bullets(s, ["Geometry is constrained by design, so it is a check on numerics. The independent tests are in the algorithm section", "Automated test enforces conservation on every code change"], 3.9, 5.5, 8.9, 1.3, 14, "val_facts");
 s.addNotes(`Presenter: ${MEMBER(4)}. Visual agreement alone is not validation; these are quantitative.`);
 
-s = content("Independent tests: prediction and known-truth twin", "Block model");
-fitImg(s, "fwdtest", 0.4, 1.35, 8.2, 2.8);
-const tw = D.twin.filter(r => r.method && !String(r.method).startsWith("Reference"));
-s.addChart(pres.charts.BAR, [{ name: "Cu RMSE", labels: D.twin.map(r => String(r.method).replace("Baseline: ", "").replace("Reference: ", "")), values: D.twin.map(r => r.cu_rmse) }],
-  { x: 0.5, y: 4.25, w: 8.0, h: 2.6, barDir: "bar", chartColors: [H.accent3], showValue: true, dataLabelPosition: "outEnd", dataLabelFormatCode: "0.00",
-    dataLabelFontSize: 10, dataLabelFontFace: "+mn-lt", dataLabelColor: "33424A", showLegend: false, catAxisLabelFontSize: 10, valAxisLabelFontSize: 9,
-    catAxisLabelFontFace: "+mn-lt", valAxisLabelFontFace: "+mn-lt", valGridLine: { color: "E3E6E8", size: 0.5 }, catGridLine: { style: "none" },
-    catAxisLabelColor: "33424A", valAxisLabelColor: "33424A", showTitle: true, title: "Twin experiment: block Cu RMSE vs truth (% Cu)", titleFontSize: 12, titleFontFace: "+mn-lt", titleColor: "33424A" });
-const ft = D.fwd.filter(r => r.set.startsWith("test"));
-const fp = ft.find(r => r.mode.startsWith("push (cal")), fb = ft.find(r => r.mode.startsWith("no-push")), fu = ft.find(r => r.mode.startsWith("uniform"));
-bullets(s, [
-  `Forward model on unseen intervals: earth-mover error ${fmt(fp.w1_m, 1)} m vs ${fmt(fb.w1_m, 1)} m without dozer push and ${fu ? fmt(fu.w1_m, 1) : "-"} m for uniform spreading`,
-  "Physics alone predicts where fill lands only moderately well, which is why the surveys must constrain the allocation",
-  `Twin: CPST block Cu r = ${fmt(D.twin[1].cu_corr, 2)}; beats period-average and global-mean baselines`,
-  (() => { const r = D.twin_alt.find(x => x.truth.startsWith("random") && x.method.startsWith("CPST")); const b = D.twin_alt.find(x => x.truth.startsWith("random") && x.method.startsWith("Baseline")); return `Stress test with a truth rule CPST does not assume (random crest): ${fmt(r.cu_rmse, 2)}% vs ${fmt(b.cu_rmse, 2)}% Cu RMSE`; })(),
-], 8.8, 1.5, 4.0, 5.3, 13, "test_facts");
-s.addNotes(`Presenter: ${MEMBER(4)}. Temporal validation uses periods never used for calibration. The twin experiment generates a stockpile with known truth (forward physics with random dozer deviations), observes it like the real one (GPS noise, 15% missing FMS records, survey noise) and reconstructs it blind.`);
-
-s = content("Uncertainty: what moves the answer", "Block model");
+// ------------------------------------------------------------ uncertainty, platform, recommendations
+sectionSlide("4  Uncertainty, platform and recommendations", `Presenter: ${MEMBER(5)} (platform and uncertainty lead)`, "Uncertainty and platform");
+s = content("Uncertainty: what moves the answer", "Uncertainty and platform");
 fitImg(s, "tornado", 0.4, 1.3, 7.6, 5.6);
 fitImg(s, "mchist", 8.1, 1.4, 4.8, 1.8);
-bullets(s, [`Monte Carlo (60 runs): GPS, payload, payload factor, volume factor, assay, survey, cut-off, mixing, push`, `Record-period tonnes P10-P90 ${fmt(mcRP[0] / 1000, 1)}-${fmt(mcRP[2] / 1000, 1)} kt; whole pile ${fmt(mcT[0] / 1000)}-${fmt(mcT[2] / 1000)} kt`, "Block grade ranges for pre-record blocks use the load-scale prior, not false precision"], 8.2, 3.4, 4.6, 3.4, 13, "unc_facts");
-s.addNotes(`Presenter: ${MEMBER(4)}. Distinguish measured, inferred, assumed and model-generated information. The pre-record grade is a scenario assumption whose range cannot be quantified from the supplied data.`);
+bullets(s, [`Monte Carlo (60 runs): GPS, payload, payload factor, volume factor, assay, survey, cut-off, mixing, push, push-cost form`, `Record-period tonnes P10-P90 ${fmt(mcRP[0] / 1000, 1)}-${fmt(mcRP[2] / 1000, 1)} kt; whole pile ${fmt(mcT[0] / 1000)}-${fmt(mcT[2] / 1000)} kt`, "Block grade ranges for pre-record blocks use the load-scale prior, not false precision"], 8.2, 3.4, 4.6, 3.4, 13, "unc_facts");
+s.addNotes(`Presenter: ${MEMBER(5)}. Distinguish measured, inferred, assumed and model-generated information. The pre-record grade is a scenario assumption whose range cannot be quantified from the supplied data.`);
 
-s = content("What does the 47% volume excess mean?", "Block model");
-fitImg(s, "scen", 0.4, 1.35, 7.9, 3.4);
-bullets(s, [
-  `Bulking (base): FMS density is a bank density, recorded tonnes correct: ${fmt(SC.S0.record_period_tonnes / 1000, 1)} kt`,
-  `Up to 19% payload under-recording (largest load to ${fmt(SC.S1.largest_load_t)} t): ${fmt(SC.S1.record_period_tonnes / 1000, 1)} kt (inside the range)`,
-  `All under-recording: loads of ${fmt(SC.X1.largest_load_t)} t, excluded`,
-  `Loads missing from the FMS: ${fmt(SC.X2.record_period_tonnes / 1000, 1)} kt. Not included in the ranges, not excluded either`,
-], 8.5, 1.45, 4.35, 5.3, 13, "scen_facts");
-s.addText("Cheapest fix: confirm whether Dens is a bank or a loose density, and run a pile density test.", { x: 0.6, y: 5.1, w: 7.7, h: 0.8, fontSize: 16, bold: true, color: C.accent1, margin: 0, isTextBox: true, objectName: "scen_fix" });
-s.addNotes(`Presenter: ${MEMBER(4)}. The volume of the FMS material is calibrated; how many tonnes it holds is not identifiable from volumes. Version 1 implicitly assumed missing loads and never tested bulking; version 2 reports all interpretations, and says plainly which one is outside the ranges.`);
-
-// ------------------------------------------------------------ platform & practice
-sectionSlide("4  Platform and professional practice", `Presenter: ${MEMBER(5)} (platform lead) with ${MEMBER(1)}`, "Platform and practice");
-s = content("A repeatable, auditable in-house platform", "Platform and practice");
+s = content("A repeatable, auditable in-house platform", "Uncertainty and platform");
 fitImg(s, "workflow", 0.4, 1.3, 8.0, 5.6);
 bullets(s, ["One command: python -m spbm update", "Managed raw store: every input SHA-256 named and logged; a changed file needs a supersede intervention", "Manual interventions need a reason, author and date, or the run stops", "40-rule QA catalogue; 66 automated tests", "Run manifest, model history and automatic change report", "Open formats: CSV, VTK, ESRI grids"], 8.6, 1.5, 4.2, 5.3, 14, "platform");
 s.addNotes(`Presenter: ${MEMBER(5)}. Demonstrate (or show the recorded demo of) examples/demo_update.sh: build the model to the 03-22 survey cut-off, then update with the later data and read the change report. Mention that version 2 combines our platform with the stronger ideas of an independent implementation (B), disclosed in Appendix A.`);
 
-s = content("Professional accountability and equity", "Platform and practice");
-const cols2 = [
-  ["Accountability", ["Never present a single expected value: lead with the record-period range and say what it excludes", "Pre-record grade is assumed: decline a 'definitive' whole-pile inventory until sampled", "We corrected our own version 1 after an independent comparison, and documented why"]],
-  ["Equity and inclusion", ["Data gaps are periods and systems, not crews: no attribution without evidence", "Average imputation can bias exactly the least-documented zones: flag, do not hide", "Explainable outputs (maps, classes, provenance) for planners, operators and processing"]],
-];
-cols2.forEach((c, i) => {
-  const x = 0.6 + i * 6.15;
-  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y: 1.5, w: 5.95, h: 4.3, fill: { color: H.lt2 }, line: { color: H.lt2 }, rectRadius: 0.08, objectName: `pp${i}_bg` });
-  s.addText(c[0], { x: x + 0.3, y: 1.7, w: 5.35, h: 0.6, fontSize: 22, bold: true, color: C.accent1, margin: 0, isTextBox: true, objectName: `pp${i}_h` });
-  bullets(s, c[1], x + 0.3, 2.45, 5.4, 3.2, 18, `pp${i}_b`);
-});
-s.addText("Scenario response: management asked for a definitive inventory. We provide it with ranges and information classes, and state what the data cannot yet support.",
-  { x: 0.6, y: 6.05, w: 12.1, h: 0.7, fontSize: 15, italic: true, color: C.text2, margin: 0, isTextBox: true, objectName: "pp_scenario" });
-s.addNotes(`Presenter: ${MEMBER(1)} and ${MEMBER(5)}. Response to the course scenario (Section 6.2): management asks for a definitive inventory. Our position: provide it with ranges and classes, and state clearly what we cannot yet support.`);
+s = content("Two independent implementations agree", "Uncertainty and platform");
+s.addTable([[{ text: "quantity", options: { bold: true, fill: { color: H.lt2 } } }, { text: "A (this platform)", options: { bold: true, fill: { color: H.lt2 } } },
+             { text: "B (independent)", options: { bold: true, fill: { color: H.lt2 } } }]].concat(D.ximpl.map(r => r.map(c => ({ text: String(c) })))),
+  { x: 0.6, y: 1.45, w: 7.9, colW: [3.5, 2.2, 2.2], fontSize: 12, fontFace: "Calibri", color: "1D2329", border: { type: "solid", pt: 0.5, color: "BDBBB3" }, rowH: 0.36, objectName: "ximpl" });
+bullets(s, [
+  "Different code, rasteriser, cut detection, reconciliation and block size",
+  "Same survey cut-off, same volume factor, same intervals flagged as FMS gaps",
+  "Record-period inventory within about 2%",
+  "B's numbers are quoted from its own report; B's code was not run",
+], 8.8, 1.5, 4.0, 5.2, 14, "ximpl_facts");
+s.addNotes(`Presenter: ${MEMBER(5)}. Reproducibility is the platform's job; an independent second implementation reaching the same physical ratio from the same data is the strongest check we have. Version 2 adopted B's timing scan, volume-factor calibration, raw store and test philosophy (Appendix A).`);
 
-s = content("Limitations and recommendations", "Platform and practice");
+s = content("Limitations and recommendations", "Uncertainty and platform");
 const rec = [
   ["1", "Confirm the FMS density basis; test the pile density; calibrate buckets", "Resolves bulking vs missing tonnes (up to +47%)"],
   ["2", "Audit FMS completeness for 03-23 to 03-27 and after 03-29 08:17", "Converts unattributed volume to tracked material"],
@@ -286,6 +291,34 @@ rec.forEach((r, i) => {
   s.addText(r[2], { x: 8.2, y: y, w: 4.6, h: 0.86, fontSize: 14, color: C.text2, valign: "middle", margin: 0, isTextBox: true, objectName: `rec${i}_d` });
 });
 s.addNotes(`Presenter: ${MEMBER(5)}. Key limitations: the meaning of the volume excess; no full-pile or pre-pile survey; two weeks of FMS against a pile built over the life of Pit I; grades are source-block values; mixing parameters are uncalibrated without tracers.`);
+
+// ------------------------------------------------------------ decision and practice
+sectionSlide("5  The decision, and professional practice", `Presenter: ${MEMBER(1)} (project lead)`, "Decision and practice");
+s = content("What does the 47% volume excess mean?", "Decision and practice");
+fitImg(s, "scen", 0.4, 1.35, 7.9, 3.4);
+bullets(s, [
+  `Bulking (base): FMS density is a bank density, recorded tonnes correct: ${fmt(SC.S0.record_period_tonnes / 1000, 1)} kt`,
+  `Up to 19% payload under-recording (largest load to ${fmt(SC.S1.largest_load_t)} t): ${fmt(SC.S1.record_period_tonnes / 1000, 1)} kt (inside the range)`,
+  `All under-recording: loads of ${fmt(SC.X1.largest_load_t)} t, excluded`,
+  `Loads missing from the FMS: ${fmt(SC.X2.record_period_tonnes / 1000, 1)} kt. Not included in the ranges, not excluded either`,
+], 8.5, 1.45, 4.35, 5.3, 13, "scen_facts");
+s.addText("Cheapest fix: confirm whether Dens is a bank or a loose density, and run a pile density test.", { x: 0.6, y: 5.1, w: 7.7, h: 0.8, fontSize: 16, bold: true, color: C.accent1, margin: 0, isTextBox: true, objectName: "scen_fix" });
+s.addNotes(`Presenter: ${MEMBER(1)}. This is the decision we ask management to take: the volume of the FMS material is calibrated; how many tonnes it holds is not identifiable from volumes. Version 1 implicitly assumed missing loads and never tested bulking; version 2 reports all interpretations, and says plainly which one is outside the ranges.`);
+
+s = content("Professional accountability and equity", "Decision and practice");
+const cols2 = [
+  ["Accountability", ["Never present a single expected value: lead with the record-period range and say what it excludes", "Pre-record grade is assumed: decline a 'definitive' whole-pile inventory until sampled", "We corrected our own version 1 after an independent comparison, and documented why"]],
+  ["Equity and inclusion", ["Data gaps are periods and systems, not crews: no attribution without evidence", "Average imputation can bias exactly the least-documented zones: flag, do not hide", "Explainable outputs (maps, classes, provenance) for planners, operators and processing"]],
+];
+cols2.forEach((c, i) => {
+  const x = 0.6 + i * 6.15;
+  s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y: 1.5, w: 5.95, h: 4.3, fill: { color: H.lt2 }, line: { color: H.lt2 }, rectRadius: 0.08, objectName: `pp${i}_bg` });
+  s.addText(c[0], { x: x + 0.3, y: 1.7, w: 5.35, h: 0.6, fontSize: 22, bold: true, color: C.accent1, margin: 0, isTextBox: true, objectName: `pp${i}_h` });
+  bullets(s, c[1], x + 0.3, 2.45, 5.4, 3.2, 18, `pp${i}_b`);
+});
+s.addText("Scenario response: management asked for a definitive inventory. We provide it with ranges and information classes, and state what the data cannot yet support.",
+  { x: 0.6, y: 6.05, w: 12.1, h: 0.7, fontSize: 15, italic: true, color: C.text2, margin: 0, isTextBox: true, objectName: "pp_scenario" });
+s.addNotes(`Presenter: ${MEMBER(1)}. Response to the course scenario (Section 6.2): management asks for a definitive inventory. Our position: provide it with ranges and classes, and state clearly what we cannot yet support.`);
 
 // ------------------------------------------------------------ close
 pres.addSection({ title: "Close" });

@@ -14,7 +14,7 @@ This project reconstructs how truck-dumped material moved through the Pit I copp
 * a hashed raw store, and manual interventions that require a reason, author and date;
 * 66 tests (previously 10).
 
-See Appendix A and D1 (DEC-11 to DEC-16).
+See Appendix A and D1 (DEC-11 to DEC-17).
 
 ## Deliverables
 
@@ -77,7 +77,7 @@ docs/                               deliverables (Markdown sources) and docs/bui
 * **Not included in those ranges:** the reading that the 47% volume excess is loads missing from the FMS rather than bulking. Under that reading, record-period tonnes are {{X2_RP}} t (+{{X2_UPLIFT}}). See D6 Section 10.2.
 * Survey cut-off D+1 07:00. Volume factor f_v = {{F_V}}, predicting held-out intervals to {{HO_MAE}}. The independent implementation B found 1.476.
 * FMS mass and metal balance: exact (relative error < 1e-9). Geometry RMSE vs survey: {{GEO_RMSE}} m.
-* Synthetic known-truth test: block Cu RMSE {{TW_CPST}}% (r = {{TW_R}}), vs {{TW_PA}}% for a period-average model.
+* Synthetic known-truth test: block Cu RMSE {{TW_CPST}}% (r = {{TW_R}}); without the push term {{TW_FLAT}}%; single mean grade {{TW_GM}}%. When the truth does not follow our push physics, the flat cost does better ({{TWA_RC_FLAT}}% vs {{TWA_RC_CPST}}%). The push cost is physically motivated and costs nothing, but on these data it cannot be shown to improve the answer, so the Monte Carlo samples both cost forms.
 
 **Pre-record core and whole pile.** The core below the earliest surveyed surfaces holds {{T_L}} t. Its geometry is inferred and its grade assumed. The whole modelled pile is {{T_T}} t (P10/P50/P90 {{MC_T}} kt). {{S_L}} of that is the pre-record core, with an assumed grade.
 
@@ -89,7 +89,7 @@ Every number is traced to `outputs/audit/run_manifest.json`; the full tables are
 
 ## What the team still has to do before submission
 
-1. Enter names in `config/team.yaml`. This fills every `[Member n]` in the built documents, the deck and the zip name. Sign D1. Keep the meeting log and contribution record (D1 §8) from what actually happens, including the proposer and approver of each decision (DEC-01 to DEC-16).
+1. Enter names in `config/team.yaml`. This fills every `[Member n]` in the built documents, the deck and the zip name. Sign D1. Keep the meeting log and contribution record (D1 §8) from what actually happens, including the proposer and approver of each decision (DEC-01 to DEC-17).
 2. Each member writes their own **D8** (reflection + confidential peer assessment) and **D9** (ethics/equity response) from the templates.
 3. Complete the verification log in **Appendix A** (AI/software disclosure, including the A + B integration) and confirm the course AI policy.
 4. Rehearse D7 (speaker notes assign each member's part).

@@ -111,24 +111,43 @@ def register_xlsx():
     md = (DOCS / "D2_Data_and_Assumption_Register.md").read_text()
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
+    def sheet_name(text):
+        """Readable Excel sheet name (<= 31 chars): no table number, no
+        parenthetical, no section number, cut at a word boundary."""
+        t = re.sub(r"^Table [\d.]+ - ", "", text.strip("*# ").strip())
+        t = re.sub(r"\([^)]*\)", "", t)
+        t = re.sub(r"^[\d.]+\s+", "", t)
+        t = re.sub(r"[^A-Za-z0-9 \-]", "", t)
+        t = re.sub(r"\s+", " ", t).strip()
+        while len(t) > 31 and " " in t:
+            t = t.rsplit(" ", 1)[0]
+        return t[:31] or "Sheet"
     section = "Sheet"
+    caption = None
     lines = md.splitlines()
     i = 0
     used = set()
     while i < len(lines):
         ln = lines[i]
         if ln.startswith("#"):
-            section = re.sub(r"[^A-Za-z0-9 ]", "", ln.lstrip("# ")).strip()[:28] or "Sheet"
+            section = sheet_name(ln)
+            caption = None
+        elif re.match(r"^\*[^*].*[^*]\*$", ln.strip()):
+            caption = sheet_name(ln)
+        elif ln.strip() and not ln.startswith("|"):
+            caption = None
         if ln.startswith("|") and i + 1 < len(lines) and re.match(r"^\|[-| :]+\|$", lines[i + 1]):
             rows = []
             while i < len(lines) and lines[i].startswith("|"):
                 if not re.match(r"^\|[-| :]+\|$", lines[i]):
                     rows.append([c.strip() for c in lines[i].strip("|").split("|")])
                 i += 1
-            name = section
+            base_name = caption or section
+            name = base_name
             k = 2
             while name in used:
-                name = f"{section[:25]}_{k}"; k += 1
+                name = f"{base_name[:27]} {k}"; k += 1
+            caption = None
             used.add(name)
             ws = wb.create_sheet(name)
             for r in rows:

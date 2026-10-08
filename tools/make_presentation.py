@@ -13,6 +13,30 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "outputs"
 
 
+def _flat_block_change() -> float:
+    so = pd.read_csv(OUT / "uncertainty" / "sensitivity_oat.csv")
+    fl = so[(so["parameter"] == "cost") & (so["value"] == "flat")]
+    return float(fl["mean_abs_block_cu_change"].iloc[0]) if len(fl) else float("nan")
+
+
+def _ximpl_rows(k, vf, cat, fwd) -> list:
+    """Key rows of D6 Table 9.7 (B's values quoted from its own report)."""
+    c = cat.set_index("rule_id")
+    ft = fwd[fwd["set"].str.startswith("test")].set_index("mode")["w1_m"]
+    return [
+        ["Survey cut-off", "D+1 07:00", "D+1 07:00"],
+        ["Volume factor f_v", f"{float(vf['f_v']):.3f}", "1.476"],
+        ["Intervals used for f_v", " ".join(str(i) for i in k["volume_factor_consistent_intervals"]), "1 2 3 4 5 6 8"],
+        ["Hold-out error", f"{float(vf['holdout_mae_fv']):.1%}", "3.2%"],
+        ["Unattributed volume (m³)", f"{k['unattributed_volume_m3']:,.0f}", "2,431"],
+        ["Record-period tonnes", f"{k['tonnes_record_period']:,.0f}", "47,600"],
+        ["Record-period Cu (t)", f"{k['cu_t_record_period']:,.0f}", "4,062"],
+        ["LOC_DEFAULT records / t", f"{int(c.loc['LOC_DEFAULT', 'count'])} / {c.loc['LOC_DEFAULT', 'tonnes']:,.0f}", "14 / 2,356"],
+        ["Forward EMD push / no push / uniform (m)", f"{ft['push (calibrated)']:.1f} / {ft['no-push baseline']:.1f} / {ft['uniform baseline']:.1f}", "12.2 / 14.5 / 27.9"],
+        ["Block size", "5 × 5 × 2 m", "2 × 2 × 1 m"],
+    ]
+
+
 def build() -> Path:
     S = json.loads((OUT / "summary.json").read_text())
     k = S["key_results"]
@@ -56,6 +80,8 @@ def build() -> Path:
         "vf": {k_: (float(v_) if k_ not in ("consistent_intervals", "excluded_intervals") else v_) for k_, v_ in vf.items()},
         "scen": scen.to_dict("records"),
         "qa": {"n_rules": int(len(cat)), "n_trig": int((cat["count"] > 0).sum())},
+        "flat_blk": _flat_block_change(),
+        "ximpl": _ximpl_rows(k, vf, cat, fwd),
         "inv": inv.to_dict("records"),
         "periods": [{"label": f"{e:%m-%d}" + ("*" if g else ""), "fill": float(f), "fms": float(v + c), "unatt": float(u)}
                     for e, g, f, v, c, u in zip(per["end"], per["gap_detected"], per["fill_volume"], per["fms_volume"],
