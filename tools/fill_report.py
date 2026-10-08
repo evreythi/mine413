@@ -71,7 +71,7 @@ def values() -> dict:
         "TW_E15": f"{twi.loc['CPST eps=15 m', 'cu_rmse']:.2f}" if "CPST eps=15 m" in twi.index else "n/a",
         "TW_FLAT": f"{twi.loc[FLAT, 'cu_rmse']:.2f}", "TW_NOUP": f"{twi.loc['CPST eps=6, no uphill penalty', 'cu_rmse']:.2f}",
         "PUSH_GAIN": f"{twi.loc[FLAT, 'cu_rmse'] - base.cu_rmse:.2f}", "TW_TCORR": f"{base.tonnes_corr:.2f}",
-        "FWD_GAIN": f"{ft.loc['no-push baseline', 'w1_m'] - ft.loc['push (calibrated)', 'w1_m']:.1f}",
+        "FWD_GAIN": f"{ft.loc['no-push baseline', 'w1_m'] - ft.loc['push (calibrated)', 'w1_m']:.2f}",
         "PRIOR_CU": f"{wq(loads['cu'].values, 0.1):.1f}-{wq(loads['cu'].values, 0.9):.1f}",
         "AU3_F": f"{F.au_gpt:.3f}", "AU3_U": f"{U.au_gpt:.3f}", "AU3_L": f"{L.au_gpt:.3f}",
         "UNATT_VOL": f"{S['key_results']['unattributed_volume_m3']:,.0f}",

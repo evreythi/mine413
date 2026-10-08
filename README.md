@@ -14,7 +14,7 @@ This project reconstructs how truck-dumped material moved through the Pit I copp
 * a hashed raw store, and manual interventions that require a reason, author and date;
 * 66 tests (previously 10).
 
-See Appendix A and D1 (DEC-11 to DEC-16).
+See Appendix A and D1 (DEC-11 to DEC-17).
 
 ## Deliverables
 
@@ -63,7 +63,7 @@ docs/                               deliverables (Markdown sources) and docs/bui
 
 `data/raw_store/` and `data/cache/` are generated on the first run and are not committed.
 
-## Key results (base case, run `20261008T074247`)
+## Key results (base case, run `20261008T173954`)
 
 **Material placed during the record (15-31 March), tied to surveyed fill:**
 
@@ -73,13 +73,13 @@ docs/                               deliverables (Markdown sources) and docs/bui
 | Unattributed (surveyed fill, no FMS record) | 3,901 | 10.22 | 8.82 | imputed grade |
 | **Record-period total** | **48,551** | 8.57 | 8.06 | |
 
-* Monte Carlo P10/P50/P90: record-period tonnes 48.1 / 52.5 / 56.0 kt; contained Cu 4.08 / 4.43 / 4.95 kt.
+* Monte Carlo P10/P50/P90: record-period tonnes 48.5 / 51.9 / 55.4 kt; contained Cu 4.04 / 4.40 / 4.94 kt.
 * **Not included in those ranges:** the reading that the 47% volume excess is loads missing from the FMS rather than bulking. Under that reading, record-period tonnes are 71,338 t (+47%). See D6 Section 10.2.
 * Survey cut-off D+1 07:00. Volume factor f_v = 1.472, predicting held-out intervals to 3.5%. The independent implementation B found 1.476.
 * FMS mass and metal balance: exact (relative error < 1e-9). Geometry RMSE vs survey: 0.03 m.
-* Synthetic known-truth test: block Cu RMSE 0.68% (r = 0.93), vs 1.19% for a period-average model.
+* Synthetic known-truth test: block Cu RMSE 0.68% (r = 0.93); without the push term 0.75%; single mean grade 1.87%. When the truth does not follow our push physics, the flat cost does better (0.53% vs 0.68%). The push cost is physically motivated and costs nothing, but on these data it cannot be shown to improve the answer, so the Monte Carlo samples both cost forms.
 
-**Pre-record core and whole pile.** The core below the earliest surveyed surfaces holds 89,795 t. Its geometry is inferred and its grade assumed. The whole modelled pile is 138,346 t (P10/P50/P90 134 / 148 / 159 kt). 64.9% of that is the pre-record core, with an assumed grade.
+**Pre-record core and whole pile.** The core below the earliest surveyed surfaces holds 89,795 t. Its geometry is inferred and its grade assumed. The whole modelled pile is 138,346 t (P10/P50/P90 135 / 147 / 158 kt). 64.9% of that is the pre-record core, with an assumed grade.
 
 > **Grade units are as supplied and unconfirmed.** 8.4% Cu / 8.0 g/t Au is roughly an order of magnitude above typical Cu-Au feed. Confirm with Geology before using any contained-metal figure. Pre-record and unattributed grades equal or derive from the FMS mean by assumption (A-22, A-21).
 
@@ -89,7 +89,7 @@ Every number is traced to `outputs/audit/run_manifest.json`; the full tables are
 
 ## What the team still has to do before submission
 
-1. Enter names in `config/team.yaml`. This fills every `[Member n]` in the built documents, the deck and the zip name. Sign D1. Keep the meeting log and contribution record (D1 §8) from what actually happens, including the proposer and approver of each decision (DEC-01 to DEC-16).
+1. Enter names in `config/team.yaml`. This fills every `[Member n]` in the built documents, the deck and the zip name. Sign D1. Keep the meeting log and contribution record (D1 §8) from what actually happens, including the proposer and approver of each decision (DEC-01 to DEC-17).
 2. Each member writes their own **D8** (reflection + confidential peer assessment) and **D9** (ethics/equity response) from the templates.
 3. Complete the verification log in **Appendix A** (AI/software disclosure, including the A + B integration) and confirm the course AI policy.
 4. Rehearse D7 (speaker notes assign each member's part).

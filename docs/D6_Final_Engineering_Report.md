@@ -2,7 +2,7 @@
 title: "Long-Term Stockpile Reconstruction and Block Modelling - Pit I HG Stockpile"
 subtitle: "D6 Final Engineering Report to Mine Management | MIN E 413 Surface Mining Methods and Operations Management, Fall 2026"
 author: "Long-Term Mine Planning Team: [Member 1], [Member 2], [Member 3], [Member 4], [Member 5]"
-date: "November 2026 - platform version 2.0, model run 20261008T074247"
+date: "November 2026 - platform version 2.0, model run 20261008T173954"
 ---
 
 # Executive Summary
@@ -18,7 +18,7 @@ date: "November 2026 - platform version 2.0, model run 20261008T074247"
 * the survey acquisition time is not recorded;
 * the FMS is missing records for 03-23 to 03-27 and after 08:17 on 03-29, while the surveys show material being placed.
 
-**Method.** We developed **CPST (Constrained Push-and-Settle Transport)**. In each survey interval, the observed fill defines where material went. The FMS loads, material carried over on the platform, and dozer cuts are the sources. A slope-aware dozer push cost and entropy-regularised optimal transport (mixing length ε = 6 m) decide which source filled which part of the fill. Fill without an FMS source becomes **unattributed** material with an imputed grade. All operations act on tonnes and metal, so **mass and metal are conserved exactly**. Two inputs are calibrated on the data and tested on data held out from the calibration:
+**Method.** We developed **CPST (Constrained Push-and-Settle Transport)**. In each survey interval, the observed fill defines where material went. The FMS loads, material carried over on the platform, and dozer cuts are the sources. A slope-aware dozer push cost and entropy-regularised optimal transport (mixing length ε = 6 m) decide which source filled which part of the fill. Fill without an FMS source becomes **unattributed** material with an imputed grade. All operations act on tonnes and metal, so **mass and metal are conserved exactly**. **The push cost is physically motivated and costs nothing, but on these two weeks of data it cannot be shown to improve the answer:** CPST's skill comes from the survey constraint, which says which interval's material lies where, and from keeping unrecorded and retained volume apart from the FMS material (Section 9.4). Two inputs are calibrated on the data and tested on data held out from the calibration:
 
 * **Survey cut-off.** A survey labelled day D closes its interval at **D+1 07:00**. This was found by scanning 0-36 h, and it coincides with the shift-change lull in dumping.
 * **Volume factor.** Measured fill is **f_v = 1.472** times the recorded tonnes ÷ FMS density on every day with a complete FMS record. Calibrated on the first half of the record, it predicts the second half to 3.5%.
@@ -33,7 +33,7 @@ date: "November 2026 - platform version 2.0, model run 20261008T074247"
 | Unattributed (surveyed fill with no FMS record) | 3,901 | 10.22 | 8.82 | 399 | 1.1 | Measured volume; **imputed** grade and density |
 | **Record-period total** | **48,551** | 8.57 | 8.06 | 4,159 | 12.6 | |
 
-* Monte Carlo (60 realisations) P10 / P50 / P90: record-period tonnes **48.1 / 52.5 / 56.0 kt**; contained Cu 4.08 / 4.43 / 4.95 kt (as-supplied units). The FMS-tracked Cu grade ranges over 7.98 - 8.79 % (P10-P90).
+* Monte Carlo (60 realisations) P10 / P50 / P90: record-period tonnes **48.5 / 51.9 / 55.4 kt**; contained Cu 4.04 / 4.40 / 4.94 kt (as-supplied units). The FMS-tracked Cu grade ranges over 7.92 - 8.97 % (P10-P90).
 * **What these ranges include and exclude.** The ranges cover:
   * GPS, payload and assay errors;
   * survey cut-off 29-32 h;
@@ -43,7 +43,7 @@ date: "November 2026 - platform version 2.0, model run 20261008T074247"
 
   They **do not** cover the interpretation that the excess volume is **whole loads missing from the FMS** (scenario X2). The data cannot exclude it. Under X2, record-period tonnes would be **71,338 t (+47%)**. *Not included in those ranges.* Confirming whether the FMS density is a bank or a loose density, and running a pile density test, would settle this (R-02).
 
-**Second: the pre-record core.** Below the earliest surveyed surfaces lies material placed before the record. Its geometry is inferred (floor plane, platform behind the crest) and its grade is assumed equal to the FMS mean. In the base case it holds 89,795 t. With it, the whole modelled pile is 138,346 t (Monte Carlo P10/P50/P90 134 / 148 / 159 kt). **64.9% of the whole-pile tonnes are this core, with an assumed grade**, so the whole-pile number must not be quoted without that qualification.
+**Second: the pre-record core.** Below the earliest surveyed surfaces lies material placed before the record. Its geometry is inferred (floor plane, platform behind the crest) and its grade is assumed equal to the FMS mean. In the base case it holds 89,795 t. With it, the whole modelled pile is 138,346 t (Monte Carlo P10/P50/P90 135 / 147 / 158 kt). **64.9% of the whole-pile tonnes are this core, with an assumed grade**, so the whole-pile number must not be quoted without that qualification.
 
 **Validation.**
 
@@ -51,8 +51,8 @@ date: "November 2026 - platform version 2.0, model run 20261008T074247"
 * The reconstructed surface matches the latest surveys: RMSE 0.03 m, with 100.0% of cells within the 0.14 m detection limit.
 * The volume factor predicts held-out intervals to 3.5%. Reading the FMS density as the in-pile density misses them by 32%.
 * On held-out intervals, the forward physics model's earth-mover error is 14.1 m. This compares with 14.3 m without dozer push and 30.6 m for uniform spreading.
-* In a synthetic twin with known truth, CPST recovers block Cu with RMSE 0.68% (r = 0.93). A period-average model gives 1.19% and a single mean grade 1.87%.
-* In a stress test whose truth uses a placement rule CPST does *not* assume (random crest), CPST still gives 0.68% against 1.06%.
+* In a synthetic twin with known truth, CPST recovers block Cu with RMSE 0.68% (r = 0.93). Without the push term (flat cost) it is 0.75%, and a single mean grade gives 1.87%.
+* When the twin's truth does *not* follow our push physics, the flat-cost variant beats CPST: 0.53% vs 0.68% (random crest) and 0.30% vs 0.51% (uniform mixing within each interval). The push cost helps only when its own assumption holds, and nothing in the data shows that it does.
 * An independent second implementation of the project (B) reached the same volume factor (1.476), the same consistent intervals and a 47.6 kt record-period inventory (Section 9.8).
 
 **Key conclusions.**
@@ -82,7 +82,7 @@ This is version 2.0 of the platform and report. Version 1 was reviewed against a
 * it never tested the bulking explanation of the volume gap;
 * it led with a whole-pile number that was mostly inferred material.
 
-It also identified governance and testing practices worth adopting. What changed, and why, is recorded in the decision log (D1, DEC-11 to DEC-16) and in Appendix A.
+It also identified governance and testing practices worth adopting. What changed, and why, is recorded in the decision log (D1, DEC-11 to DEC-17) and in Appendix A.
 
 # Description of Available Data
 
@@ -252,8 +252,8 @@ The full derivation, pseudocode and flowcharts are in D3. In summary, each inter
 | Question | CPST answer |
 |---|---|
 | A. Initial placement | Each load is a parcel of in-pile volume T·f_v/Dens at its reported X/Y (GPS error σ = 3 m in the Monte Carlo). Loads with a default FMS position have an unknown location (uniform cost) |
-| B. Direction | Least-work route over the pre-interval terrain: geodesic distance with uphill penalty α = 4 m per m of lift. The survey decides which face sector received fill |
-| C. Distance / stopping | Material stops where observed accommodation space exists (capacity constraint). Max push 90 m. Unplaceable volume is retained on the platform (dozer lag) |
+| B. Direction | The survey decides which face sector received fill. Within that fill, the base case prefers the least-work route over the pre-interval terrain (geodesic distance, uphill penalty α = 4 m per m of lift). Whether this preference improves the answer cannot be shown on these data (below) |
+| C. Distance / stopping | Material stops where observed accommodation space exists (capacity constraint, from the survey). Max push 90 m in the base case. Unplaceable volume is retained on the platform (dozer lag) |
 | D. Downslope behaviour | The layer top is the surveyed surface, with faces at the measured repose angle. Forward model: avalanche CA at 37° |
 | E. Mixing | Entropic OT with mixing length ε = 6 m. Grades composited from metal ÷ tonnes |
 | F. Surface reconciliation | Column marginals = observed fill, so the model surface = survey (residual < 10⁻⁶) |
@@ -265,6 +265,18 @@ The full derivation, pseudocode and flowcharts are in D3. In summary, each inter
 ![CPST algorithm for one survey interval.](figures/fig_algorithm.png)
 
 **Why optimal transport?** Moving cut volume to fill volume with minimum work is the original optimal-transport problem (Monge, 1781). The entropic form adds exactly one physically interpretable parameter, the mixing length. Sinkhorn iterations solve it robustly, and conservation is guaranteed. A rule that pushes each load to its nearest crest cell cannot honour the observed fill, and black-box regression has no training data. The forward-model test (Section 9.3) shows that physics alone predicts the fill location only moderately well, which confirms that the survey constraint is necessary.
+
+**What the push cost buys.** CPST has two ingredients: the survey constraint (each interval's sources may only fill that interval's measured fill, with unrecorded and retained volume kept apart through the dummy nodes) and the push cost (within that fill, nearer and downhill destinations are cheaper). An ablation removes the push term entirely (`movement.cost: flat`), so every source is spread over its interval's whole fill:
+
+| Twin truth | CPST (push cost) | Flat cost (survey constraint only) |
+|---|---|---|
+| Our push physics (nearest crest + 6 m jitter) | 0.68% | 0.75% |
+| Random crest (dump position uninformative) | 0.68% | 0.53% |
+| Uniform mixing within each interval | 0.51% | 0.30% |
+
+*Block Cu RMSE against known truth (Section 9.4).*
+
+The push term helps by 0.07% Cu when the truth follows the same physics, and hurts when it does not. Dropping the uphill penalty alone (0.66%) is no worse than the base case. In the forward test, physics with a dozer push beats leaving material at the dump point by only 0.26 m of earth-mover distance (14.1 vs 14.3 m). On the real data, removing it moves block grades by 0.21% Cu on average and leaves every total unchanged. **The push cost is physically motivated and costs nothing, but on these two weeks of data it cannot be shown to improve the answer.** We keep it in the base case because dozers do push to the nearest face, and the Monte Carlo samples both cost forms so that the block grade ranges carry this structural uncertainty. Tracer trials (R-06) are the way to settle it.
 
 ![Reconstructed (volume-weighted) push distances.](../outputs/growth/fig_growth_push_distance.png)
 
@@ -296,8 +308,8 @@ The complete register (32 assumptions with need, justification, consequence and 
 
 | confidence | blocks | tonnes | cu_pct | au_gpt | cu_t | au_koz |
 |---|---|---|---|---|---|---|
-| High | 695 | 36,117 | 8.26 | 7.90 | 2,983 | 9.2 |
-| Medium | 242 | 10,703 | 9.22 | 8.40 | 987 | 2.9 |
+| High | 667 | 35,591 | 8.22 | 7.89 | 2,925 | 9.0 |
+| Medium | 270 | 11,229 | 9.31 | 8.38 | 1,046 | 3.0 |
 | Low | 122 | 6,574 | 8.97 | 8.30 | 590 | 1.8 |
 | Uninformed | 1,640 | 84,951 | 8.43 | 8.01 | 7,161 | 21.9 |
 
@@ -393,11 +405,12 @@ A known-truth stockpile was generated from the real dump sequence with the forwa
 | CPST eps=6 m (base) | 684 | 0.68 | 0.48 | 0.93 | 0.28 | 0.96 | 1.00 |
 | CPST eps=15 m | 684 | 0.65 | 0.47 | 0.94 | 0.28 | 0.96 | 1.00 |
 | CPST eps=6, no uphill penalty | 684 | 0.66 | 0.47 | 0.94 | 0.28 | 0.96 | 1.00 |
+| CPST eps=6, flat cost (no push term) | 684 | 0.75 | 0.54 | 0.92 | 0.30 | 0.96 | 1.00 |
 | Baseline: period-average (eps=1e4) | 684 | 1.19 | 0.91 | 0.82 | 0.66 | 0.82 | 0.99 |
 | Reference: global mean grade | 684 | 1.87 | 1.58 |  |  |  |  |
 
 
-CPST recovers block Cu grade with RMSE 0.68% Cu (r = 0.93). That is a 43% lower error than allocating each interval's loads uniformly over its fill, and far better than a single mean grade. In this twin a larger mixing length (ε = 15 m, 0.65%) does slightly better than the base 6 m, which suggests the base case may under-mix somewhat. ε is therefore sampled over 2-15 m in the Monte Carlo, and calibrating it with tracers is recommended (R-06).
+CPST recovers block Cu grade with RMSE 0.68% Cu (r = 0.93), against 0.75% without the push term and 1.87% for a single mean grade. The period-average baseline (1.19%) also spreads unrecorded and retained volume through the FMS material; most of its larger error comes from that, not from the absence of a push cost. Block **tonnage** is reconstructed at r = 1.00 while block **grade** reaches r = 0.93: tonnage is measured by the survey, grade is what the algorithm infers. (With the A-13b toe-fill inference switched on, tonnage drops to r ≈ 0.88, and v1 reported 0.83, because the inference adds volume the synthetic truth does not have. This is further support for A-13b off.) In this twin a larger mixing length (ε = 15 m, 0.65%) does slightly better than the base 6 m, which suggests the base case may under-mix somewhat. ε is therefore sampled over 2-15 m in the Monte Carlo, and calibrating it with tracers is recommended (R-06).
 
 ![Twin experiment: true vs reconstructed block Cu.](../outputs/validation/fig_val_twin_scatter.png)
 
@@ -412,16 +425,19 @@ CPST recovers block Cu grade with RMSE 0.68% Cu (r = 0.93). That is a 43% lower 
 |---|---|---|---|---|---|
 | physics (nearest crest + 6 m jitter) | CPST eps=6 m (base) | 684 | 0.68 | 0.93 | 0.28 |
 | period-uniform mixing | CPST eps=6 m (base) | 684 | 0.51 | 0.96 | 0.21 |
+| physics (nearest crest + 6 m jitter) | CPST eps=6, flat cost (no push term) | 684 | 0.75 | 0.92 | 0.30 |
+| period-uniform mixing | CPST eps=6, flat cost (no push term) | 684 | 0.30 | 0.99 | 0.17 |
 | physics (nearest crest + 6 m jitter) | Baseline: period-average (eps=1e4) | 684 | 1.19 | 0.82 | 0.66 |
 | period-uniform mixing | Baseline: period-average (eps=1e4) | 684 | 0.99 | 0.88 | 0.61 |
 | physics (nearest crest + 6 m jitter) | Reference: global mean grade | 684 | 1.87 |  |  |
 | period-uniform mixing | Reference: global mean grade | 684 | 1.77 |  |  |
 | random-crest (dump position uninformative) | CPST eps=6 m (base) | 673 | 0.68 | 0.90 | 0.32 |
+| random-crest (dump position uninformative) | CPST eps=6, flat cost (no push term) | 673 | 0.53 | 0.95 | 0.22 |
 | random-crest (dump position uninformative) | Baseline: period-average (eps=1e4) | 673 | 1.06 | 0.82 | 0.55 |
 | random-crest (dump position uninformative) | Reference: global mean grade | 673 | 1.59 |  |  |
 
 
-When the dump position is uninformative, CPST's error is 0.68% Cu, practically the same as in the main twin (0.68%). It still beats the period-average model (1.06%) and the global mean (1.59%). Most of CPST's skill therefore comes from the survey constraint, which says which interval's material is where and in which layer. Under period-uniform mixing, CPST does not impose spurious structure (0.51% vs 0.99%).
+When the dump position is uninformative, CPST's error is 0.68% Cu, practically the same as in the main twin (0.68%), and the flat-cost variant does better (0.53%). Under uniform mixing within each interval, the flat cost is better again (0.30% vs 0.51%). The skill that survives every truth is the survey constraint's, which says which interval's material is where and in which layer. The push cost adds 0.07% Cu when its own assumption holds and costs more than that when it does not (Section 6).
 
 ## Robustness to numerical settings
 
@@ -453,7 +469,7 @@ See Section 5 and D2 Section 2.5. f_v is calibrated on the first half of the rec
 | Sinkhorn max column residual | < 10⁻⁶ |
 | Volume factor hold-out error | 3.5% (f_v = 1: 32%) |
 | Forward model W1 (test intervals) | 14.1 m (no-push 14.3 m; uniform 30.6 m) |
-| Twin block Cu RMSE / r | 0.68% / 0.93 |
+| Twin block Cu RMSE / r | 0.68% / 0.93 (flat cost 0.75%) |
 | Automated tests | 66 (unit, real-data, platform) |
 
 ## Cross-implementation check
@@ -504,25 +520,26 @@ Sixty Monte Carlo realisations jointly sampled the following (D3, Section 7):
 * survey bias (5 cm);
 * survey cut-off (29-32 h);
 * mixing length (2-15 m), uphill penalty (1-10) and maximum push (50-130 m);
+* the push-cost form (geodesic or flat, 50/50), because the twins cannot distinguish them;
 * the unattributed grade (bootstrap).
 
 *Table 10.1 - Monte Carlo summary (60 realisations): record-period rows first; class_t_l = pre-record core*
 
 | quantity | P10 | P50 | P90 | cv |
 |---|---|---|---|---|
-| record_period_tonnes | 48,083.63 | 52,496.89 | 56,006.40 | 0.062 |
-| record_period_cu_t | 4,084.61 | 4,427.36 | 4,951.81 | 0.076 |
-| record_period_au_kg | 381.19 | 416.75 | 464.04 | 0.077 |
-| fms_tonnes | 45,203.10 | 47,124.91 | 49,666.79 | 0.040 |
-| class_t_u | 1,660.51 | 4,660.75 | 8,890.87 | 0.533 |
-| class_fms_cu_pct | 7.98 | 8.50 | 8.79 | 0.040 |
-| class_fms_au_gpt | 7.51 | 8.00 | 8.51 | 0.050 |
-| class_t_l | 86,603.64 | 94,912.28 | 103,077.82 | 0.072 |
-| total_tonnes | 134,036.38 | 147,624.14 | 158,568.00 | 0.067 |
-| cu_t | 11,284.21 | 12,413.00 | 13,790.62 | 0.080 |
-| au_kg | 1,076.56 | 1,175.82 | 1,308.66 | 0.082 |
-| cu_pct | 8.00 | 8.54 | 8.83 | 0.040 |
-| au_gpt | 7.54 | 8.03 | 8.53 | 0.049 |
+| record_period_tonnes | 48,522.89 | 51,903.25 | 55,370.57 | 0.054 |
+| record_period_cu_t | 4,038.46 | 4,403.66 | 4,935.96 | 0.085 |
+| record_period_au_kg | 387.47 | 412.74 | 456.68 | 0.068 |
+| fms_tonnes | 44,783.43 | 46,859.04 | 50,486.56 | 0.046 |
+| class_t_u | 1,776.87 | 4,565.13 | 7,143.87 | 0.435 |
+| class_fms_cu_pct | 7.92 | 8.53 | 8.97 | 0.051 |
+| class_fms_au_gpt | 7.54 | 7.98 | 8.37 | 0.045 |
+| class_t_l | 87,180.89 | 95,185.35 | 102,364.84 | 0.062 |
+| total_tonnes | 135,008.85 | 147,143.91 | 157,949.46 | 0.058 |
+| cu_t | 11,375.56 | 12,418.61 | 13,936.06 | 0.088 |
+| au_kg | 1,088.18 | 1,170.98 | 1,291.20 | 0.071 |
+| cu_pct | 7.94 | 8.54 | 9.02 | 0.051 |
+| au_gpt | 7.55 | 8.01 | 8.38 | 0.044 |
 
 
 ![Monte Carlo distributions: record-period tonnes and Cu, and the whole pile.](../outputs/uncertainty/fig_unc_global_histograms.png)
@@ -537,7 +554,7 @@ Sixty Monte Carlo realisations jointly sampled the following (D3, Section 7):
 
 * **Record-period tonnage** is driven by the payload factor, the volume factor (scatter plot above) and the A-13b switch. Moving the survey cut-off to 29 or 32 h changes record-period tonnes by 2%-5%, mostly through the recalibrated f_v. It still moves block grades by up to 0.22% Cu on average, because loads dumped within an hour or two of the cut-off change interval.
 * **Whole-pile tonnage** is driven by the payload and volume factors, because they set the in-pile density that converts the pre-record core's volume into tonnes. The A-13b switch moves about 10 kt from the core to the unattributed class.
-* **Spatial grade field.** The survey cut-off, the movement parameters, the grid and the A-13b switch drive the grade field of the FMS-tracked material (mean absolute block Cu change in the tornado). The Monte Carlo block Cu CV for FMS-tracked blocks has a median of 7% (P90 9%).
+* **Spatial grade field.** The survey cut-off, the movement parameters, the grid and the A-13b switch drive the grade field of the FMS-tracked material (mean absolute block Cu change in the tornado). The Monte Carlo block Cu CV for FMS-tracked blocks has a median of 8% (P90 10%).
 * **What the Monte Carlo cannot quantify.** The pre-record core grade is an assumption, not a measurement. For blocks with less than 50% FMS-tracked material we therefore report a *prior* range: the load-scale P10-P90 of all FMS loads, 5.8-12.1 % Cu. We do not report Monte Carlo precision for these blocks, because it would be false.
 
 ## Interpretations of the volume gap (scenarios)
@@ -645,7 +662,7 @@ Manual corrections are possible only through `config/manual_interventions.csv`. 
 4. Grades are source-block values (no within-load variability); payloads are pass-count estimates; moisture basis unknown.
 5. Missing surveys and toe-clipped solids. The survey cut-off is inferred, not recorded.
 6. Within-interval vertical homogeneity (A-19); no particle-size segregation (A-27); no settlement (A-28).
-7. Mixing length and push parameters are supported by the synthetic twins but not calibrated with field tracers.
+7. Mixing length and push cost are not calibrated with field tracers. The twins cannot show that the push term improves the answer, so both cost forms are sampled in the Monte Carlo.
 8. Confidence classes are internal planning classes, not JORC/NI 43-101 categories.
 
 # Recommendations for Mine Implementation
@@ -665,7 +682,7 @@ Manual corrections are possible only through `config/manual_interventions.csv`. 
 
 The supplied data support a defensible reconstruction of the material dumped during 15-31 March 2026. The change-solid surveys serve as measured fill. A survey cut-off and a volume factor are calibrated from the data and verified on held-out intervals. A conservative, survey-constrained optimal-transport allocation then places every FMS tonne and every unit of metal in a 3-D block model, with exact balances, quantified uncertainty and full provenance.
 
-The record-period inventory is 48,551 t (P10-P90 48.1-56.0 kt), with one explicitly stated exclusion: tonnes missing from the FMS. It agrees with an independent implementation to about 2%. Independent tests show that the method recovers block grades far better than simpler alternatives. Most of the whole pile pre-dates the record and has no grade information in the supplied data. The responsible deliverable is therefore:
+The record-period inventory is 48,551 t (P10-P90 48.5-55.4 kt), with one explicitly stated exclusion: tonnes missing from the FMS. It agrees with an independent implementation to about 2%. Independent tests show that the method recovers block grades far better than simpler alternatives. Most of the whole pile pre-dates the record and has no grade information in the supplied data. The responsible deliverable is therefore:
 
 * an inventory with ranges and explicit information classes;
 * a near-term reclaim plan on the well-informed outer benches;

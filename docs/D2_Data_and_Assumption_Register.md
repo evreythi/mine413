@@ -1,6 +1,6 @@
 ---
 title: "D2 - Data and Assumption Register"
-subtitle: "MIN E 413 Term Project - Pit I HG stockpile reconstruction (platform version 2.0, run 20261008T074247)"
+subtitle: "MIN E 413 Term Project - Pit I HG stockpile reconstruction (platform version 2.0, run 20261008T173954)"
 ---
 
 This register is the controlled record of:
@@ -95,7 +95,7 @@ Record-level rules are defined once (`spbm/rules.py`) and used by both the QA re
 
 40 rules are checked and 25 are triggered by the supplied data. No FMS record meets an error rule, so all 275 records are modelled. The 14 LOC_DEFAULT records (2,356 t) are modelled with an unknown location.
 
-## 2.2 FMS records (DS-1): findings and treatment
+## 2.2 FMS record findings (DS-1)
 
 | ID | Finding | Evidence (rule) | Action / treatment | Influence on model |
 |---|---|---|---|---|
@@ -177,6 +177,8 @@ On the seven intervals with complete FMS records (consistent: within median ± 3
 
 f_v is predictive, not merely fitted:
 
+*Volume factor hold-out tests*
+
 | Hold-out test (`volume_factor_summary.csv`) | Mean absolute volume error on held-out consistent intervals |
 |---|---|
 | f_v calibrated on the first half (intervals 0-4), predicting intervals 5, 6 and 8 | **3.5%** |
@@ -232,8 +234,8 @@ Columns follow the course outline, Task 4: Assumption | Need | Justification | C
 | A-13 | Never-surveyed cells: behind the crest = flat platform at the nearest crest elevation; in front of the face = face continued at 37° to the floor | Geometry where no survey exists | Truck-operated platform is flat; faces at repose | Pre-record core volume and extent | Geometry class "inferred"; reported separately |
 | A-13b | **Off in the base case.** (If on: first-surveyed cells in front of an earlier face were at its repose extrapolation; a solid bottom above it is fill not captured by any solid.) | Option for toe-clipped solids | With f_v calibrated, recorded loads explain measured fill of complete days to ~3%, leaving no room for ~7,200 m³ of unrecorded fill | About 7,200 m³ moves from the pre-record core to unattributed | S (switch); Sc (S2) |
 | A-14 | Model domain = convex hull of surveyed change and dump locations | Lateral limit of the pile | No full-pile survey supplied | The back of the pile outside the hull is not modelled | Stated limitation; R-01 |
-| A-15 | Dozer push follows least total push work (optimal transport over a slope-aware geodesic cost) | Unknown dozer trajectories | Operators minimise push distance; OT is the classical earth-moving formulation | Wrong allocation of grade inside an interval's fill | MC/S on ε, α, L_max; twin experiments |
-| A-16 | Uphill push penalty α = 4 m per m of lift | Prevent implausible uphill pushes | Dozer production falls sharply uphill (grade correction factors, Caterpillar Performance Handbook) | Allocation across the crest | S (1/10), MC U(1, 10) |
+| A-15 | Within an interval's measured fill, dozer push follows least total push work (optimal transport over a slope-aware geodesic cost) | Unknown dozer trajectories | Operators minimise push distance; OT is the classical earth-moving formulation. **Evidence is weak**: in the twins the push cost helps only when the truth follows the same physics, and a flat cost (no push term) does better otherwise | Block grades change by about 0.2% Cu on average (flat vs geodesic); totals unchanged | MC samples geodesic/flat 50/50; tornado; twin ablation; tracer trials (R-06) |
+| A-16 | Uphill push penalty α = 4 m per m of lift | Prevent implausible uphill pushes | Dozer production falls sharply uphill (grade correction factors, Caterpillar Performance Handbook). The twin with α = 0 is no worse | Allocation across the crest | S (1/10), MC U(1, 10), twin (α = 0) |
 | A-17 | Maximum effective push distance 90 m (geodesic) | Limit movement | Dozing is generally economical to about 100 m | Loads may be retained on the platform | S (50/130), MC U(50, 130) |
 | A-18 | Mixing length ε = 6 m (entropy regularisation) | Degree of mixing | GPS error (3 m), blade spill, rolling on the face; twin favours small-moderate ε | Over- or under-mixing of grades | S (2/15), MC U(2, 15), twin |
 | A-19 | Within one interval, the fill of a column is vertically homogeneous | Vertical placement | Daily fill is built by many interleaved loads | Vertical grade resolution limited to the interval layer (0.5-3 m) | Inherent; documented |

@@ -284,7 +284,7 @@ CPST recovers block Cu grade with RMSE {{TW_CPST}}% Cu (r = {{TW_R}}), against {
 
 {{TABLE_TWIN_ALT}}
 
-When the dump position is uninformative, CPST's error is {{TWA_RC_CPST}}% Cu, practically the same as in the main twin ({{TW_CPST}}%), and the flat-cost variant does better ({{TWA_RC_FLAT}}%). Under uniform mixing within each interval, the flat cost is better again ({{TWA_PU_FLAT}}% vs {{TWA_PU_CPST}}%). The skill that survives every truth is the survey constraint's, which says which interval's material is where and in which layer. The push cost adds a little when its own assumption holds and costs a little when it does not (Section 6).
+When the dump position is uninformative, CPST's error is {{TWA_RC_CPST}}% Cu, practically the same as in the main twin ({{TW_CPST}}%), and the flat-cost variant does better ({{TWA_RC_FLAT}}%). Under uniform mixing within each interval, the flat cost is better again ({{TWA_PU_FLAT}}% vs {{TWA_PU_CPST}}%). The skill that survives every truth is the survey constraint's, which says which interval's material is where and in which layer. The push cost adds {{PUSH_GAIN}}% Cu when its own assumption holds and costs more than that when it does not (Section 6).
 
 ## Robustness to numerical settings
 

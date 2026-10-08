@@ -1,0 +1,535 @@
+{
+  "run_id": "20261008T173954",
+  "started": "2026-10-08T17:39:54",
+  "finished": "2026-10-08T18:42:45",
+  "git_commit": "d690c57",
+  "spbm_source_sha256": "4ad240d499f43e5b",
+  "config_file": "/home/user/mine413/config/project.yaml",
+  "config_hash": "bcd25f6089be",
+  "software": {
+    "python": "3.13.16",
+    "platform": "Linux-6.18.44-fc-v80-x86_64-with-glibc2.39",
+    "spbm": "2.0.0",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "pandas": "3.0.5",
+    "matplotlib": "3.11.2",
+    "ezdxf": "1.4.4",
+    "pyyaml": "6.0.1"
+  },
+  "inputs": [
+    {
+      "file": "Dump Data.csv",
+      "kind": "fms",
+      "sha256": "1742c711814ceca0a4c38985cc29f828e88da194c7fb8f7043f9ed007fa0d95a",
+      "bytes": 21844,
+      "origin": "/home/user/mine413/data/raw_store"
+    },
+    {
+      "file": "Topo_250328.dxf",
+      "kind": "survey",
+      "sha256": "9862549b002ba65531a358583be4dc44624a0c664eae9dff6aff692b99913234",
+      "bytes": 6348294,
+      "origin": "/home/user/mine413/data/raw_store"
+    },
+    {
+      "file": "Topo_250329.dxf",
+      "kind": "survey",
+      "sha256": "468ce1f2d2d09163da27dfbd9ec70bfb2576b340a5a26abc78e3500e69449edb",
+      "bytes": 3015556,
+      "origin": "/home/user/mine413/data/raw_store"
+    },
+    {
+      "file": "Topo_260315.dxf",
+      "kind": "survey",
+      "sha256": "f22a6eb71764909104701c5f89956f66cf7145d8b5715867f0e2a0b6bc954130",
+      "bytes": 4462966,
+      "origin": "/home/user/mine413/data/raw_store"
+    },
+    {
+      "file": "Topo_260316.dxf",
+      "kind": "survey",
+      "sha256": "18c4663d5cc651854766944a13cd3664d640ab74c56021f4ee7f05eaeb97d662",
+      "bytes": 2937992,
+      "origin": "/home/user/mine413/data/raw_store"
+    },
+    {
+      "file": "Topo_260318.dxf",
+      "kind": "survey",
+      "sha256": "3327e3839bb7ed1d2cc96e668d426d63492c4639b7e0d69e6ec084ec6e9b0313",
+      "bytes": 5330655,
+      "origin": "/home/user/mine413/data/raw_store"
+    },
+    {
+      "file": "Topo_260319.dxf",
+      "kind": "survey",
+      "sha256": "a66cbc90abd1efd7bd049b6a6b331742b473ec7e194abb1c554844317afe161b",
+      "bytes": 4582978,
+      "origin": "/home/user/mine413/data/raw_store"
+    },
+    {
+      "file": "Topo_260320.dxf",
+      "kind": "survey",
+      "sha256": "230e4aa86e408e5e14ef9765049f0e64e264b9ccd308aa0fddef7053bd2ff0d5",
+      "bytes": 3597064,
+      "origin": "/home/user/mine413/data/raw_store"
+    },
+    {
+      "file": "Topo_260321.dxf",
+      "kind": "survey",
+      "sha256": "81e4e63d6ef2aa02dbed237c9466eab92bd04e1f6a5f70b7b5f0d5a49f066f71",
+      "bytes": 2280096,
+      "origin": "/home/user/mine413/data/raw_store"
+    },
+    {
+      "file": "Topo_260322.dxf",
+      "kind": "survey",
+      "sha256": "535226be973656daca938289e8be3f3e00abeab95c009fd7959444af254f3100",
+      "bytes": 3496531,
+      "origin": "/home/user/mine413/data/raw_store"
+    },
+    {
+      "file": "Topo_260327.dxf",
+      "kind": "survey",
+      "sha256": "72752e0303ed3a78a862078e40e8029215fba056c4730160157f7d50d3bc6965",
+      "bytes": 4566371,
+      "origin": "/home/user/mine413/data/raw_store"
+    }
+  ],
+  "manual_interventions": [
+    {
+      "id": "MI-001",
+      "type": "survey_date",
+      "target": "Topo_250328.dxf",
+      "value": "2026-03-28",
+      "reason": "File name year '25' contradicts the record: FMS dumps on 2026-03-28; face lies beyond Topo_260327 and its base matches that solid's top; all ten layer names carry '25'; no 2025 FMS data exist (QA-S02).",
+      "author": "Survey lead",
+      "date": "2026-10-07",
+      "approved_by": "Team review"
+    },
+    {
+      "id": "MI-002",
+      "type": "survey_date",
+      "target": "Topo_250329.dxf",
+      "value": "2026-03-29",
+      "reason": "As MI-001: face advances beyond the 2026-03-28 solid; FMS dumps on 2026-03-29 (QA-S02).",
+      "author": "Survey lead",
+      "date": "2026-10-07",
+      "approved_by": "Team review"
+    }
+  ],
+  "notes": [],
+  "key_results": {
+    "last_survey": "2026-03-30 07:00:00",
+    "n_surveys": 10,
+    "n_fms_records": 275,
+    "fms_tonnes": 44650.0,
+    "fms_cu_t": 3760.423000000006,
+    "fms_au_kg": 357.1236200000006,
+    "total_tonnes": 138345.83201003505,
+    "total_cu_t": 11721.531883697253,
+    "total_au_kg": 1109.7214359961476,
+    "tonnes_fms_in_model": 44650.0,
+    "tonnes_unattributed": 3901.2785594861084,
+    "tonnes_legacy": 89794.55345054896,
+    "mass_balance_rel_err_ppm": 1.6295537769727718e-10,
+    "cu_balance_rel_err_ppm": -2.176737115999009e-09,
+    "au_balance_rel_err_ppm": -2.3875521952653786e-09,
+    "geometry_rmse_m": 0.029146579583023646,
+    "survey_volume_m3": 35095.559693264295,
+    "unattributed_volume_m3": 2869.270313329849,
+    "blocks": 2699,
+    "block_size": [
+      5.0,
+      5.0,
+      2.0
+    ],
+    "survey_cutoff_hours": 31.0,
+    "volume_factor": 1.4717380687565416,
+    "volume_factor_p10_p90": [
+      1.397846215527493,
+      1.524959273063707
+    ],
+    "volume_factor_consistent_intervals": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      8
+    ],
+    "volume_factor_holdout_mae": 0.034584962204253424,
+    "payload_factor": 1.0,
+    "in_pile_density_t_m3": 1.4046110369494245,
+    "tonnes_record_period": 48551.278559486105,
+    "cu_t_record_period": 4159.034592092019,
+    "twin_cu_rmse_base": 0.6805303138384898,
+    "twin_cu_corr_base": 0.9313382992751342,
+    "scenario_S0_record_period_tonnes": 48551.27855948611,
+    "scenario_S0_total_tonnes": 138345.83201003444,
+    "scenario_S1_record_period_tonnes": 57776.02148578848,
+    "scenario_S1_total_tonnes": 164631.5400919405,
+    "scenario_S2_record_period_tonnes": 58681.52192682905,
+    "scenario_S2_total_tonnes": 137295.3606602252,
+    "scenario_X1_record_period_tonnes": 71454.76160458093,
+    "scenario_X1_total_tonnes": 203608.8181107862,
+    "scenario_X2_record_period_tonnes": 71337.70529552153,
+    "scenario_X2_total_tonnes": 203491.76180172662,
+    "mc_record_period_tonnes_p10_p50_p90": [
+      48522.89364579109,
+      51903.24979453598,
+      55370.56539576109
+    ],
+    "mc_record_period_cu_t_p10_p50_p90": [
+      4038.4596994972894,
+      4403.662675309266,
+      4935.960608407778
+    ],
+    "mc_total_tonnes_p10_p50_p90": [
+      135008.851275244,
+      147143.91418955813,
+      157949.4560913856
+    ],
+    "mc_cu_t_p10_p50_p90": [
+      11375.556084586156,
+      12418.606208331323,
+      13936.062939197976
+    ],
+    "mc_au_kg_p10_p50_p90": [
+      1088.179819290776,
+      1170.984707399229,
+      1291.1994472135357
+    ]
+  },
+  "outputs": [
+    {
+      "path": "audit/data_registry.csv",
+      "bytes": 1871
+    },
+    {
+      "path": "audit/ingest_log.csv",
+      "bytes": 2300
+    },
+    {
+      "path": "audit/manual_interventions_applied.csv",
+      "bytes": 504
+    },
+    {
+      "path": "audit/run_log.csv",
+      "bytes": 249
+    },
+    {
+      "path": "audit/survey_register.csv",
+      "bytes": 1209
+    },
+    {
+      "path": "blockmodel/block_model_definition.json",
+      "bytes": 446
+    },
+    {
+      "path": "blockmodel/fig_bm_3d_cu_pct.png",
+      "bytes": 289608
+    },
+    {
+      "path": "blockmodel/fig_bm_confidence.png",
+      "bytes": 46416
+    },
+    {
+      "path": "blockmodel/fig_bm_grade_tonnage.png",
+      "bytes": 102513
+    },
+    {
+      "path": "blockmodel/fig_bm_information_class.png",
+      "bytes": 49926
+    },
+    {
+      "path": "blockmodel/fig_bm_plans_au_gpt.png",
+      "bytes": 115545
+    },
+    {
+      "path": "blockmodel/fig_bm_plans_cu_pct.png",
+      "bytes": 114435
+    },
+    {
+      "path": "blockmodel/fig_bm_plans_frac_fms.png",
+      "bytes": 124001
+    },
+    {
+      "path": "blockmodel/fig_bm_plans_tonnes.png",
+      "bytes": 123902
+    },
+    {
+      "path": "blockmodel/fig_bm_sections_cu_pct.png",
+      "bytes": 167771
+    },
+    {
+      "path": "blockmodel/fig_bm_sections_frac_fms.png",
+      "bytes": 169596
+    },
+    {
+      "path": "blockmodel/stockpile_block_model.csv",
+      "bytes": 879757
+    },
+    {
+      "path": "blockmodel/stockpile_block_model.vtk",
+      "bytes": 334787
+    },
+    {
+      "path": "blockmodel/summary_by_bench_4m.csv",
+      "bytes": 963
+    },
+    {
+      "path": "blockmodel/summary_by_confidence.csv",
+      "bytes": 789
+    },
+    {
+      "path": "blockmodel/summary_by_dominant_info_class.csv",
+      "bytes": 827
+    },
+    {
+      "path": "blockmodel/summary_by_material_source.csv",
+      "bytes": 205
+    },
+    {
+      "path": "blockmodel/summary_grade_tonnage.csv",
+      "bytes": 860
+    },
+    {
+      "path": "growth/dump_time_of_day.csv",
+      "bytes": 351
+    },
+    {
+      "path": "growth/fig_growth_cumulative.png",
+      "bytes": 76185
+    },
+    {
+      "path": "growth/fig_growth_face_advance.png",
+      "bytes": 95129
+    },
+    {
+      "path": "growth/fig_growth_period_maps.png",
+      "bytes": 252916
+    },
+    {
+      "path": "growth/fig_growth_period_reconciliation.png",
+      "bytes": 55670
+    },
+    {
+      "path": "growth/fig_growth_push_distance.png",
+      "bytes": 34737
+    },
+    {
+      "path": "growth/fig_temporal_alignment.png",
+      "bytes": 129810
+    },
+    {
+      "path": "growth/fig_volume_factor.png",
+      "bytes": 113354
+    },
+    {
+      "path": "growth/period_reconciliation.csv",
+      "bytes": 4890
+    },
+    {
+      "path": "growth/temporal_alignment.csv",
+      "bytes": 6228
+    },
+    {
+      "path": "growth/volume_factor_calibration.csv",
+      "bytes": 3587
+    },
+    {
+      "path": "growth/volume_factor_summary.csv",
+      "bytes": 491
+    },
+    {
+      "path": "movement/final_model_surface.asc",
+      "bytes": 161219
+    },
+    {
+      "path": "movement/floor_plane.asc",
+      "bytes": 153307
+    },
+    {
+      "path": "movement/latest_surveyed_surface.asc",
+      "bytes": 163518
+    },
+    {
+      "path": "movement/load_destinations.csv",
+      "bytes": 91079
+    },
+    {
+      "path": "movement/loads_used.csv",
+      "bytes": 49897
+    },
+    {
+      "path": "movement/pre_record_surface.asc",
+      "bytes": 161219
+    },
+    {
+      "path": "qaqc/daily_coverage.csv",
+      "bytes": 1359
+    },
+    {
+      "path": "qaqc/fig_qaqc_daily_grades.png",
+      "bytes": 120211
+    },
+    {
+      "path": "qaqc/fig_qaqc_daily_tonnage_volume.png",
+      "bytes": 83908
+    },
+    {
+      "path": "qaqc/fig_qaqc_dump_density.png",
+      "bytes": 103854
+    },
+    {
+      "path": "qaqc/fig_qaqc_dump_map.png",
+      "bytes": 300227
+    },
+    {
+      "path": "qaqc/fig_qaqc_dumpz_timeofday.png",
+      "bytes": 37691
+    },
+    {
+      "path": "qaqc/fig_qaqc_floor_plane.png",
+      "bytes": 72859
+    },
+    {
+      "path": "qaqc/fig_qaqc_payload_grades.png",
+      "bytes": 61248
+    },
+    {
+      "path": "qaqc/fig_qaqc_repose.png",
+      "bytes": 32646
+    },
+    {
+      "path": "qaqc/fig_qaqc_survey_solids.png",
+      "bytes": 162752
+    },
+    {
+      "path": "qaqc/fms_flag_summary.csv",
+      "bytes": 2672
+    },
+    {
+      "path": "qaqc/fms_records_with_flags.csv",
+      "bytes": 97060
+    },
+    {
+      "path": "qaqc/grade_signatures.csv",
+      "bytes": 1598
+    },
+    {
+      "path": "qaqc/payload_distribution.csv",
+      "bytes": 113
+    },
+    {
+      "path": "qaqc/qa_rule_catalogue.csv",
+      "bytes": 6541
+    },
+    {
+      "path": "qaqc/survey_qaqc.csv",
+      "bytes": 5514
+    },
+    {
+      "path": "report_tables.md",
+      "bytes": 21457
+    },
+    {
+      "path": "summary.json",
+      "bytes": 4263
+    },
+    {
+      "path": "uncertainty/fig_bm_plans_cu_cv.png",
+      "bytes": 126168
+    },
+    {
+      "path": "uncertainty/fig_scenarios.png",
+      "bytes": 74181
+    },
+    {
+      "path": "uncertainty/fig_sens_tornado.png",
+      "bytes": 207259
+    },
+    {
+      "path": "uncertainty/fig_unc_block_maps.png",
+      "bytes": 59002
+    },
+    {
+      "path": "uncertainty/fig_unc_global_histograms.png",
+      "bytes": 75019
+    },
+    {
+      "path": "uncertainty/fig_unc_param_scatter.png",
+      "bytes": 99369
+    },
+    {
+      "path": "uncertainty/mc_global_summary.csv",
+      "bytes": 2114
+    },
+    {
+      "path": "uncertainty/mc_realizations.csv",
+      "bytes": 21155
+    },
+    {
+      "path": "uncertainty/scenarios.csv",
+      "bytes": 2036
+    },
+    {
+      "path": "uncertainty/sensitivity_oat.csv",
+      "bytes": 6285
+    },
+    {
+      "path": "validation/fig_val_forward_test.png",
+      "bytes": 216820
+    },
+    {
+      "path": "validation/fig_val_geometry.png",
+      "bytes": 90632
+    },
+    {
+      "path": "validation/fig_val_twin_scatter.png",
+      "bytes": 110701
+    },
+    {
+      "path": "validation/forward_calibration_grid.csv",
+      "bytes": 1436
+    },
+    {
+      "path": "validation/forward_temporal_summary.csv",
+      "bytes": 434
+    },
+    {
+      "path": "validation/forward_temporal_validation.csv",
+      "bytes": 5255
+    },
+    {
+      "path": "validation/geometry_check.csv",
+      "bytes": 224
+    },
+    {
+      "path": "validation/inventory_by_class.csv",
+      "bytes": 660
+    },
+    {
+      "path": "validation/mass_metal_balance.csv",
+      "bytes": 557
+    },
+    {
+      "path": "validation/robustness_numerical.csv",
+      "bytes": 1969
+    },
+    {
+      "path": "validation/twin_alternative_truths.csv",
+      "bytes": 2238
+    },
+    {
+      "path": "validation/twin_experiment.csv",
+      "bytes": 1137
+    },
+    {
+      "path": "validation/volume_reconciliation.csv",
+      "bytes": 566
+    }
+  ]
+}

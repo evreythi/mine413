@@ -58,6 +58,7 @@
     "legacy_density": null
   },
   "movement": {
+    "cost": "geodesic",
     "epsilon": 6.0,
     "alpha_up": 4.0,
     "max_push": 90.0,
@@ -139,6 +140,10 @@
       2.0,
       15.0
     ],
+    "cost_modes": [
+      "geodesic",
+      "flat"
+    ],
     "alpha_range": [
       1.0,
       10.0
@@ -189,6 +194,10 @@
     "front_unobserved_fill": [
       false,
       true
+    ],
+    "cost": [
+      "geodesic",
+      "flat"
     ],
     "block": [
       [

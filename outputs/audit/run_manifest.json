@@ -1,11 +1,11 @@
 {
-  "run_id": "20261008T074247",
-  "started": "2026-10-08T07:42:47",
-  "finished": "2026-10-08T08:25:29",
-  "git_commit": "fab1cc3",
-  "spbm_source_sha256": "dc043ea7b7968527",
+  "run_id": "20261008T173954",
+  "started": "2026-10-08T17:39:54",
+  "finished": "2026-10-08T18:42:45",
+  "git_commit": "d690c57",
+  "spbm_source_sha256": "4ad240d499f43e5b",
   "config_file": "/home/user/mine413/config/project.yaml",
-  "config_hash": "e3f932157144",
+  "config_hash": "bcd25f6089be",
   "software": {
     "python": "3.13.16",
     "platform": "Linux-6.18.44-fc-v80-x86_64-with-glibc2.39",
@@ -177,29 +177,29 @@
     "scenario_X2_record_period_tonnes": 71337.70529552153,
     "scenario_X2_total_tonnes": 203491.76180172662,
     "mc_record_period_tonnes_p10_p50_p90": [
-      48083.627300151995,
-      52496.894975996765,
-      56006.40245646977
+      48522.89364579109,
+      51903.24979453598,
+      55370.56539576109
     ],
     "mc_record_period_cu_t_p10_p50_p90": [
-      4084.611166496437,
-      4427.3560226468835,
-      4951.80747643611
+      4038.4596994972894,
+      4403.662675309266,
+      4935.960608407778
     ],
     "mc_total_tonnes_p10_p50_p90": [
-      134036.38013531925,
-      147624.14058119373,
-      158567.99807763306
+      135008.851275244,
+      147143.91418955813,
+      157949.4560913856
     ],
     "mc_cu_t_p10_p50_p90": [
-      11284.213472451936,
-      12413.004734151578,
-      13790.618483282435
+      11375.556084586156,
+      12418.606208331323,
+      13936.062939197976
     ],
     "mc_au_kg_p10_p50_p90": [
-      1076.5573756027763,
-      1175.8214371708773,
-      1308.6639544756335
+      1088.179819290776,
+      1170.984707399229,
+      1291.1994472135357
     ]
   },
   "outputs": [
@@ -217,7 +217,7 @@
     },
     {
       "path": "audit/run_log.csv",
-      "bytes": 162
+      "bytes": 249
     },
     {
       "path": "audit/survey_register.csv",
@@ -233,7 +233,7 @@
     },
     {
       "path": "blockmodel/fig_bm_confidence.png",
-      "bytes": 46284
+      "bytes": 46416
     },
     {
       "path": "blockmodel/fig_bm_grade_tonnage.png",
@@ -269,11 +269,11 @@
     },
     {
       "path": "blockmodel/stockpile_block_model.csv",
-      "bytes": 879728
+      "bytes": 879757
     },
     {
       "path": "blockmodel/stockpile_block_model.vtk",
-      "bytes": 334829
+      "bytes": 334787
     },
     {
       "path": "blockmodel/summary_by_bench_4m.csv",
@@ -433,15 +433,15 @@
     },
     {
       "path": "report_tables.md",
-      "bytes": 21359
+      "bytes": 21457
     },
     {
       "path": "summary.json",
-      "bytes": 4269
+      "bytes": 4263
     },
     {
       "path": "uncertainty/fig_bm_plans_cu_cv.png",
-      "bytes": 126278
+      "bytes": 126168
     },
     {
       "path": "uncertainty/fig_scenarios.png",
@@ -449,27 +449,27 @@
     },
     {
       "path": "uncertainty/fig_sens_tornado.png",
-      "bytes": 203059
+      "bytes": 207259
     },
     {
       "path": "uncertainty/fig_unc_block_maps.png",
-      "bytes": 59006
+      "bytes": 59002
     },
     {
       "path": "uncertainty/fig_unc_global_histograms.png",
-      "bytes": 77741
+      "bytes": 75019
     },
     {
       "path": "uncertainty/fig_unc_param_scatter.png",
-      "bytes": 94564
+      "bytes": 99369
     },
     {
       "path": "uncertainty/mc_global_summary.csv",
-      "bytes": 2122
+      "bytes": 2114
     },
     {
       "path": "uncertainty/mc_realizations.csv",
-      "bytes": 20745
+      "bytes": 21155
     },
     {
       "path": "uncertainty/scenarios.csv",
@@ -477,7 +477,7 @@
     },
     {
       "path": "uncertainty/sensitivity_oat.csv",
-      "bytes": 5793
+      "bytes": 6285
     },
     {
       "path": "validation/fig_val_forward_test.png",
@@ -521,11 +521,11 @@
     },
     {
       "path": "validation/twin_alternative_truths.csv",
-      "bytes": 1609
+      "bytes": 2238
     },
     {
       "path": "validation/twin_experiment.csv",
-      "bytes": 963
+      "bytes": 1137
     },
     {
       "path": "validation/volume_reconciliation.csv",

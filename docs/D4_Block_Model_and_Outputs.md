@@ -72,8 +72,8 @@ subtitle: "Pit I HG stockpile - current state after the 2026-03-29 survey (provi
 
 | confidence | blocks | tonnes | cu_pct | au_gpt | cu_t | au_koz |
 |---|---|---|---|---|---|---|
-| High | 695 | 36,117 | 8.26 | 7.90 | 2,983 | 9.2 |
-| Medium | 242 | 10,703 | 9.22 | 8.40 | 987 | 2.9 |
+| High | 667 | 35,591 | 8.22 | 7.89 | 2,925 | 9.0 |
+| Medium | 270 | 11,229 | 9.31 | 8.38 | 1,046 | 3.0 |
 | Low | 122 | 6,574 | 8.97 | 8.30 | 590 | 1.8 |
 | Uninformed | 1,640 | 84,951 | 8.43 | 8.01 | 7,161 | 21.9 |
 
@@ -91,7 +91,7 @@ subtitle: "Pit I HG stockpile - current state after the 2026-03-29 survey (provi
 | 4474-4478 | 793 | 36,472 | 8.44 | 8.00 | 3,080 | 9.4 |
 
 
-Source: `outputs/blockmodel/summary_by_bench_4m.csv` (model run 20261008T074247).
+Source: `outputs/blockmodel/summary_by_bench_4m.csv` (model run 20261008T173954).
 
 # 3. Visualisations
 
