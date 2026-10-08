@@ -76,8 +76,12 @@ def disc(shape, j, i, r_cells):
     return (J - j) ** 2 + (I - i) ** 2 <= r_cells ** 2
 
 
-def place_loads(z0, loads_xy_vol, g, fcfg, rng=None, push_jitter=0.0, sequential=False, B=None, crest_region=None):
+def place_loads(z0, loads_xy_vol, g, fcfg, rng=None, push_jitter=0.0, sequential=False, B=None, crest_region=None,
+                crest_rule="nearest"):
     """Push each load to the nearest crest and let it avalanche.
+    crest_rule="random" (used only for stress-testing the reconstruction)
+    sends each load to a random crest cell, so the dump position carries no
+    information about where the material ends up.
     loads_xy_vol: array (n,3) of x, y, volume.  Returns final surface and, if
     sequential, a list of per-load footprints (thickness arrays)."""
     tanphi = np.tan(np.radians(fcfg["repose_deg"]))
@@ -103,8 +107,11 @@ def place_loads(z0, loads_xy_vol, g, fcfg, rng=None, push_jitter=0.0, sequential
             xx += rng.normal(0, push_jitter); yy += rng.normal(0, push_jitter)
         j = int(np.clip((yy - g.y0) // g.cell, 0, g.ny - 1))
         i = int(np.clip((xx - g.x0) // g.cell, 0, g.nx - 1))
-        _, (tj, ti) = ndimage.distance_transform_edt(~crest, return_indices=True)
-        cj, ci = tj[j, i], ti[j, i]
+        if crest_rule == "random" and rng is not None:
+            cj, ci = np.unravel_index(rng.choice(np.flatnonzero(crest)), crest.shape)
+        else:
+            _, (tj, ti) = ndimage.distance_transform_edt(~crest, return_indices=True)
+            cj, ci = tj[j, i], ti[j, i]
         # push over the edge: move the release point down-slope onto the face
         zs = ndimage.gaussian_filter(z, 1.5 / g.cell)
         gy_, gx_ = np.gradient(zs, g.cell)

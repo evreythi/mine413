@@ -42,7 +42,7 @@ Data: `Data_Topo 2026.zip` (FMS records and survey solids) supplied by the cours
 | Avalanche model | Unit test: volume conserved, slope ≤ repose | Pass | |
 | Survey re-dating | Unit test + manual review of face progression figure | Pass | |
 | Temporal alignment | Hand calculation for 2 survey times from `daily_coverage.csv` | | |
-| Block model totals | Hand sum of `summary_by_info_class.csv` vs `inventory_by_class.csv` | | |
+| Block model totals | Hand sum of `summary_by_dominant_info_class.csv` vs `inventory_by_class.csv` | | |
 | Spot check of 3 loads in `load_destinations.csv` against period maps | Visual / distance calculation | | |
 | Every number quoted in D6 | Traced to `outputs/report_tables.md` / `summary.json` of the cited run ID | | |
 | References | Each reference located and checked for existence and relevance | | |

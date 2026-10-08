@@ -2,7 +2,7 @@
 title: "Long-Term Stockpile Reconstruction and Block Modelling - Pit I HG Stockpile"
 subtitle: "D6 Final Engineering Report to Mine Management | MIN E 413 Surface Mining Methods and Operations Management, Fall 2026"
 author: "Long-Term Mine Planning Team: [Member 1], [Member 2], [Member 3], [Member 4], [Member 5]"
-date: "November 2026 - model run 20261007T081228"
+date: "November 2026 - model run 20261007T164408"
 ---
 
 # Executive Summary
@@ -20,6 +20,8 @@ date: "November 2026 - model run 20261007T081228"
 
 **Method.** We developed **CPST (Constrained Push-and-Settle Transport)**. For each survey period, the observed fill defines where material went. The FMS loads (plus material carried over on the platform, and dozer cuts) are the sources. A slope-aware dozer push cost and entropy-regularised optimal transport decide which source filled which part of the observed fill. The mixing length is ε = 6 m. Two dummy nodes make data mismatches explicit: fill without an FMS source becomes **unattributed** material with an imputed grade, and FMS volume not seen on the face is **retained** and carried to the next period. All operations act on extensive quantities (tonnes, metal), so **mass and metal are conserved exactly**. A separate forward physics model (dozer push to the crest + avalanche at the 37° angle of repose measured from the surveys) is used for prediction, nowcasting and known-truth testing.
 
+> **Grade units are unconfirmed.** The FMS grades average 8.4% Cu and 8.0 g/t Au, roughly an order of magnitude above typical Cu-Au mill feed. They may be scaled, anonymised or in different units (QA-F04). All grades and contained-metal figures in this report are **as supplied** and must be confirmed with Geology before they are used for any economic purpose. Tonnages, the spatial distribution and the relative grade patterns are not affected.
+
 **Results (base case, 5 × 5 × 2 m blocks).**
 
 | Material class | Tonnes | Share | Cu % | Au g/t | Basis of grade |
@@ -29,12 +31,15 @@ date: "November 2026 - model run 20261007T081228"
 | Legacy (pre-record pile) | 115,699 | 57.2% | 8.42 | 8.00 | **Assumed** |
 | **Total modelled** | **202,107** | 100% | 8.46 | 8.00 | |
 
-* Monte Carlo (60 realisations) P10/P50/P90: total tonnes 185 / 201 / 218 kt; contained Cu 15.4 / 17.0 / 19.0 kt; contained Au 46.9 / 51.7 / 56.9 koz. The FMS-tracked class: Cu grade P10-P90 8.05 - 8.88 %.
+Note on the identical Cu/Au values: legacy grades *equal* the FMS mean by assumption A-22, and unattributed grades are imputed from the same loads (A-21). Near-identical values across classes are therefore a consequence of the assumptions, not a measurement, and certainly not overwritten fields. Exact class Au grades are 7.998 / 8.002 / 7.998 g/t.
+
+* Monte Carlo (60 realisations) P10/P50/P90: total tonnes 185 / 201 / 218 kt; contained Cu 15.4 / 17.0 / 19.0 kt (as-supplied units); contained Au 46.9 / 51.7 / 56.9 koz. The FMS-tracked class: Cu grade P10-P90 8.05 - 8.88 %.
 * Validation:
   * FMS tonnes, Cu, Au and Ag balance to floating-point precision.
   * The reconstructed surface matches the latest surveys (RMSE 0.03 m; 100.0% of cells within the 0.14 m detection limit).
   * On held-out periods the forward model's earth-mover error is 18.6 m, vs 20.4 m without dozer push.
-  * In a synthetic twin with known truth, CPST recovers block Cu with RMSE 0.80% (r = 0.90), vs 1.18% for a period-average model and 1.83% for a single mean grade.
+  * In a synthetic twin with known truth, CPST recovers block Cu with RMSE 0.79% (r = 0.90), vs 1.18% for a period-average model and 1.83% for a single mean grade.
+  * In a stress test where the truth uses a placement rule CPST does *not* assume (dozers push each load to a random point on the crest), CPST still gives 0.90% (r = 0.85) vs 1.13%.
 
 **Key conclusions.**
 
@@ -84,7 +89,7 @@ The full QA/QC is in D2 Section 2 and `outputs/qaqc/`. No record was deleted. Fo
 | F08_density_range | Density outside 1.5-3.0 t/m3 | 0 | Retained; flagged |
 | F09_far_from_face | Dump > 60 m from any surveyed change | 0 | Retained; push distance check |
 | F10_below_floor | Dump Z below fitted stockpile floor - 0.5 m | 14 | Retained; XY used, Z not used by algorithm |
-| F11_z_residual | |Dump Z - surface| > 3 m where surface known | 29 | Retained; Z not used by algorithm (XY only) |
+| F11_z_residual | abs(Dump Z - surface) > 3 m where surface known | 29 | Retained; Z not used by algorithm (XY only) |
 | F12_after_last_survey | Dump after the last survey | 1 | Placed provisionally (unreconciled) - updated when next survey arrives |
 | F13_survey_gap_period | Dump inside a period with a missing survey | 18 | Retained; period flagged in reconciliation |
 | F14_repeated_location | Identical X/Y/Z shared by >= 3 records (default / stuck FMS position) | 14 | Retained; X/Y imputed as tonnage-weighted centroid of the period's other dumps, GPS error x5 in Monte Carlo |
@@ -195,6 +200,7 @@ The complete register (31 assumptions with need, justification, consequence and 
 * **Compositing** by metal ÷ tonnes. Within-block heterogeneity of mixed loads is reported.
 * **Provenance**: each block lists its effective number of loads and its top three contributing cycle IDs, enabling reconciliation with plant data.
 * **Uncertain or uninformed regions** are labelled by information class (FMS-reconciled, Unattributed-imputed, Legacy-assumed, Provisional) and by confidence class (High, Medium, Low, Uninformed).
+* **Two class breakdowns exist and both are correct.** The *exact* tonnage split by class (each block's tonnes divided among FMS, unattributed and legacy) is `summary_by_material_source.csv` and `validation/inventory_by_class.csv`; it is the split quoted throughout this report. `summary_by_dominant_info_class.csv` instead assigns each *whole* block to its dominant class (a block that is 60% FMS counts entirely as FMS-reconciled), for mapping and reclaim planning. Both sum to the same total.
 
 *Table 8.1 - Inventory by confidence class*
 
@@ -291,21 +297,43 @@ A known-truth stockpile was generated from the real dump sequence with the forwa
 
 | method | blocks | cu_rmse | cu_mae | cu_corr | au_rmse | au_corr | tonnes_corr |
 |---|---|---|---|---|---|---|---|
-| CPST eps=2 m | 589 | 0.83 | 0.55 | 0.89 | 0.40 | 0.91 | 0.83 |
-| CPST eps=6 m (base) | 589 | 0.80 | 0.56 | 0.90 | 0.39 | 0.93 | 0.83 |
-| CPST eps=15 m | 589 | 0.83 | 0.60 | 0.89 | 0.42 | 0.91 | 0.83 |
+| CPST eps=2 m | 589 | 0.84 | 0.55 | 0.89 | 0.40 | 0.91 | 0.83 |
+| CPST eps=6 m (base) | 589 | 0.79 | 0.55 | 0.90 | 0.39 | 0.93 | 0.83 |
+| CPST eps=15 m | 589 | 0.82 | 0.59 | 0.89 | 0.42 | 0.91 | 0.83 |
 | CPST eps=6, no uphill penalty | 589 | 0.80 | 0.56 | 0.90 | 0.39 | 0.93 | 0.83 |
 | Baseline: period-average (eps=1e4) | 589 | 1.18 | 0.89 | 0.78 | 0.63 | 0.82 | 0.81 |
 | Reference: global mean grade | 589 | 1.83 | 1.51 |  |  |  |  |
 
 
-CPST recovers block Cu grade with RMSE 0.80% Cu (r = 0.90). This is a 32% lower error than allocating each period's loads uniformly over its fill, and far better than a single mean grade. The intermediate mixing length (ε = 6 m) performs best among those tested. The uphill penalty has little effect in this geometry.
+CPST recovers block Cu grade with RMSE 0.79% Cu (r = 0.90). This is a 33% lower error than allocating each period's loads uniformly over its fill, and far better than a single mean grade. The intermediate mixing length (ε = 6 m) performs best among those tested. The uphill penalty has little effect in this geometry.
 
 ![Twin experiment: true vs reconstructed block Cu.](../outputs/validation/fig_val_twin_scatter.png)
 
+**Is the twin circular?** The main twin's truth comes from our own forward physics (push to the nearest crest, avalanche at 37°). CPST does not use the forward model, but its push cost encodes a similar idea, that material goes to nearby face. Two further twins therefore use truths generated by rules CPST does **not** assume:
+
+* **Random crest.** Each load is pushed to a uniformly random point of the active crest, so the dump position carries *no* information about the destination. These truths have their own geometry and surveys, and are reconstructed blind.
+* **Period-uniform mixing.** Each period's fill is perfectly homogeneous, so there is no within-period spatial structure to find.
+
+*Table 9.5 - Twin stress tests: truth generated with placement rules CPST does not assume*
+
+| truth | method | blocks | cu_rmse | cu_corr | au_rmse |
+|---|---|---|---|---|---|
+| physics (nearest crest + 6 m jitter) | CPST eps=6 m (base) | 589 | 0.79 | 0.90 | 0.39 |
+| period-uniform mixing | CPST eps=6 m (base) | 589 | 0.52 | 0.95 | 0.31 |
+| physics (nearest crest + 6 m jitter) | Baseline: period-average (eps=1e4) | 589 | 1.18 | 0.78 | 0.63 |
+| period-uniform mixing | Baseline: period-average (eps=1e4) | 589 | 0.88 | 0.87 | 0.50 |
+| physics (nearest crest + 6 m jitter) | Reference: global mean grade | 589 | 1.83 |  |  |
+| period-uniform mixing | Reference: global mean grade | 589 | 1.71 |  |  |
+| random-crest (dump position uninformative) | CPST eps=6 m (base) | 615 | 0.90 | 0.85 | 0.40 |
+| random-crest (dump position uninformative) | Baseline: period-average (eps=1e4) | 615 | 1.13 | 0.78 | 0.61 |
+| random-crest (dump position uninformative) | Reference: global mean grade | 615 | 1.71 |  |  |
+
+
+When the dump position is uninformative, CPST's error rises from 0.79% to 0.90% Cu, but it still beats the period-average model (1.13%) and the global mean (1.71%). Most of CPST's skill therefore comes from the survey constraint (which period's material is where, and in which layer). The dump-position locality adds roughly 0.1% Cu when it is valid, and does no harm when it is not. Under period-uniform mixing CPST does not impose spurious structure (0.52% vs 0.88%). One caution on these comparisons: the period-average baseline also spreads the unattributed (imputed-grade) volume through every fill cell, which is part of why it trails even when the truth is uniformly mixed.
+
 ## Robustness to numerical settings
 
-*Table 9.5 - Robustness to numerical settings*
+*Table 9.6 - Robustness to numerical settings*
 
 | variant | total_tonnes | fms_tonnes | unattributed_tonnes | legacy_tonnes | tracked_blocks_cu_pct | top_bench_cu_pct | mean_abs_block_cu_change |
 |---|---|---|---|---|---|---|---|
@@ -328,7 +356,7 @@ Key results (class tonnages, tracked-block grade, top-bench grade) are stable un
 | Geometry RMSE vs survey | 0.03 m |
 | Sinkhorn max column residual | ≤ 8×10⁻⁷ |
 | Forward model W1 (test periods) | 18.6 m (no-push 20.4 m) |
-| Twin block Cu RMSE / r | 0.80% / 0.90 |
+| Twin block Cu RMSE / r | 0.79% / 0.90 |
 
 # Uncertainty and Sensitivity Analysis
 
@@ -383,7 +411,7 @@ The platform (`spbm`, D5) performs the eleven required steps with one command:
 * block model and inventories;
 * uncertainty, QA/QC and reconciliation outputs;
 * exports (CSV, VTK, ESRI grids, figures);
-* an audit trail: run manifest with code commit, library versions, configuration hash, input hashes and manual interventions, model history, and an automatic change report between versions.
+* an audit trail: run manifest with code commit (or, in an unzipped package without Git, the packaged commit from `BUILD_INFO.json`), a SHA-256 of the platform source, library versions, configuration hash, input hashes and manual interventions, model history, and an automatic change report between versions.
 
 Eight automated tests (including end-to-end conservation) guard every change. The update workflow is demonstrated in `examples/demo_update.sh` (model to 22 March, then updated with later data).
 

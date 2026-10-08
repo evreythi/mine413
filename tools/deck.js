@@ -3,7 +3,16 @@ const fs = require("fs");
 const path = require("path");
 const pptxgen = require(path.join(__dirname, "node_modules", "pptxgenjs"));
 
-const D = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+let RAW = fs.readFileSync(process.argv[2], "utf8");
+const D0 = JSON.parse(RAW);
+// substitute team names from config/team.yaml into every string ("[Member n]")
+(D0.team && D0.team.members || []).forEach((m, i) => {
+  const ph = `[Member ${i + 1}]`;
+  if (m.name && m.name !== ph) RAW = RAW.split(ph).join(m.name);
+});
+const D = JSON.parse(RAW);
+const MEMBER = i => { const m = (D.team && D.team.members || [])[i - 1]; return m && m.name ? m.name : `[Member ${i}]`; };
+const TEAM_NAMES = (D.team && D.team.members || []).map(m => m.name).join(", ") || "[Member 1-5]";
 const k = D.k;
 const THEME = {
   name: "Copper Pit",
@@ -87,8 +96,8 @@ const mcT = D.mc.total_tonnes, mcCu = D.mc.cu_t, mcAu = D.mc.au_kg;
 pres.addSection({ title: "Opening" });
 let s = pres.addSlide({ masterName: "TITLE_DARK", sectionTitle: "Opening" });
 s.addText("Reconstructing the Pit I HG stockpile", { placeholder: "title" });
-s.addText("Material movement, 3-D block model and uncertainty\nMIN E 413 term project  |  Fall 2026  |  Team: [Member 1-5]", { placeholder: "body" });
-s.addNotes("Presenter: Member 1 (project lead). Introduce the team and the Mine Manager's request: a defensible, updatable platform that reconstructs where truck-dumped material ended up in the long-term stockpile, and a block model of tonnage, grade, metal and uncertainty.");
+s.addText(`Material movement, 3-D block model and uncertainty\nMIN E 413 term project  |  Fall 2026  |  Team: ${TEAM_NAMES}`, { placeholder: "body" });
+s.addNotes(`Presenter: ${MEMBER(1)} (project lead). Introduce the team and the Mine Manager's request: a defensible, updatable platform that reconstructs where truck-dumped material ended up in the long-term stockpile, and a block model of tonnage, grade, metal and uncertainty.`);
 
 // ------------------------------------------------------------ 2 answer first
 s = content("The answer first: one fifth of the pile has a measured grade basis", "Opening");
@@ -99,12 +108,13 @@ card(s, 10.05, 1.5, 2.7, 2.1, `${fmt(L.tonnes / 1000, 1)} kt`, `legacy (${fmt(L.
 bullets(s, [
   `Best-estimate grade ${fmt(T.cu_pct, 2)}% Cu and ${fmt(T.au_gpt, 2)} g/t Au; contained Cu P10-P90 ${fmt(mcCu[0] / 1000, 1)}-${fmt(mcCu[2] / 1000, 1)} kt, Au ${fmt(mcAu[0] / 31.1035, 1)}-${fmt(mcAu[2] / 31.1035, 1)} koz.`,
   "Recommendation: plan reclaim on the FMS-tracked benches with P10/P90 ranges; sample the legacy core before committing it to a production target.",
+  "Grades and metal are as supplied (8.4% Cu, 8.0 g/t Au is implausibly high): units must be confirmed with Geology before any economic use.",
   "Everything is reproducible with one command and auditable to the input file hash.",
-], 0.6, 4.0, 12.1, 2.7, 17, "summary");
-s.addNotes("Presenter: Member 1. State the main message before the detail. The FMS covers only two weeks; most of the pile pre-dates the record. We never mix measured, imputed and assumed numbers without labelling them.");
+], 0.6, 4.0, 12.1, 2.8, 16, "summary");
+s.addNotes(`Presenter: ${MEMBER(1)}. State the main message before the detail. The FMS covers only two weeks; most of the pile pre-dates the record. We never mix measured, imputed and assumed numbers without labelling them.`);
 
 // ------------------------------------------------------------ data
-sectionSlide("1  Data and QA/QC", "Presenter: Member 2 (data and QA/QC lead)", "Data and QA/QC");
+sectionSlide("1  Data and QA/QC", `Presenter: ${MEMBER(2)} (data and QA/QC lead)`, "Data and QA/QC");
 s = content("Each survey file is a change solid, not a surface", "Data and QA/QC");
 fitImg(s, "solids", 0.5, 1.35, 8.4, 5.5);
 bullets(s, [
@@ -113,7 +123,7 @@ bullets(s, [
   "So the files give measured daily fill directly, but only where change occurred",
   `${fmt(k.survey_volume_m3)} m³ in 10 solids, 03-15 to 03-29`,
 ], 9.1, 1.5, 3.7, 5.2, 15, "solid_facts");
-s.addNotes("Presenter: Member 2. This was the key discovery in the data: the DXFs are Vulcan change solids. That is why each file looks like a crescent band, the active crest and face, rather than the whole pile.");
+s.addNotes(`Presenter: ${MEMBER(2)}. This was the key discovery in the data: the DXFs are Vulcan change solids. That is why each file looks like a crescent band, the active crest and face, rather than the whole pile.`);
 
 s = content("Data-quality findings that shape the model", "Data and QA/QC");
 const qa = [
@@ -130,7 +140,7 @@ qa.forEach((q, i) => {
   s.addText(q[0], { x: x + 0.2, y: y + 0.15, w: 3.45, h: 0.55, fontSize: 18, bold: true, color: C.accent1, margin: 0, isTextBox: true, objectName: `qa${i}_h` });
   s.addText(q[1], { x: x + 0.2, y: y + 0.75, w: 3.45, h: 1.5, fontSize: 14, color: C.text1, margin: 0, valign: "top", isTextBox: true, objectName: `qa${i}_t` });
 });
-s.addNotes("Presenter: Member 2. No record was deleted: 14 flags, each with a documented treatment (D2). Emphasise that these findings changed the method: payload and grade error enter the Monte Carlo, Z is ignored, and gaps become an explicit 'unattributed' class.");
+s.addNotes(`Presenter: ${MEMBER(2)}. No record was deleted: 14 flags, each with a documented treatment (D2). Emphasise that these findings changed the method: payload and grade error enter the Monte Carlo, Z is ignored, and gaps become an explicit 'unattributed' class.`);
 
 s = content(`Surveys represent the end of the day (r = ${fmt(D.align_r, 2)})`, "Data and QA/QC");
 fitImg(s, "align", 0.5, 1.4, 8.6, 3.6);
@@ -140,7 +150,7 @@ bullets(s, [
   `Any time before 10:00 gives r ≤ ${fmt(D.align_morning_r, 2)}`,
   "Sensitivity: 21:00-23:59 sampled in the Monte Carlo",
 ], 9.3, 1.5, 3.5, 5.2, 15, "align_facts");
-s.addNotes("Presenter: Member 2. A data-driven choice of an unrecorded parameter, documented as assumption A-05.");
+s.addNotes(`Presenter: ${MEMBER(2)}. A data-driven choice of an unrecorded parameter, documented as assumption A-05.`);
 
 s = content("FMS explains only part of the surveyed fill", "Data and QA/QC");
 s.addChart(pres.charts.BAR, [
@@ -158,10 +168,10 @@ bullets(s, [
   "Complete days: apparent density 1.67 t/m³ vs FMS 2.06 t/m³: swell or missing loads (cannot be separated)",
   "Dozer lag: 03-20 surplus carried to 03-21",
 ], 9.4, 1.5, 3.4, 5.2, 14, "recon_facts");
-s.addNotes("Presenter: Member 2. Distinguish physical explanations (swell, dozer lag) from data limitations (FMS outages, missing surveys).");
+s.addNotes(`Presenter: ${MEMBER(2)}. Distinguish physical explanations (swell, dozer lag) from data limitations (FMS outages, missing surveys).`);
 
 // ------------------------------------------------------------ algorithm
-sectionSlide("2  Material-movement algorithm", "Presenter: Member 3 (algorithm lead)", "Algorithm");
+sectionSlide("2  Material-movement algorithm", `Presenter: ${MEMBER(3)} (algorithm lead)`, "Algorithm");
 s = content("CPST: surveys say where, FMS says what, push work says which", "Algorithm");
 fitImg(s, "algo", 0.5, 1.3, 6.2, 5.6);
 bullets(s, [
@@ -171,25 +181,25 @@ bullets(s, [
   "Dummy nodes keep it honest: U = fill with no FMS source, R = FMS volume not yet on the face",
   "Every operation is linear in tonnes and metal, so conservation is exact",
 ], 6.9, 1.45, 5.9, 5.3, 15, "cpst");
-s.addNotes("Presenter: Member 3. Optimal transport was invented by Monge in 1781 for moving cuts to fills, the same earthworks problem. Walk through questions A to J: initial placement (point parcel at dump X/Y), direction (least-work route), distance (capacity plus max push), downslope (the surveyed face is at repose), mixing (epsilon), reconciliation (column marginals = survey), mass and metal (exact), sequential updating (column state), numerical stability (tolerance, grid tests).");
+s.addNotes(`Presenter: ${MEMBER(3)}. Optimal transport was invented by Monge in 1781 for moving cuts to fills, the same earthworks problem. Walk through questions A to J: initial placement (point parcel at dump X/Y), direction (least-work route), distance (capacity plus max push), downslope (the surveyed face is at repose), mixing (epsilon), reconciliation (column marginals = survey), mass and metal (exact), sequential updating (column state), numerical stability (tolerance, grid tests).`);
 
 s = content("Push distances and the face advance are physically plausible", "Algorithm");
 fitImg(s, "advance", 0.5, 1.3, 6.4, 5.6);
 fitImg(s, "push", 7.1, 1.4, 5.7, 3.4);
 bullets(s, ["Crest advanced about 30 m south in two weeks", "Reconstructed pushes are mostly tens of metres, well inside the dozer economic range"], 7.1, 5.0, 5.7, 1.8, 14, "adv_facts");
-s.addNotes("Presenter: Member 3. Growth characterisation (Task 2): when each cell first received fill.");
+s.addNotes(`Presenter: ${MEMBER(3)}. Growth characterisation (Task 2): when each cell first received fill.`);
 
 // ------------------------------------------------------------ block model, validation, uncertainty
-sectionSlide("3  Block model, validation and uncertainty", "Presenter: Member 4 (block model and validation lead)", "Block model");
+sectionSlide("3  Block model, validation and uncertainty", `Presenter: ${MEMBER(4)} (block model and validation lead)`, "Block model");
 s = content("Block model: 5 × 5 × 2 m, Cu grade by bench", "Block model");
 fitImg(s, "plans", 0.4, 1.3, 12.5, 5.6);
-s.addNotes("Presenter: Member 4. Block size justified by GPS error plus mixing length (~5 m) horizontally and daily layer thickness vertically. Partial blocks keep their fill fraction. Grades are composited from metal over tonnes.");
+s.addNotes(`Presenter: ${MEMBER(4)}. Block size justified by GPS error plus mixing length (~5 m) horizontally and daily layer thickness vertically. Partial blocks keep their fill fraction. Grades are composited from metal over tonnes.`);
 
 s = content("Tracked material forms a skin on the advancing face", "Block model");
 fitImg(s, "sections", 0.4, 1.3, 7.6, 5.6);
 fitImg(s, "classes", 8.1, 1.5, 4.8, 2.2);
 bullets(s, ["Orange dashed = pre-record surface: everything below is legacy material with an assumed grade", "Reclaim of the outer benches recovers mostly FMS-tracked material"], 8.2, 4.0, 4.6, 2.8, 14, "sec_facts");
-s.addNotes("Presenter: Member 4. Show where measured and assumed information sit in 3-D.");
+s.addNotes(`Presenter: ${MEMBER(4)}. Show where measured and assumed information sit in 3-D.`);
 
 s = content("Inventory by information and confidence class", "Block model");
 s.addChart(pres.charts.BAR, [{ name: "tonnes (kt)", labels: ["FMS-tracked", "Unattributed", "Legacy"], values: [F.tonnes / 1000, U.tonnes / 1000, L.tonnes / 1000] }],
@@ -199,14 +209,14 @@ s.addChart(pres.charts.BAR, [{ name: "tonnes (kt)", labels: ["FMS-tracked", "Una
     catAxisLabelColor: "33424A", valAxisLabelColor: "33424A", showTitle: true, title: "Modelled tonnes by information class (kt)", titleFontSize: 13, titleFontFace: "+mn-lt", titleColor: "33424A" });
 fitImg(s, "confidence", 6.6, 1.4, 6.2, 3.3);
 bullets(s, [`High + Medium confidence: ${fmt((D.conf.High + D.conf.Medium) / 1000, 1)} kt`, "Classes are internal planning classes, not JORC/NI 43-101 categories"], 6.7, 5.0, 6.0, 1.7, 14, "conf_facts");
-s.addNotes("Presenter: Member 4. Legacy and unattributed grades are not measurements; they are reported separately.");
+s.addNotes(`Presenter: ${MEMBER(4)}. Legacy and unattributed grades are not measurements; they are reported separately.`);
 
 s = content("Validation: exact balances, survey-matched geometry", "Block model");
 card(s, 0.6, 1.5, 3.0, 1.9, "< 10⁻⁹", "relative mass and Cu/Au/Ag balance error (FMS in vs block model)", C.accent6, "v1");
 card(s, 0.6, 3.6, 3.0, 1.9, `${fmt(D.geo.rmse_m, 2)} m`, `RMSE model vs latest survey; ${fmt(D.geo.frac_within_tau * 100, 1)}% of cells within 0.14 m`, C.accent6, "v2");
 fitImg(s, "geometry", 3.9, 1.4, 8.9, 3.9);
 bullets(s, ["Geometry is constrained by design, so it is a check on numerics. Independent tests are on the next slide", "Automated test enforces conservation on every code change"], 3.9, 5.5, 8.9, 1.3, 14, "val_facts");
-s.addNotes("Presenter: Member 4. Visual agreement alone is not validation; these are quantitative.");
+s.addNotes(`Presenter: ${MEMBER(4)}. Visual agreement alone is not validation; these are quantitative.`);
 
 s = content("Independent tests: prediction and known-truth twin", "Block model");
 fitImg(s, "fwdtest", 0.4, 1.35, 8.2, 2.8);
@@ -222,21 +232,22 @@ bullets(s, [
   `Forward model on unseen periods: earth-mover error ${fmt(fp.w1_m, 1)} m vs ${fmt(fb.w1_m, 1)} m without dozer push`,
   "Physics alone predicts where fill lands only moderately well, which is why the surveys must constrain the allocation",
   `Twin: CPST block Cu r = ${fmt(D.twin[1].cu_corr, 2)}; beats period-average and global-mean baselines`,
-], 8.8, 1.5, 4.0, 5.3, 14, "test_facts");
-s.addNotes("Presenter: Member 4. Temporal validation uses periods never used for calibration. The twin experiment generates a stockpile with known truth (forward physics with random dozer deviations), observes it like the real one (GPS noise, 15% missing FMS records, survey noise) and reconstructs it blind.");
+  (() => { const r = D.twin_alt.find(x => x.truth.startsWith("random") && x.method.startsWith("CPST")); const b = D.twin_alt.find(x => x.truth.startsWith("random") && x.method.startsWith("Baseline")); return `Stress test with a truth rule CPST does not assume (random crest): ${fmt(r.cu_rmse, 2)}% vs ${fmt(b.cu_rmse, 2)}% Cu RMSE`; })(),
+], 8.8, 1.5, 4.0, 5.3, 13, "test_facts");
+s.addNotes(`Presenter: ${MEMBER(4)}. Temporal validation uses periods never used for calibration. The twin experiment generates a stockpile with known truth (forward physics with random dozer deviations), observes it like the real one (GPS noise, 15% missing FMS records, survey noise) and reconstructs it blind.`);
 
 s = content("Uncertainty: what moves the answer", "Block model");
 fitImg(s, "tornado", 0.4, 1.3, 7.6, 5.6);
 fitImg(s, "mchist", 8.1, 1.4, 4.8, 1.8);
 bullets(s, [`Monte Carlo (60 runs): GPS, payload, assay, density, survey, timing, mixing, push`, `Total tonnes P10-P90 ${fmt(mcT[0] / 1000)}-${fmt(mcT[2] / 1000)} kt, driven by density/swell and the legacy volume`, "Block grade ranges for legacy blocks use the load-scale prior, not false precision"], 8.2, 3.4, 4.6, 3.4, 13, "unc_facts");
-s.addNotes("Presenter: Member 4. Distinguish measured, inferred, assumed and model-generated information. Global ranges cover the FMS-informed uncertainty; the legacy grade is a scenario assumption whose range cannot be quantified from the supplied data.");
+s.addNotes(`Presenter: ${MEMBER(4)}. Distinguish measured, inferred, assumed and model-generated information. Global ranges cover the FMS-informed uncertainty; the legacy grade is a scenario assumption whose range cannot be quantified from the supplied data.`);
 
 // ------------------------------------------------------------ platform & practice
-sectionSlide("4  Platform and professional practice", "Presenter: Member 5 (platform lead) with Member 1", "Platform and practice");
+sectionSlide("4  Platform and professional practice", `Presenter: ${MEMBER(5)} (platform lead) with ${MEMBER(1)}`, "Platform and practice");
 s = content("A repeatable, auditable in-house platform", "Platform and practice");
 fitImg(s, "workflow", 0.4, 1.3, 8.0, 5.6);
 bullets(s, ["One command: python -m spbm update", "Input files hashed; every manual intervention logged with reason and approver", "Run manifest: code commit, library versions, configuration hash", "Model history and automatic change report", "Open formats: CSV, VTK, ESRI grids"], 8.6, 1.5, 4.2, 5.3, 15, "platform");
-s.addNotes("Presenter: Member 5. Demonstrate (or show the recorded demo of) examples/demo_update.sh: build the model to 22 March, then update with the later data and read the change report.");
+s.addNotes(`Presenter: ${MEMBER(5)}. Demonstrate (or show the recorded demo of) examples/demo_update.sh: build the model to 22 March, then update with the later data and read the change report.`);
 
 s = content("Professional accountability and equity", "Platform and practice");
 const cols2 = [
@@ -251,7 +262,7 @@ cols2.forEach((c, i) => {
 });
 s.addText("Scenario response: management asked for a definitive inventory. We provide it with ranges and information classes, and state what the data cannot yet support.",
   { x: 0.6, y: 6.05, w: 12.1, h: 0.7, fontSize: 15, italic: true, color: C.text2, margin: 0, isTextBox: true, objectName: "pp_scenario" });
-s.addNotes("Presenter: Member 1 and Member 5. Response to the course scenario (Section 6.2): management asks for a definitive inventory. Our position: provide it with ranges and classes, and state clearly what we cannot yet support.");
+s.addNotes(`Presenter: ${MEMBER(1)} and ${MEMBER(5)}. Response to the course scenario (Section 6.2): management asks for a definitive inventory. Our position: provide it with ranges and classes, and state clearly what we cannot yet support.`);
 
 s = content("Limitations and recommendations", "Platform and practice");
 const rec = [
@@ -268,14 +279,14 @@ rec.forEach((r, i) => {
   s.addText(r[1], { x: 1.45, y: y, w: 6.6, h: 0.86, fontSize: 16, bold: true, color: C.text1, valign: "middle", margin: 0, isTextBox: true, objectName: `rec${i}_t` });
   s.addText(r[2], { x: 8.2, y: y, w: 4.6, h: 0.86, fontSize: 14, color: C.text2, valign: "middle", margin: 0, isTextBox: true, objectName: `rec${i}_d` });
 });
-s.addNotes("Presenter: Member 5. Key limitations: no full-pile or pre-pile survey; two weeks of FMS against a pile built over the life of Pit I; grades are source-block values; mixing parameters are uncalibrated without tracers.");
+s.addNotes(`Presenter: ${MEMBER(5)}. Key limitations: no full-pile or pre-pile survey; two weeks of FMS against a pile built over the life of Pit I; grades are source-block values; mixing parameters are uncalibrated without tracers.`);
 
 // ------------------------------------------------------------ close
 pres.addSection({ title: "Close" });
 s = pres.addSlide({ masterName: "TITLE_DARK", sectionTitle: "Close" });
 s.addText("Plan with ranges, sample the unknown, update every survey", { placeholder: "title" });
 s.addText("Questions?\nAll results reproducible: python -m spbm run", { placeholder: "body" });
-s.addNotes("Presenter: Member 1. Close and take questions. Any member may be asked about data treatment, assumptions, algorithm, validation, uncertainty, software or professional decisions.");
+s.addNotes(`Presenter: ${MEMBER(1)}. Close and take questions. Any member may be asked about data treatment, assumptions, algorithm, validation, uncertainty, software or professional decisions.`);
 
 // pptxgenjs writes Office's default palette into the theme; replace it with THEME
 // so scheme colours resolve correctly in PowerPoint (uses the jszip bundled with pptxgenjs).

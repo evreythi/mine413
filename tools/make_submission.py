@@ -21,13 +21,25 @@ EXCLUDE_NAMES = {"package-lock.json"}
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--team", default="Team")
+    import yaml
+    default_team = yaml.safe_load((ROOT / "config" / "team.yaml").read_text()).get("team_name", "Team")
+    ap.add_argument("--team", default=default_team)
     a = ap.parse_args()
     dist = ROOT / "dist"
     dist.mkdir(exist_ok=True)
     out = dist / f"MINE413_TermProject_{a.team}.zip"
+    import json
+    import subprocess
+    from datetime import datetime
+    try:
+        commit = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
+    except Exception:
+        commit = "unknown"
+    build_info = json.dumps({"git_commit": commit, "packaged": datetime.now().isoformat(timespec="seconds"),
+                             "note": "Submission package (no .git). The platform reads this file to record code identity."}, indent=2)
     n = 0
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(f"MINE413_TermProject_{a.team}/BUILD_INFO.json", build_info)
         for item in INCLUDE:
             p = ROOT / item
             files = [p] if p.is_file() else sorted(p.rglob("*")) if p.exists() else []

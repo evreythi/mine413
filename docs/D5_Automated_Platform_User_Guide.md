@@ -94,8 +94,10 @@ python -m spbm status    # registered input files and run log
 python tools/make_diagrams.py   # redraw workflow/algorithm diagrams
 python tools/build_docs.py      # rebuild DOCX/PDF documents and the presentation
 python tools/fill_report.py     # refresh D4/D6 numbers from the latest run (templates in tools/templates)
-python tools/make_submission.py --team <name>   # Canvas zip in dist/
+python tools/make_submission.py   # Canvas zip in dist/ (team name from config/team.yaml)
 ```
+
+Team names: edit `config/team.yaml`. Every `[Member n]` placeholder in the built documents and the presentation is replaced at build time.
 
 Document tooling (optional; not needed for the analysis): pandoc, Node.js with `npm install` in `tools/` (pptxgenjs), and Playwright's Chromium for PDF rendering.
 
@@ -106,7 +108,7 @@ Document tooling (optional; not needed for the analysis): pandoc, Node.js with `
 | `blockmodel/stockpile_block_model.csv` | One row per block containing material. See D3 Section 5 for fields |
 | `blockmodel/stockpile_block_model.vtk` | Same, as a VTK structured grid (ParaView: *Threshold* on `tonnes > 0`) |
 | `blockmodel/block_model_definition.json` | Origin, block size, units, CRS note |
-| `blockmodel/summary_*.csv` | Inventory by information class, confidence, 4 m bench, material source; grade-tonnage |
+| `blockmodel/summary_*.csv` | Inventory by material source (**exact** tonnage split by class), by dominant information class (whole blocks labelled by their dominant class, for maps), confidence, 4 m bench; grade-tonnage |
 | `movement/load_destinations.csv` | For each load: dump X/Y, volume placed, retained, destination centroid, mean push distance, spread |
 | `movement/transport_plans.npz` | Transport matrix of every period (full traceability of the allocation) |
 | `movement/*.asc` | Floor plane, pre-record surface, final model surface, latest surveyed surface (ESRI ASCII grids) |
@@ -122,7 +124,7 @@ Document tooling (optional; not needed for the analysis): pandoc, Node.js with `
 
 * **Input identity**: every input file is hashed (SHA-256) and registered once with the date it was first seen. The manifest lists the hashes used by the run.
 * **Configuration identity**: the configuration is hashed and copied (`config_used.json`). Every parameter is linked to an assumption ID.
-* **Code identity**: the Git commit and all library versions are recorded.
+* **Code identity**: the Git commit (`+modified` if the source differs from it), a SHA-256 of the platform source and configuration (`spbm_source_sha256`), and all library versions are recorded. In an unzipped submission package without `.git`, the commit is read from `BUILD_INFO.json`, written by `tools/make_submission.py`.
 * **Manual interventions**: only through `survey_overrides.csv`, with a reason and an approver, copied into the manifest. Raw files are never edited.
 * **No silent deletion**: FMS records are flagged, never removed. Exclusions (duplicates, missing fields, bad timestamps) are listed in the flag file.
 * **Model versions**: `history/` keeps each version's manifest and key tables; `change_report.md` documents differences.

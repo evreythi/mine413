@@ -25,7 +25,7 @@ FLAG_RULES = {
     "F08_density_range": ("Density outside 1.5-3.0 t/m3", "Retained; flagged"),
     "F09_far_from_face": ("Dump > 60 m from any surveyed change", "Retained; push distance check"),
     "F10_below_floor": ("Dump Z below fitted stockpile floor - 0.5 m", "Retained; XY used, Z not used by algorithm"),
-    "F11_z_residual": ("|Dump Z - surface| > 3 m where surface known", "Retained; Z not used by algorithm (XY only)"),
+    "F11_z_residual": ("abs(Dump Z - surface) > 3 m where surface known", "Retained; Z not used by algorithm (XY only)"),
     "F12_after_last_survey": ("Dump after the last survey", "Placed provisionally (unreconciled) - updated when next survey arrives"),
     "F13_survey_gap_period": ("Dump inside a period with a missing survey", "Retained; period flagged in reconciliation"),
     "F14_repeated_location": ("Identical X/Y/Z shared by >= 3 records (default / stuck FMS position)",

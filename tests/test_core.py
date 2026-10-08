@@ -103,3 +103,25 @@ def test_survey_override_redates_files():
     names = [s.file for s in ds.surveys]
     assert names[-2:] == ["Topo_250328.dxf", "Topo_250329.dxf"]
     assert str(ds.surveys[-1].datetime.date()) == "2026-03-29"
+
+
+def test_markdown_tables_escape_pipes():
+    import importlib.util
+    import pandas as pd
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("fill_report", Path(__file__).resolve().parents[1] / "tools" / "fill_report.py")
+    fr = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fr)
+    txt = fr.md(pd.DataFrame({"a": ["|x| > 3"], "b": [1]}), "t")
+    row = [l for l in txt.splitlines() if "x" in l][0]
+    assert row.count(" | ") == 1 and "\\|x\\|" in row
+
+
+def test_code_identity_without_git(tmp_path, monkeypatch):
+    from spbm import audit
+    monkeypatch.setattr(audit, "ROOT", tmp_path)   # a folder that is not a git checkout
+    (tmp_path / "spbm").mkdir()
+    (tmp_path / "config").mkdir()
+    (tmp_path / "BUILD_INFO.json").write_text('{"git_commit": "abc123", "packaged": "2026-11-26"}')
+    s = audit.git_commit()
+    assert "not a git checkout" in s and "abc123" in s

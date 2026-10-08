@@ -12,7 +12,7 @@ subtitle: "Pit I HG stockpile - current state after the 2026-03-29 survey (provi
 | `outputs/blockmodel/block_model_definition.json` | JSON | Origin, block size, dimensions, units, CRS note |
 | `outputs/movement/*.asc` | ESRI ASCII grids (1 m) | Floor plane, pre-record surface, final model surface, latest surveyed surface (GIS / CAD) |
 | `outputs/movement/load_destinations.csv` | CSV | Where each truck load was placed (destination centroid, push distance, spread) |
-| `outputs/blockmodel/summary_*.csv` | CSV | Inventory by information class, confidence class, 4 m bench, material source; grade-tonnage |
+| `outputs/blockmodel/summary_*.csv` | CSV | Inventory by material source (**exact** class split), by dominant information class (whole blocks), confidence class, 4 m bench; grade-tonnage |
 
 **Block definition.** Origin (lower-left-bottom corner) E 511,290, N 7,122,280, Z 4,474.0. Blocks 5 × 5 × 2 m; 27 × 26 × 10 blocks. Partial blocks are exported with `fill_frac` and their true material volume. Coordinates are in the mine grid (see D2, A-01).
 
@@ -43,6 +43,12 @@ subtitle: "Pit I HG stockpile - current state after the 2026-03-29 survey (provi
 ## 2.1 By information class (base case)
 
 {{TABLE_INV}}
+
+> **Two class tables.** This table is the *exact* split: every block's tonnes are divided among the classes. `summary_by_dominant_info_class.csv` instead counts each whole block under its dominant class, for maps and reclaim planning, so its class totals differ even though the grand total is the same.
+>
+> **Identical grades across classes** follow from the assumptions: legacy grade = FMS mean (A-22), and unattributed grade is imputed from the same loads (A-21).
+>
+> **Grade units are as supplied and unconfirmed (QA-F04).**
 
 > **Reading this table.** Only the first two rows rest on measured grade data. The grades of the unattributed and legacy rows are imputed or assumed, and their *volumes* depend on assumptions A-13, A-13b and A-14. They must not be summed with the FMS-tracked inventory without that caveat.
 

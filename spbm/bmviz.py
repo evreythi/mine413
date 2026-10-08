@@ -38,6 +38,14 @@ def bench_plans(df, bg, rec, col, label, cmap, out: Path, vmin=None, vmax=None, 
     return pl.save(fig, out / (fname or f"fig_bm_plans_{col}.png"))
 
 
+def _colmean(a, axis):
+    """nanmean that returns NaN silently for all-NaN slices."""
+    a = np.asarray(a, float)
+    n = np.isfinite(a).sum(axis=axis)
+    s = np.nansum(a, axis=axis)
+    return np.where(n > 0, s / np.maximum(n, 1), np.nan)
+
+
 def sections(df, bg, rec, out: Path, col="cu_pct", label="Cu (%)", cmap=pl.SEQ):
     import matplotlib.pyplot as plt
     a = _grid(df, bg, col)
@@ -57,9 +65,9 @@ def sections(df, bg, rec, out: Path, col="cu_pct", label="Cu (%)", cmap=pl.SEQ):
                    cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto", interpolation="nearest")
     i_cells = slice(ix * bg.fx, (ix + 1) * bg.fx)
     ys = g.yc
-    a1.plot(ys, np.nanmean(rec.diagnostics["final_surface"][:, i_cells], axis=1), color=pl.INK, lw=1.2, label="model top surface")
-    a1.plot(ys, np.nanmean(rec.legacy_top[:, i_cells], axis=1), color=pl.CAT[1], lw=1.2, ls="--", label="pre-record surface (top of legacy)")
-    a1.plot(ys, np.nanmean(rec.B[:, i_cells], axis=1), color=pl.MUTED, lw=1.0, ls=":", label="fitted floor")
+    a1.plot(ys, _colmean(rec.diagnostics["final_surface"][:, i_cells], axis=1), color=pl.INK, lw=1.2, label="model top surface")
+    a1.plot(ys, _colmean(rec.legacy_top[:, i_cells], axis=1), color=pl.CAT[1], lw=1.2, ls="--", label="pre-record surface (top of legacy)")
+    a1.plot(ys, _colmean(rec.B[:, i_cells], axis=1), color=pl.MUTED, lw=1.0, ls=":", label="fitted floor")
     a1.set_title(f"N-S section at E {bg.x0 + (ix + 0.5) * bg.dx:.1f} (looking west)", loc="left")
     a1.set_xlabel("Northing (m)"); a1.set_ylabel("Elevation (m)"); a1.legend(loc="upper right", ncol=3)
     a1.ticklabel_format(useOffset=False, style="plain"); a1.grid(False)
@@ -67,9 +75,9 @@ def sections(df, bg, rec, out: Path, col="cu_pct", label="Cu (%)", cmap=pl.SEQ):
     a2.imshow(sec2, origin="lower", extent=[bg.x0, bg.x0 + bg.nx * bg.dx, bg.z0, bg.z0 + bg.nz * bg.dz],
               cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto", interpolation="nearest")
     j_cells = slice(iy * bg.fy, (iy + 1) * bg.fy)
-    a2.plot(g.xc, np.nanmean(rec.diagnostics["final_surface"][j_cells, :], axis=0), color=pl.INK, lw=1.2)
-    a2.plot(g.xc, np.nanmean(rec.legacy_top[j_cells, :], axis=0), color=pl.CAT[1], lw=1.2, ls="--")
-    a2.plot(g.xc, np.nanmean(rec.B[j_cells, :], axis=0), color=pl.MUTED, lw=1.0, ls=":")
+    a2.plot(g.xc, _colmean(rec.diagnostics["final_surface"][j_cells, :], axis=0), color=pl.INK, lw=1.2)
+    a2.plot(g.xc, _colmean(rec.legacy_top[j_cells, :], axis=0), color=pl.CAT[1], lw=1.2, ls="--")
+    a2.plot(g.xc, _colmean(rec.B[j_cells, :], axis=0), color=pl.MUTED, lw=1.0, ls=":")
     a2.set_title(f"E-W section at N {bg.y0 + (iy + 0.5) * bg.dy:.1f} (looking north)", loc="left")
     a2.set_xlabel("Easting (m)"); a2.set_ylabel("Elevation (m)")
     a2.ticklabel_format(useOffset=False, style="plain"); a2.grid(False)

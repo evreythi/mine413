@@ -20,6 +20,8 @@ date: "November 2026 - model run {{RUN_ID}}"
 
 **Method.** We developed **CPST (Constrained Push-and-Settle Transport)**. For each survey period, the observed fill defines where material went. The FMS loads (plus material carried over on the platform, and dozer cuts) are the sources. A slope-aware dozer push cost and entropy-regularised optimal transport decide which source filled which part of the observed fill. The mixing length is ε = 6 m. Two dummy nodes make data mismatches explicit: fill without an FMS source becomes **unattributed** material with an imputed grade, and FMS volume not seen on the face is **retained** and carried to the next period. All operations act on extensive quantities (tonnes, metal), so **mass and metal are conserved exactly**. A separate forward physics model (dozer push to the crest + avalanche at the 37° angle of repose measured from the surveys) is used for prediction, nowcasting and known-truth testing.
 
+> **Grade units are unconfirmed.** The FMS grades average 8.4% Cu and 8.0 g/t Au, roughly an order of magnitude above typical Cu-Au mill feed. They may be scaled, anonymised or in different units (QA-F04). All grades and contained-metal figures in this report are **as supplied** and must be confirmed with Geology before they are used for any economic purpose. Tonnages, the spatial distribution and the relative grade patterns are not affected.
+
 **Results (base case, 5 × 5 × 2 m blocks).**
 
 | Material class | Tonnes | Share | Cu % | Au g/t | Basis of grade |
@@ -29,12 +31,15 @@ date: "November 2026 - model run {{RUN_ID}}"
 | Legacy (pre-record pile) | {{T_L}} | {{S_L}} | {{CU_L}} | {{AU_L}} | **Assumed** |
 | **Total modelled** | **{{T_T}}** | 100% | {{CU_T}} | {{AU_T}} | |
 
-* Monte Carlo (60 realisations) P10/P50/P90: total tonnes {{MC_T}} kt; contained Cu {{MC_CU}} kt; contained Au {{MC_AU}} koz. The FMS-tracked class: Cu grade P10-P90 {{MC_FCU}} %.
+Note on the identical Cu/Au values: legacy grades *equal* the FMS mean by assumption A-22, and unattributed grades are imputed from the same loads (A-21). Near-identical values across classes are therefore a consequence of the assumptions, not a measurement, and certainly not overwritten fields. Exact class Au grades are {{AU3_F}} / {{AU3_U}} / {{AU3_L}} g/t.
+
+* Monte Carlo (60 realisations) P10/P50/P90: total tonnes {{MC_T}} kt; contained Cu {{MC_CU}} kt (as-supplied units); contained Au {{MC_AU}} koz. The FMS-tracked class: Cu grade P10-P90 {{MC_FCU}} %.
 * Validation:
   * FMS tonnes, Cu, Au and Ag balance to floating-point precision.
   * The reconstructed surface matches the latest surveys (RMSE {{GEO_RMSE}} m; {{GEO_TAU}}% of cells within the 0.14 m detection limit).
   * On held-out periods the forward model's earth-mover error is {{FWD_P}} m, vs {{FWD_B}} m without dozer push.
   * In a synthetic twin with known truth, CPST recovers block Cu with RMSE {{TW_CPST}}% (r = {{TW_R}}), vs {{TW_PA}}% for a period-average model and {{TW_GM}}% for a single mean grade.
+  * In a stress test where the truth uses a placement rule CPST does *not* assume (dozers push each load to a random point on the crest), CPST still gives {{TWA_RC_CPST}}% (r = {{TWA_RC_R}}) vs {{TWA_RC_PA}}%.
 
 **Key conclusions.**
 
@@ -163,6 +168,7 @@ The complete register (31 assumptions with need, justification, consequence and 
 * **Compositing** by metal ÷ tonnes. Within-block heterogeneity of mixed loads is reported.
 * **Provenance**: each block lists its effective number of loads and its top three contributing cycle IDs, enabling reconciliation with plant data.
 * **Uncertain or uninformed regions** are labelled by information class (FMS-reconciled, Unattributed-imputed, Legacy-assumed, Provisional) and by confidence class (High, Medium, Low, Uninformed).
+* **Two class breakdowns exist and both are correct.** The *exact* tonnage split by class (each block's tonnes divided among FMS, unattributed and legacy) is `summary_by_material_source.csv` and `validation/inventory_by_class.csv`; it is the split quoted throughout this report. `summary_by_dominant_info_class.csv` instead assigns each *whole* block to its dominant class (a block that is 60% FMS counts entirely as FMS-reconciled), for mapping and reclaim planning. Both sum to the same total.
 
 {{TABLE_CONF}}
 
@@ -211,6 +217,15 @@ A known-truth stockpile was generated from the real dump sequence with the forwa
 CPST recovers block Cu grade with RMSE {{TW_CPST}}% Cu (r = {{TW_R}}). This is a {{TW_IMPROVE}}% lower error than allocating each period's loads uniformly over its fill, and far better than a single mean grade. The intermediate mixing length (ε = 6 m) performs best among those tested. The uphill penalty has little effect in this geometry.
 
 ![Twin experiment: true vs reconstructed block Cu.](../outputs/validation/fig_val_twin_scatter.png)
+
+**Is the twin circular?** The main twin's truth comes from our own forward physics (push to the nearest crest, avalanche at 37°). CPST does not use the forward model, but its push cost encodes a similar idea, that material goes to nearby face. Two further twins therefore use truths generated by rules CPST does **not** assume:
+
+* **Random crest.** Each load is pushed to a uniformly random point of the active crest, so the dump position carries *no* information about the destination. These truths have their own geometry and surveys, and are reconstructed blind.
+* **Period-uniform mixing.** Each period's fill is perfectly homogeneous, so there is no within-period spatial structure to find.
+
+{{TABLE_TWIN_ALT}}
+
+When the dump position is uninformative, CPST's error rises from {{TW_CPST}}% to {{TWA_RC_CPST}}% Cu, but it still beats the period-average model ({{TWA_RC_PA}}%) and the global mean ({{TWA_RC_GM}}%). Most of CPST's skill therefore comes from the survey constraint (which period's material is where, and in which layer). The dump-position locality adds roughly 0.1% Cu when it is valid, and does no harm when it is not. Under period-uniform mixing CPST does not impose spurious structure ({{TWA_PU_CPST}}% vs {{TWA_PU_PA}}%). One caution on these comparisons: the period-average baseline also spreads the unattributed (imputed-grade) volume through every fill cell, which is part of why it trails even when the truth is uniformly mixed.
 
 ## Robustness to numerical settings
 
@@ -267,7 +282,7 @@ The platform (`spbm`, D5) performs the eleven required steps with one command:
 * block model and inventories;
 * uncertainty, QA/QC and reconciliation outputs;
 * exports (CSV, VTK, ESRI grids, figures);
-* an audit trail: run manifest with code commit, library versions, configuration hash, input hashes and manual interventions, model history, and an automatic change report between versions.
+* an audit trail: run manifest with code commit (or, in an unzipped package without Git, the packaged commit from `BUILD_INFO.json`), a SHA-256 of the platform source, library versions, configuration hash, input hashes and manual interventions, model history, and an automatic change report between versions.
 
 Eight automated tests (including end-to-end conservation) guard every change. The update workflow is demonstrated in `examples/demo_update.sh` (model to 22 March, then updated with later data).
 

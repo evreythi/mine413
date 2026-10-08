@@ -221,7 +221,10 @@ def summary_tables(df: pd.DataFrame, cfg) -> dict:
                           "ag_gpt": g["ag_kg"].sum() / t * 1000 if t else np.nan,
                           "cu_t": g["cu_t"].sum(), "au_kg": g["au_kg"].sum(), "au_koz": g["au_kg"].sum() / 31.1035,
                           "ag_kg": g["ag_kg"].sum()})
-    out = {"by_info_class": df.groupby("info_class").apply(agg, include_groups=False)}
+    # NB: whole blocks grouped by their DOMINANT class (a block that is 60% FMS
+    # counts entirely as FMS). The exact tonnage split by class is
+    # 'by_material_source' (and validation/inventory_by_class.csv).
+    out = {"by_dominant_info_class": df.groupby("info_class").apply(agg, include_groups=False)}
     if "confidence" in df:
         out["by_confidence"] = df.groupby("confidence").apply(agg, include_groups=False)
     bench = (np.floor((df["zc"] - df["dz"] / 2 - cfg["blockmodel"]["origin_z"]) / 4.0) * 4 + cfg["blockmodel"]["origin_z"]).astype(int)
@@ -230,6 +233,7 @@ def summary_tables(df: pd.DataFrame, cfg) -> dict:
     src = pd.DataFrame({
         "tonnes": [df["t_fms"].sum() - df["t_provisional"].sum(), df["t_provisional"].sum(), df["t_unattributed"].sum(), df["t_legacy"].sum()],
     }, index=["FMS (survey-reconciled)", "FMS (provisional, unreconciled)", "Unattributed (imputed grade)", "Legacy (assumed grade)"])
+    src.index.name = "material class (exact tonnage split)"
     out["by_material_source"] = src
     # grade-tonnage on Cu (all material and FMS-tracked only)
     rows = []

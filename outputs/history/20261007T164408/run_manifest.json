@@ -1,8 +1,9 @@
 {
-  "run_id": "20261007T081228",
-  "started": "2026-10-07T08:12:28",
-  "finished": "2026-10-07T08:27:15",
-  "git_commit": "b958bb7",
+  "run_id": "20261007T164408",
+  "started": "2026-10-07T16:44:08",
+  "finished": "2026-10-07T16:58:19",
+  "git_commit": "4bdcbf2",
+  "spbm_source_sha256": "d1dedd2d0a4d4401",
   "config_file": "/home/user/mine413/config/project.yaml",
   "config_hash": "a179baf12522",
   "software": {
@@ -137,8 +138,8 @@
       5.0,
       2.0
     ],
-    "twin_cu_rmse_base": 0.7972856296966664,
-    "twin_cu_corr_base": 0.9005413991314963,
+    "twin_cu_rmse_base": 0.7901021993038596,
+    "twin_cu_corr_base": 0.9023127105683209,
     "mc_total_tonnes_p10_p50_p90": [
       184798.59610629865,
       201201.15793143268,
@@ -225,12 +226,12 @@
       "bytes": 788
     },
     {
-      "path": "blockmodel/summary_by_info_class.csv",
+      "path": "blockmodel/summary_by_dominant_info_class.csv",
       "bytes": 827
     },
     {
       "path": "blockmodel/summary_by_material_source.csv",
-      "bytes": 182
+      "bytes": 218
     },
     {
       "path": "blockmodel/summary_grade_tonnage.csv",
@@ -334,7 +335,7 @@
     },
     {
       "path": "qaqc/fms_flag_summary.csv",
-      "bytes": 1552
+      "bytes": 1555
     },
     {
       "path": "qaqc/fms_records_with_flags.csv",
@@ -354,7 +355,7 @@
     },
     {
       "path": "report_tables.md",
-      "bytes": 11682
+      "bytes": 11725
     },
     {
       "path": "summary.json",
@@ -402,7 +403,7 @@
     },
     {
       "path": "validation/fig_val_twin_scatter.png",
-      "bytes": 104016
+      "bytes": 103949
     },
     {
       "path": "validation/forward_calibration_grid.csv",
@@ -431,6 +432,10 @@
     {
       "path": "validation/robustness_numerical.csv",
       "bytes": 1814
+    },
+    {
+      "path": "validation/twin_alternative_truths.csv",
+      "bytes": 1619
     },
     {
       "path": "validation/twin_experiment.csv",

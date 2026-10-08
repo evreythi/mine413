@@ -13,7 +13,7 @@
 | F08_density_range | Density outside 1.5-3.0 t/m3 | 0 | Retained; flagged |
 | F09_far_from_face | Dump > 60 m from any surveyed change | 0 | Retained; push distance check |
 | F10_below_floor | Dump Z below fitted stockpile floor - 0.5 m | 14 | Retained; XY used, Z not used by algorithm |
-| F11_z_residual | |Dump Z - surface| > 3 m where surface known | 29 | Retained; Z not used by algorithm (XY only) |
+| F11_z_residual | abs(Dump Z - surface) > 3 m where surface known | 29 | Retained; Z not used by algorithm (XY only) |
 | F12_after_last_survey | Dump after the last survey | 1 | Placed provisionally (unreconciled) - updated when next survey arrives |
 | F13_survey_gap_period | Dump inside a period with a missing survey | 18 | Retained; period flagged in reconciliation |
 | F14_repeated_location | Identical X/Y/Z shared by >= 3 records (default / stuck FMS position) | 14 | Retained; X/Y imputed as tonnage-weighted centroid of the period's other dumps, GPS error x5 in Monte Carlo |
@@ -76,7 +76,7 @@
 | Legacy (assumed grade) | 115,699.16 | 9,744.18 | 925.40 | 22,865.52 | 8.42 | 8.00 | 0.57 |
 | TOTAL | 202,107.42 | 17,102.16 | 1,616.66 | 39,886.09 | 8.46 | 8.00 | 1.00 |
 
-## Block model summary: by_info_class
+## Block model summary: by_dominant_info_class
 | info_class | blocks | volume_m3 | tonnes | cu_pct | au_gpt | ag_gpt | cu_t | au_kg | au_koz | ag_kg |
 |---|---|---|---|---|---|---|---|---|---|---|
 | FMS-reconciled | 691.00 | 22,719.26 | 46,937.09 | 8.37 | 7.96 | 197.42 | 3,929.50 | 373.56 | 12.01 | 9,266.16 |
@@ -102,7 +102,7 @@
 | 4474 | 792.00 | 25,787.04 | 53,383.21 | 8.35 | 7.97 | 197.48 | 4,455.46 | 425.32 | 13.67 | 10,542.18 |
 
 ## Block model summary: by_material_source
-| index | tonnes |
+| material class (exact tonnage split) | tonnes |
 |---|---|
 | FMS (survey-reconciled) | 44,422.00 |
 | FMS (provisional, unreconciled) | 228.00 |
@@ -139,9 +139,9 @@
 ## Synthetic twin experiment
 | method | blocks | cu_rmse | cu_mae | cu_corr | au_rmse | au_corr | tonnes_corr | recovered_fms_tonnes_frac |
 |---|---|---|---|---|---|---|---|---|
-| CPST eps=2 m | 589 | 0.83 | 0.55 | 0.89 | 0.40 | 0.91 | 0.83 | 0.80 |
-| CPST eps=6 m (base) | 589 | 0.80 | 0.56 | 0.90 | 0.39 | 0.93 | 0.83 | 0.80 |
-| CPST eps=15 m | 589 | 0.83 | 0.60 | 0.89 | 0.42 | 0.91 | 0.83 | 0.80 |
+| CPST eps=2 m | 589 | 0.84 | 0.55 | 0.89 | 0.40 | 0.91 | 0.83 | 0.80 |
+| CPST eps=6 m (base) | 589 | 0.79 | 0.55 | 0.90 | 0.39 | 0.93 | 0.83 | 0.80 |
+| CPST eps=15 m | 589 | 0.82 | 0.59 | 0.89 | 0.42 | 0.91 | 0.83 | 0.80 |
 | CPST eps=6, no uphill penalty | 589 | 0.80 | 0.56 | 0.90 | 0.39 | 0.93 | 0.83 | 0.80 |
 | Baseline: period-average (eps=1e4) | 589 | 1.18 | 0.89 | 0.78 | 0.63 | 0.82 | 0.81 | 0.79 |
 | Reference: global mean grade | 589 | 1.83 | 1.51 |  |  |  |  |  |

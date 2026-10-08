@@ -3,7 +3,7 @@ title: "D1 - Team Charter and Work Plan"
 subtitle: "MIN E 413 Term Project - Long-Term Stockpile Reconstruction and Block Modelling"
 ---
 
-> **Before submission:** replace every `[Member n]` placeholder with real names, confirm the roles at the first meeting, and have every member sign Section 9. The meeting log and contribution record (Section 8) must reflect what *actually* happened. Do not pre-fill them.
+> **Before submission:** enter real names in `config/team.yaml` (they replace every `[Member n]` in the built documents), confirm the roles at the first meeting, and have every member sign Section 9. The meeting log and contribution record (Section 8) must reflect what *actually* happened. Do not pre-fill them.
 
 # 1. Team members and initial roles
 
