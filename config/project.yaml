@@ -100,6 +100,12 @@ density:
 
 movement:
   # A-15..A-19 - see docs/D3 for equations
+  # A-15: push cost. "geodesic" = slope-aware dozer push distance (base case);
+  # "flat" = no push term: every source may fill any fill cell of its interval
+  # at equal cost (pure survey-constrained allocation). The synthetic twins
+  # cannot show that the push term improves the answer, so both forms are
+  # sampled in the Monte Carlo (uncertainty.cost_modes).
+  cost: geodesic
   epsilon: 6.0          # m  : entropic mixing length (degree of mixing)
   alpha_up: 4.0         # -  : uphill push penalty (m of horizontal push per m of lift)
   max_push: 90.0        # m  : maximum effective dozer push distance (geodesic)
@@ -146,6 +152,7 @@ uncertainty:
   volume_factor_bootstrap: true      # A-06: f_v drawn from its bootstrap distribution
   assay_cv: 0.10            # A-11 per-source-signature grade error
   epsilon_range: [2.0, 15.0]
+  cost_modes: [geodesic, flat]  # A-15: structural uncertainty - the twins cannot show that the push term improves the answer
   alpha_range: [1.0, 10.0]
   max_push_range: [50.0, 130.0]
   survey_bias_sd: 0.05      # m, per-survey vertical datum error
@@ -162,4 +169,5 @@ sensitivity:
   survey_cutoff_hours: [29.0, 32.0]
   cell: [0.5, 2.5]
   front_unobserved_fill: [false, true]
+  cost: [geodesic, flat]
   block: [[2.0, 2.0, 1.0], [10.0, 10.0, 4.0]]

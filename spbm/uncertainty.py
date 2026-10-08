@@ -36,6 +36,7 @@ def monte_carlo(ds_loader, cfg, bg, base_df, out: Path, n=None, verbose=True) ->
         prm = {
             "survey_cutoff_hours": float(rng.choice(cutoffs)),
             "epsilon": float(rng.uniform(*u["epsilon_range"])),
+            "cost": str(rng.choice(u.get("cost_modes", ["geodesic"]))),
             "alpha_up": float(rng.uniform(*u["alpha_range"])),
             "max_push": float(rng.uniform(*u["max_push_range"])),
             # A-06: recorded payloads most likely (mode = lower bound); under-recording
@@ -45,7 +46,7 @@ def monte_carlo(ds_loader, cfg, bg, base_df, out: Path, n=None, verbose=True) ->
         c2 = apply_overrides(cfg, {"time.survey_cutoff_hours": prm["survey_cutoff_hours"], "movement.epsilon": prm["epsilon"],
                                    "movement.alpha_up": prm["alpha_up"], "movement.max_push": prm["max_push"],
                                    "movement.retain_cost": max(prm["max_push"], cfg["movement"]["retain_cost"]),
-                                   "density.payload_factor": prm["payload_factor"]})
+                                   "density.payload_factor": prm["payload_factor"], "movement.cost": prm["cost"]})
         c2["_mc_impute"] = True
         if prm["survey_cutoff_hours"] not in ds_cache:
             ds_cache[prm["survey_cutoff_hours"]] = ds_loader(c2)
@@ -154,7 +155,7 @@ def sensitivity_oat(ds_loader, cfg, base_df, base_rec, out: Path, verbose=True) 
     keymap = {"epsilon": "movement.epsilon", "alpha_up": "movement.alpha_up", "max_push": "movement.max_push",
               "payload_factor": "density.payload_factor", "volume_factor": "density.volume_factor",
               "sigma_z": "survey.sigma_z", "survey_cutoff_hours": "time.survey_cutoff_hours", "cell": "grid.cell",
-              "front_unobserved_fill": "infill.front_unobserved_fill"}
+              "front_unobserved_fill": "infill.front_unobserved_fill", "cost": "movement.cost"}
     rows = [dict(_key_metrics("base", base_rec, base_df, base_df), parameter="base", level="base", value="")]
     for name, (lo, hi) in s.items():
         for level, val in [("low", lo), ("high", hi)]:

@@ -310,6 +310,7 @@ def twin_experiment(rec, ds, cfg, out: Path, seed=7, drop_frac=0.15, gps_sigma=3
     agg = {k: bm.aggregate(SimpleNamespace(grid=ds.grid, cols=t), bg).reshape(-1, NP) for k, t in truths.items()}
     variants = [("CPST eps=2 m", {"movement.epsilon": 2.0}), ("CPST eps=6 m (base)", {}),
                 ("CPST eps=15 m", {"movement.epsilon": 15.0}), ("CPST eps=6, no uphill penalty", {"movement.alpha_up": 0.0}),
+                ("CPST eps=6, flat cost (no push term)", {"movement.cost": "flat"}),
                 ("Baseline: period-average (eps=1e4)", {"movement.epsilon": 1e4})]
     rows, alt = [], []
     sel = agg["loads"][:, P["T_F"]] > 25
@@ -327,7 +328,7 @@ def twin_experiment(rec, ds, cfg, out: Path, seed=7, drop_frac=0.15, gps_sigma=3
     tab.to_csv(out / "twin_experiment.csv", index=False)
 
     # ---- stress tests: truth placement rules CPST does not assume
-    key = ["CPST eps=6 m (base)", "Baseline: period-average (eps=1e4)"]
+    key = ["CPST eps=6 m (base)", "CPST eps=6, flat cost (no push term)", "Baseline: period-average (eps=1e4)"]
     for name in key:
         alt.append(_twin_score(name, "physics (nearest crest + 6 m jitter)", agg["loads"], recon[name], sel)[0])
         alt.append(_twin_score(name, "period-uniform mixing", agg["uniform"], recon[name], sel)[0])

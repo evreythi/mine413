@@ -173,3 +173,20 @@ def test_unknown_location_loads_fully_placed(real_rec):
     assert "loc_unknown" in d and d["loc_unknown"].sum() > 0
     u = d[d["loc_unknown"] & ~d["kind"].str.startswith("provisional")]
     assert (u["placed_volume"] + u["retained_volume"]).sum() == pytest.approx(u["volume_in"].sum(), rel=1e-6)
+
+
+def test_flat_cost_ablation_changes_allocation_not_totals(real_ds, real_rec, resolved_cfg):
+    """The push term only re-allocates material inside each interval's fill:
+    totals are unchanged, block grades move."""
+    from spbm import blockmodel as bm
+    from spbm.config import apply_overrides
+    from spbm.movement import reconstruct
+    flat = reconstruct(real_ds, apply_overrides(resolved_cfg, {"movement.cost": "flat"}))
+    bg = bm.make_block_grid(real_rec, resolved_cfg)
+    a0 = bm.aggregate(real_rec, bg).reshape(-1, NP)
+    a1 = bm.aggregate(flat, bg).reshape(-1, NP)
+    for k in ["T_F", "CU_F", "AU_F"]:
+        assert a1[:, P[k]].sum() == pytest.approx(a0[:, P[k]].sum(), rel=1e-9)
+    assert flat.periods["unattributed_volume"].sum() == pytest.approx(real_rec.periods["unattributed_volume"].sum(), rel=0.02)
+    moved = np.abs(a1[:, P["CU_F"]] - a0[:, P["CU_F"]]).sum() / a0[:, P["CU_F"]].sum()
+    assert moved > 0.01                                  # allocation does change

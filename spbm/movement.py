@@ -469,8 +469,13 @@ def reconstruct(ds, cfg, loads=None, rng=None, survey_bias=None, keep_plans=Fals
         nF = len(fill_cells)
         C = np.full((nS + 1, nF + 1), np.inf)
         if nS:
-            D = geodesic_cost(surf_full, domain, g.cell, mv["alpha_up"], np.asarray(src_cell), mv["max_push"])
-            C[:nS, :nF] = D[:, fill_cells]
+            if mv.get("cost", "geodesic") == "flat":
+                # ablation: pure survey-constrained allocation - every source may fill
+                # any fill cell of its interval at equal cost (no push term)
+                C[:nS, :nF] = 0.0
+            else:
+                D = geodesic_cost(surf_full, domain, g.cell, mv["alpha_up"], np.asarray(src_cell), mv["max_push"])
+                C[:nS, :nF] = D[:, fill_cells]
             C[:nS, nF] = mv["retain_cost"]
             # A-32: loads with an unknown dump location (default FMS position)
             # get a uniform push cost: they fill whatever part of the period's
