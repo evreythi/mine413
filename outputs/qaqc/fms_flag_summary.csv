@@ -1,15 +1,24 @@
-flag,description,records,treatment
-F01_duplicate_id,Duplicate Cycle ID,0,"Second occurrence excluded from modelling, kept in register"
-F02_missing_field,Missing mandatory field,0,"Excluded from modelling (cannot be placed/graded), kept in register"
-F03_bad_timestamp,Unparseable timestamp,0,"Excluded from modelling, kept in register"
-F04_id_out_of_order,Cycle ID not in chronological order,33,Information only - timestamp governs ordering
-F05_low_payload,Payload < 50% of median (part load),2,Retained; higher payload uncertainty in Monte Carlo
-F06_high_payload,Payload > 150% of median,3,Retained; checked against truck class; higher uncertainty
-F07_grade_outlier,Grade outside Q1-3IQR..Q3+3IQR or <=0,1,Retained (source-block grade); flagged
-F08_density_range,Density outside 1.5-3.0 t/m3,0,Retained; flagged
-F09_far_from_face,Dump > 60 m from any surveyed change,0,Retained; push distance check
-F10_below_floor,Dump Z below fitted stockpile floor - 0.5 m,14,"Retained; XY used, Z not used by algorithm"
-F11_z_residual,abs(Dump Z - surface) > 3 m where surface known,29,Retained; Z not used by algorithm (XY only)
-F12_after_last_survey,Dump after the last survey,1,Placed provisionally (unreconciled) - updated when next survey arrives
-F13_survey_gap_period,Dump inside a period with a missing survey,18,Retained; period flagged in reconciliation
-F14_repeated_location,Identical X/Y/Z shared by >= 3 records (default / stuck FMS position),14,"Retained; X/Y imputed as tonnage-weighted centroid of the period's other dumps, GPS error x5 in Monte Carlo"
+rule_id,severity,description,records,tonnes,treatment
+MISSING_PAYLOAD,error,Truck payload missing,0,0.0,"Excluded from modelling, kept in register"
+MISSING_TIME,error,Dump timestamp missing or unparseable,0,0.0,"Excluded from modelling, kept in register"
+GRADE_MISSING,error,"Cu, Au or Ag missing",0,0.0,"Excluded from modelling, kept in register"
+DENS_MISSING,error,Density missing,0,0.0,"Excluded from modelling, kept in register"
+LOC_MISSING,error,Dump X or Y missing,0,0.0,"Excluded from modelling, kept in register"
+DUP_IDENTICAL,warning,Cycle ID repeated with identical content,0,0.0,"First copy modelled, repeats excluded"
+DUP_CONFLICT,error,Cycle ID repeated with different content,0,0.0,"First copy modelled, others excluded; resolve with an fms_exclude intervention"
+PAYLOAD_NONPOSITIVE,error,Payload <= 0 t,0,0.0,Excluded from modelling
+PAYLOAD_PARTIAL,info,Payload <= 50% of the median (part load),3,152.0,Modelled; payload error in Monte Carlo
+PAYLOAD_HIGH,info,Payload > 150% of the median,3,874.0,Modelled; bounds the payload factor (A-06)
+PAYLOAD_OFF_QUANTUM,warning,Payload not a multiple of the 38 t pass quantum (A-10),0,0.0,Modelled; checked manually
+GRADE_INVALID,error,"Cu <= 0 or > 100 %, or Au/Ag < 0",0,0.0,Excluded from modelling
+GRADE_OUTLIER,info,Grade outside Q1 - 3 IQR .. Q3 + 3 IQR,1,114.0,Modelled (source-block grade); flagged
+DENS_INVALID,error,Density outside 1.5-3.0 t/m3,0,0.0,Excluded from modelling
+LOC_OUTSIDE_DOMAIN,error,Dump X/Y more than 100 m outside every survey solid,0,0.0,Location treated as unknown (as LOC_DEFAULT)
+LOC_DEFAULT,warning,"X/Y/Z shared by >= 3 records (default / stuck FMS position, A-32)",14,2356.0,Location treated as unknown: uniform push cost over the interval's fill
+LOC_OUTSIDE_SURVEYS,info,Dump X/Y outside the union of all survey change solids,56,9120.0,Modelled: pushed from the dump point (crest dumping)
+LOC_Z_INCONSISTENT,info,"Dump Z outside the interval's [start surface, end surface] envelope +/- 5 m",2,380.0,Modelled; dump Z is not used by the engine (X/Y only)
+TIME_BEFORE_FIRST_INTERVAL,error,Dump before the start of the first survey interval,0,0.0,Excluded (belongs to the pre-record pile)
+TIME_AFTER_LAST_SURVEY,warning,Dump after the last survey cut-off,1,228.0,Placed provisionally by the forward model; reconciled when the next survey arrives
+TIME_DUPLICATE,info,Timestamp identical to another record,2,304.0,Modelled; both kept
+ID_OUT_OF_ORDER,info,Cycle ID not in chronological order,33,5358.0,None - the timestamp governs ordering
+IN_SURVEY_GAP_INTERVAL,info,Dump inside a survey interval longer than 36 h,63,9918.0,Modelled; the interval's spatial resolution in time is coarser

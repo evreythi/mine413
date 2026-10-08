@@ -1,51 +1,95 @@
 {
   "key_results": {
-    "last_survey": "2026-03-29 23:59:00",
+    "last_survey": "2026-03-30 07:00:00",
     "n_surveys": 10,
     "n_fms_records": 275,
     "fms_tonnes": 44650.0,
     "fms_cu_t": 3760.423000000006,
     "fms_au_kg": 357.1236200000006,
-    "total_tonnes": 202107.41786492534,
-    "total_cu_t": 17102.162868402695,
-    "total_au_kg": 1616.6603669108777,
+    "total_tonnes": 138345.83201003505,
+    "total_cu_t": 11721.531883697253,
+    "total_au_kg": 1109.7214359961476,
     "tonnes_fms_in_model": 44650.0,
-    "tonnes_unattributed": 41758.25328493983,
-    "tonnes_legacy": 115699.16457998552,
-    "mass_balance_rel_err_ppm": -6.518215107891087e-10,
-    "cu_balance_rel_err_ppm": -7.255790386663363e-10,
-    "au_balance_rel_err_ppm": -4.138423805126656e-09,
-    "geometry_rmse_m": 0.026194049688463672,
+    "tonnes_unattributed": 3901.2785594861084,
+    "tonnes_legacy": 89794.55345054896,
+    "mass_balance_rel_err_ppm": 1.6295537769727718e-10,
+    "cu_balance_rel_err_ppm": -2.176737115999009e-09,
+    "au_balance_rel_err_ppm": -2.3875521952653786e-09,
+    "geometry_rmse_m": 0.029146579583023646,
     "survey_volume_m3": 35095.559693264295,
-    "unattributed_volume_m3": 20261.028090640724,
-    "blocks": 2695,
+    "unattributed_volume_m3": 2869.270313329849,
+    "blocks": 2699,
     "block_size": [
       5.0,
       5.0,
       2.0
     ],
-    "twin_cu_rmse_base": 0.7901021993038596,
-    "twin_cu_corr_base": 0.9023127105683209,
+    "survey_cutoff_hours": 31.0,
+    "volume_factor": 1.4717380687565416,
+    "volume_factor_p10_p90": [
+      1.397846215527493,
+      1.524959273063707
+    ],
+    "volume_factor_consistent_intervals": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      8
+    ],
+    "volume_factor_holdout_mae": 0.034584962204253424,
+    "payload_factor": 1.0,
+    "in_pile_density_t_m3": 1.4046110369494245,
+    "tonnes_record_period": 48551.278559486105,
+    "cu_t_record_period": 4159.034592092019,
+    "twin_cu_rmse_base": 0.6805303138384898,
+    "twin_cu_corr_base": 0.9313382992751342,
+    "scenario_S0_record_period_tonnes": 48551.27855948611,
+    "scenario_S0_total_tonnes": 138345.83201003444,
+    "scenario_S1_record_period_tonnes": 57776.02148578848,
+    "scenario_S1_total_tonnes": 164631.5400919405,
+    "scenario_S2_record_period_tonnes": 58681.52192682905,
+    "scenario_S2_total_tonnes": 137295.3606602252,
+    "scenario_X1_record_period_tonnes": 71454.76160458093,
+    "scenario_X1_total_tonnes": 203608.8181107862,
+    "scenario_X2_record_period_tonnes": 71337.70529552153,
+    "scenario_X2_total_tonnes": 203491.76180172662,
+    "mc_record_period_tonnes_p10_p50_p90": [
+      48083.627300151995,
+      52496.894975996765,
+      56006.40245646977
+    ],
+    "mc_record_period_cu_t_p10_p50_p90": [
+      4084.611166496437,
+      4427.3560226468835,
+      4951.80747643611
+    ],
     "mc_total_tonnes_p10_p50_p90": [
-      184798.59610629865,
-      201201.15793143268,
-      218064.4724291216
+      134036.38013531925,
+      147624.14058119373,
+      158567.99807763306
     ],
     "mc_cu_t_p10_p50_p90": [
-      15390.043213415653,
-      16983.557267638513,
-      19021.86340202169
+      11284.213472451936,
+      12413.004734151578,
+      13790.618483282435
     ],
     "mc_au_kg_p10_p50_p90": [
-      1459.5158648393792,
-      1607.904896180755,
-      1768.7128928402406
+      1076.5573756027763,
+      1175.8214371708773,
+      1308.6639544756335
     ]
   },
   "qaqc": {
     "n_fms_records": 275,
     "n_excluded": 0,
-    "n_flagged_any": 90,
+    "n_location_unknown": 14,
+    "tonnes_location_unknown": 2356.0,
+    "n_rules": 40,
+    "n_rules_triggered": 25,
+    "n_flagged_any": 139,
     "payload_multiple_of_38_frac": 1.0,
     "n_grade_signatures": 21,
     "fms_first": "2026-03-15 17:43:00",
@@ -71,40 +115,38 @@
       "mode": 37.0
     },
     "dump_z_minus_surface": {
-      "n": 200,
-      "median": -0.7030699302927133,
-      "p10": -2.8467843389919834,
-      "p90": 2.0110436792640023
+      "n": 197,
+      "median": -0.3213957947846211,
+      "p10": -2.5442420425166343,
+      "p90": 3.5883550684593515
     },
     "gap_periods": [
       [
-        "2026-03-16 23:59:00",
-        "2026-03-18 23:59:00"
+        "2026-03-17 07:00:00",
+        "2026-03-19 07:00:00"
       ],
       [
-        "2026-03-22 23:59:00",
-        "2026-03-27 23:59:00"
+        "2026-03-23 07:00:00",
+        "2026-03-28 07:00:00"
       ]
     ],
-    "days_survey_no_fms": [
-      "2026-03-27"
-    ]
+    "days_survey_no_fms": []
   },
   "geometry": {
     "cells": 6813,
-    "mean_m": -0.007136692202890923,
-    "rmse_m": 0.026194049688463672,
-    "p01_m": -0.12824897018454068,
-    "p99_m": 0.00042208960639982267,
-    "max_abs_m": 0.14138558165450377,
-    "volume_diff_m3": -48.622283978295854,
-    "frac_within_tau": 1.0
+    "mean_m": -0.008008925969545456,
+    "rmse_m": 0.029146579583023646,
+    "p01_m": -0.129666052739085,
+    "p99_m": 0.011461640723682918,
+    "max_abs_m": 0.19840463442596956,
+    "volume_diff_m3": -54.56481263051319,
+    "frac_within_tau": 0.9998532217818875
   },
   "forward_best": {
     "repose_deg": 35.0,
     "deposit_radius": 2.0,
     "release_offset": 0.0,
-    "calib_w1_m": 19.01497541531224,
-    "calib_capture": 0.3414791950086177
+    "calib_w1_m": 16.368611488426914,
+    "calib_capture": 0.3610433069096122
   }
 }

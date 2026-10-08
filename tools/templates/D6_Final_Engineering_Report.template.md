@@ -346,6 +346,8 @@ Sixty Monte Carlo realisations jointly sampled the following (D3, Section 7):
 
 The calibrated f_v fixes the in-pile volume of the FMS material. The scenarios below differ only in how many tonnes the **same surveyed volume** holds.
 
+{{TABLE_SCEN_DESC}}
+
 {{TABLE_SCEN}}
 
 ![Tonnes held by the same surveyed volume under each interpretation.](../outputs/uncertainty/fig_scenarios.png)

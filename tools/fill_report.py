@@ -130,13 +130,15 @@ def values() -> dict:
     v.update({"X2_RP": f"{sc.loc['X2', 'record_period_tonnes']:,.0f}", "X2_UPLIFT": f"{sc.loc['X2', 'record_period_tonnes'] / s0 - 1:.0%}",
               "S1_UPLIFT": f"{sc.loc['S1', 'record_period_tonnes'] / s0 - 1:.0%}", "X2_TOT": f"{sc.loc['X2', 'total_tonnes']:,.0f}",
               "S2_SHIFT": f"{(sc.loc['S2', 'unattributed_tonnes'] - sc.loc['S0', 'unattributed_tonnes']) / 1000:,.0f}"})
-    st_ = sc.reset_index()[["scenario", "status", "volume_factor", "payload_factor", "in_pile_density_t_m3", "largest_load_t", "fms_tonnes",
-                            "unattributed_tonnes", "record_period_tonnes", "record_period_cu_t", "pre_record_tonnes", "total_tonnes", "description"]]
+    v["TABLE_SCEN_DESC"] = md(sc.reset_index()[["scenario", "status", "description"]],
+                              "Table 10.2 - Interpretations of the volume gap: what each scenario assumes")
+    st_ = sc.reset_index()[["scenario", "volume_factor", "payload_factor", "in_pile_density_t_m3", "largest_load_t", "fms_tonnes",
+                            "unattributed_tonnes", "record_period_tonnes", "record_period_cu_t", "pre_record_tonnes", "total_tonnes"]]
     st_ = st_.rename(columns={"volume_factor": "f_v", "payload_factor": "f_pay", "in_pile_density_t_m3": "in-pile t/m³",
                               "largest_load_t": "largest load t", "fms_tonnes": "FMS t", "unattributed_tonnes": "unattributed t",
                               "record_period_tonnes": "record-period t", "record_period_cu_t": "record-period Cu t",
                               "pre_record_tonnes": "pre-record core t", "total_tonnes": "whole pile t"})
-    v["TABLE_SCEN"] = md(st_, "Table 10.2 - Interpretations of the volume gap (outputs/uncertainty/scenarios.csv)",
+    v["TABLE_SCEN"] = md(st_, "Table 10.3 - Tonnes under each interpretation (outputs/uncertainty/scenarios.csv)",
                          {"f_v": "{:.3f}", "f_pay": "{:.2f}", "in-pile t/m³": "{:.2f}", "largest load t": "{:,.0f}", "FMS t": "{:,.0f}",
                           "unattributed t": "{:,.0f}", "record-period t": "{:,.0f}", "record-period Cu t": "{:,.0f}",
                           "pre-record core t": "{:,.0f}", "whole pile t": "{:,.0f}"})

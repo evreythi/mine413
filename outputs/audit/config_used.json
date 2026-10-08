@@ -8,33 +8,23 @@
       "Data_Topo 2026.zip",
       "data/inbox"
     ],
+    "raw_store": "data/raw_store",
     "fms_pattern": "*.csv",
     "survey_pattern": "*.dxf",
-    "survey_overrides": "config/survey_overrides.csv",
+    "manual_interventions": "config/manual_interventions.csv",
     "cache_dir": "data/cache"
   },
   "outputs": {
     "root": "outputs"
   },
   "time": {
-    "survey_time": "23:59",
-    "survey_time_candidates": [
-      "00:00",
-      "03:00",
-      "05:00",
-      "06:00",
-      "07:00",
-      "08:00",
-      "09:00",
-      "10:00",
-      "12:00",
-      "15:00",
-      "18:00",
-      "21:00",
-      "22:00",
-      "23:00",
-      "23:59"
-    ]
+    "survey_cutoff_hours": 31.0,
+    "cutoff_scan_hours": [
+      0.0,
+      36.0,
+      0.5
+    ],
+    "first_interval_hours": 24.0
   },
   "grid": {
     "cell": 1.0,
@@ -54,13 +44,17 @@
     "repose_deg": 37.0,
     "platform_rule": "nearest_crest",
     "domain": "hull",
-    "front_unobserved_fill": true
+    "front_unobserved_fill": false
   },
   "fms": {
-    "repeated_location_min": 3
+    "repeated_location_min": 3,
+    "pass_quantum_t": 38.0,
+    "dump_z_tolerance_m": 5.0
   },
   "density": {
-    "compaction_factor": 1.0,
+    "volume_factor": "auto",
+    "payload_factor": 1.0,
+    "calibration_outlier_k_mad": 3.0,
     "legacy_density": null
   },
   "movement": {
@@ -135,12 +129,12 @@
     "seed": 413,
     "gps_sigma": 3.0,
     "payload_cv": 0.08,
-    "payload_bias_sd": 0.03,
-    "assay_cv": 0.1,
-    "compaction_range": [
-      0.9,
-      1.1
+    "payload_factor_range": [
+      1.0,
+      1.19
     ],
+    "volume_factor_bootstrap": true,
+    "assay_cv": 0.1,
     "epsilon_range": [
       2.0,
       15.0
@@ -154,11 +148,9 @@
       130.0
     ],
     "survey_bias_sd": 0.05,
-    "survey_time_choices": [
-      "21:00",
-      "22:00",
-      "23:00",
-      "23:59"
+    "survey_cutoff_range": [
+      29.0,
+      32.0
     ]
   },
   "sensitivity": {
@@ -174,17 +166,21 @@
       50.0,
       130.0
     ],
-    "compaction_factor": [
-      0.9,
-      1.1
+    "payload_factor": [
+      1.0,
+      1.19
+    ],
+    "volume_factor": [
+      1.35,
+      1.6
     ],
     "sigma_z": [
       0.025,
       0.15
     ],
-    "survey_time": [
-      "21:00",
-      "23:59"
+    "survey_cutoff_hours": [
+      29.0,
+      32.0
     ],
     "cell": [
       0.5,
