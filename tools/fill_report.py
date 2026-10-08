@@ -205,6 +205,8 @@ def values() -> dict:
     v["TABLE_FLAGS"] = md(flags, "FMS record rules (records retained; treatment as stated)", {"records": "{:,.0f}", "tonnes": "{:,.0f}"})
     p = pd.read_csv(OUT / "growth" / "period_reconciliation.csv", parse_dates=["end"])
     dmap = dict(zip(vt["survey"], vt["survey_date"].str[5:]))
+    cons = set(vt.loc[vt["consistent"], "interval"])
+    v["UNATT_NONGAP"] = f"{p.loc[p['period'].isin(cons), 'unattributed_volume'].sum():,.0f}"
     pt = pd.DataFrame({"survey (D)": p["survey"].map(dmap), "gap": np.where(p["gap_detected"], "yes", ""),
                        "loads": p["n_loads"], "FMS t": p["fms_tonnes"], "FMS m³": p["fms_volume"] + p["carried_in_volume"],
                        "solid m³": p["solid_volume"], "fill m³": p["fill_volume"], "cut m³": p["cut_volume"],
@@ -226,6 +228,9 @@ def values() -> dict:
         columns={"FMS_input": "FMS input", "block_model_grid": "block model", "abs_diff_block_vs_input": "difference"})
     v["TABLE_BALANCE"] = md(bal, "Table 9.1 - FMS mass and metal balance", {"FMS input": "{:,.3f}", "block model": "{:,.3f}", "difference": "{:.1e}"})
     vr = pd.read_csv(OUT / "validation" / "volume_reconciliation.csv")
+    vr["item"] = vr["item"].replace({
+        "FMS volume (tonnes / density) (m3)": "FMS in-pile volume, T × f_v / Dens (m3)",
+        "FMS volume placed into observed fill (m3)": "volume placed into observed fill from loads, carried parcels and cuts (m3)"})
     v["TABLE_VOLUME"] = md(vr, "Table 9.2 - Volume reconciliation over the record", {"value": "{:,.6g}"})
     fw = fwd.copy()
     v["TABLE_FORWARD"] = md(fw.rename(columns={"w1_m": "W1 (m)", "capture": "capture", "centroid_err_m": "centroid error (m)"}),

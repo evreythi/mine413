@@ -181,7 +181,7 @@ The full derivation, pseudocode and flowcharts are in D3. In summary, each inter
 | C. Distance / stopping | Material stops where observed accommodation space exists (capacity constraint). Max push 90 m. Unplaceable volume is retained on the platform (dozer lag) |
 | D. Downslope behaviour | The layer top is the surveyed surface, with faces at the measured repose angle. Forward model: avalanche CA at 37° |
 | E. Mixing | Entropic OT with mixing length ε = 6 m. Grades composited from metal ÷ tonnes |
-| F. Surface reconciliation | Column marginals = observed fill, so the model surface = survey (residual ≤ 8×10⁻⁷) |
+| F. Surface reconciliation | Column marginals = observed fill, so the model surface = survey (residual < 10⁻⁶) |
 | G. Mass conservation | Row sums exact by construction; unattributed and pre-record volumes kept in separate classes |
 | H. Metal conservation | All operations linear in metal; verified to 10⁻¹² relative |
 | I. Sequential updating | Column stacks plus carried parcels form the initial state of the next interval. Cuts remove and re-handle the column top |
@@ -290,7 +290,7 @@ See Section 5 and D2 Section 2.5. f_v is calibrated on the first half of the rec
 |---|---|
 | FMS mass / metal balance error | < 10⁻⁹ relative |
 | Geometry RMSE vs survey | {{GEO_RMSE}} m |
-| Sinkhorn max column residual | ≤ 8×10⁻⁷ |
+| Sinkhorn max column residual | < 10⁻⁶ |
 | Volume factor hold-out error | {{HO_MAE}} (f_v = 1: {{HO_DENS}}) |
 | Forward model W1 (test intervals) | {{FWD_P}} m (no-push {{FWD_B}} m; uniform {{FWD_U}} m) |
 | Twin block Cu RMSE / r | {{TW_CPST}}% / {{TW_R}} |
@@ -382,7 +382,7 @@ Manual corrections are possible only through `config/manual_interventions.csv`. 
 
 1. **Where the dumped material is.** FMS-tracked material forms a skin on the south and west faces and the upper benches, laid in daily layers that dip with the face (see the block model sections). The median reconstructed push is about {{PUSH_P50}} m per load (P90 about {{PUSH_P90}} m). A typical load is spread over a patch of face about {{SPREAD_P50}} m across, reflecting dozer spreading and rolling on the face.
 2. **Grade pattern.** Grade varies strongly between production days, from 5.8% Cu (03-19, 03-20) to 13.2% (03-21) and 12.2% (03-27). The tracked material is therefore banded parallel to the face. A reclaim cut advancing from the south face would see the feed grade change by more than a factor of two over about 20 m, so it must be blended.
-3. **The record-period inventory is now consistent between the surveys and the FMS.** Once the cut-off and the volume factor are calibrated, recorded loads explain the measured fill of every complete day. Only {{UNATT_VOL}} m³ of surveyed fill (about {{UNATT_SHARE}} of the fill) has no FMS source, and all of it falls in the three FMS-gap intervals. Version 1 booked roughly ten times as much unattributed material, because it did not calibrate the volume conversion.
+3. **The record-period inventory is now consistent between the surveys and the FMS.** Once the cut-off and the volume factor are calibrated, recorded loads explain the measured fill of every complete day. Only {{UNATT_VOL}} m³ of surveyed fill (about {{UNATT_SHARE}} of the fill) has no FMS source. Nearly all of it falls in the three FMS-gap intervals; only {{UNATT_NONGAP}} m³ falls on complete days, within their day-to-day scatter. Version 1 booked roughly ten times as much unattributed material, because it did not calibrate the volume conversion.
 4. **The pre-record core dominates the whole-pile tonnage** but carries no grade information in the supplied data. Its geometry (floor plane plus inferred platform) is also the least certain part of the model.
 5. **The volume excess is the open question.** Bulking (our base case) and missing tonnes are indistinguishable from volumes alone. The answer moves the record-period tonnes by up to {{X2_UPLIFT}}.
 

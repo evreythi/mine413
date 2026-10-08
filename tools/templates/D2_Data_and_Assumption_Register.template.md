@@ -29,7 +29,7 @@ Information type key, used throughout the project (course outline, Task 7): **M*
 
 * the coordinates coincide with the FMS mine grid (dumps sit on and behind the surveyed crests);
 * in inches, the pile would be 2.5 m wide and stand 114 m above sea level;
-* the face slopes (36°) and the volume budget (Section 2.5) are physically consistent only in metres.
+* the volume budget (Section 2.5) balances recorded tonnes against surveyed volume only in metres; in cubic inches the solids would hold 1/61,000 of the FMS volume.
 
 The header is therefore ignored (rule DXF_UNITS_HEADER). FMS and surveys overlay without offset, so **no transformation** was applied (A-01).
 

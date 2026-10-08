@@ -113,7 +113,7 @@ The solution is $P_{kc} = \exp\big((f_k + g_c - C_{kc})/\varepsilon\big)$. It is
 
 $$f_k \leftarrow \varepsilon\log a_k - \varepsilon\,\text{LSE}_c\!\left(\tfrac{g_c - C_{kc}}{\varepsilon}\right),\qquad g_c \leftarrow \varepsilon\log b_c - \varepsilon\,\text{LSE}_k\!\left(\tfrac{f_k - C_{kc}}{\varepsilon}\right)$$
 
-Iteration stops when $\sum_k |\sum_c P_{kc} - a_k| / \sum a < 10^{-6}$ (max. 5000 iterations). A final row rescaling $P_{kc} \leftarrow P_{kc}\,a_k/\sum_c P_{kc}$ makes **each source's volume exactly conserved**. The remaining column residual (≤ 8×10⁻⁷ relative in all periods) is reported as the numerical reconciliation error.
+Iteration stops when $\sum_k |\sum_c P_{kc} - a_k| / \sum a < 10^{-6}$ (max. 5000 iterations). A final row rescaling $P_{kc} \leftarrow P_{kc}\,a_k/\sum_c P_{kc}$ makes **each source's volume exactly conserved**. The remaining column residual (< 10⁻⁶ relative in all intervals) is reported as the numerical reconciliation error.
 
 **ε is the mixing length** (A-18). As ε → 0 the plan becomes the work-minimising deterministic assignment (no mixing beyond what is geometrically forced). As ε → ∞ every source is spread uniformly over the period's fill, giving the "period-average" model. ε = 6 m represents GPS error, blade spill and rolling on the face. Its effect is quantified by the twin experiment, the tornado and the Monte Carlo.
 
@@ -146,7 +146,7 @@ After deposit, $z_m$ = column tops, the volume in column R becomes carried parce
 |---|---|---|
 | Grid cell | 1 m (0.5 and 2.5 m tested) | Robustness table, Section 9.6 |
 | Detection limit τ | 0.14 m (k = 1-4 tested) | Volume not moved: 96 m³ (0.2%) |
-| Sinkhorn tolerance | 10⁻⁶ (10⁻⁴, 10⁻⁸ tested) | Column residual ≤ 8×10⁻⁷ |
+| Sinkhorn tolerance | 10⁻⁶ (10⁻⁴, 10⁻⁸ tested) | Column residual < 10⁻⁶ |
 | Log-domain Sinkhorn | always | No underflow with costs ≫ ε |
 | Time step | one survey interval (cut-off D+1 07:00, data-driven) | Gap periods flagged |
 | Block size | 5 × 5 × 2 m (2 × 2 × 1 and 10 × 10 × 4 tested) | Tornado |
