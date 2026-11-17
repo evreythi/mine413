@@ -10,8 +10,8 @@
 """
 from __future__ import annotations
 
-import copy
 import itertools
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -24,7 +24,7 @@ from . import forward as fw
 from . import plots as pl
 from .config import apply_overrides
 from .dataset import Dataset, Survey
-from .movement import NP, P, ColumnModel, load_props, prepare_loads, reconstruct, sinkhorn
+from .movement import NP, P, ColumnModel, load_props, reconstruct, sinkhorn
 from .surfaces import extend_outside
 
 
@@ -66,8 +66,8 @@ def volume_reconciliation(rec) -> pd.DataFrame:
         "  of which unobserved fill on first-surveyed cells (m3)": p["unobserved_fill_new_cells"].sum(),
         "cut / re-handled volume (m3)": p["cut_volume"].sum(),
         "sub-threshold change not modelled (m3)": p["noise_volume"].sum(),
-        "FMS volume (tonnes / density) (m3)": rec.loads["vol"].sum(),
-        "FMS volume placed into observed fill (m3)": p["placed_volume"].sum() - 0,
+        "FMS in-pile volume, T x f_v / Dens (m3)": rec.loads["vol"].sum(),
+        "volume placed into observed fill from loads, carried parcels and cuts (m3)": p["placed_volume"].sum(),
         "unattributed fill volume (m3)": p["unattributed_volume"].sum(),
         "FMS volume never reconciled (provisional) (m3)": rec.destinations.loc[rec.destinations["kind"].str.startswith("provisional"), "volume_in"].sum(),
         "max Sinkhorn column residual (relative)": p["sinkhorn_col_err"].max(),
@@ -124,13 +124,17 @@ def _forward_metrics(rec, s, fcfg, mode="push"):
     L = rec.loads[rec.loads.period == s]
     if len(L) == 0:
         return None
-    creg = ndimage.binary_dilation(snap["observed_before"], iterations=2)
+    creg = ndimage.binary_dilation(snap["observed_before"], iterations=max(1, int(round(2.0 / g.cell))))   # 2 m
     xyv = L[["x", "y", "vol"]].values
     if mode == "push":
         zp, _ = fw.place_loads(z0, xyv, g, fcfg, crest_region=creg)
+        dp = zp - z0
+    elif mode == "uniform":
+        # no-information baseline: the period's volume spread evenly over the model domain
+        dp = np.where(rec.domain, xyv[:, 2].sum() / (rec.domain.sum() * g.area), 0.0)
     else:
         zp = fw.place_at_dump(z0, xyv, g, fcfg)
-    dp = zp - z0
+        dp = zp - z0
     ob = snap["fill"]
     X, Y = g.mesh()
     cen = lambda w: np.array([(w * X).sum() / w.sum(), (w * Y).sum() / w.sum()])  # noqa: E731
@@ -158,8 +162,9 @@ def temporal_validation(rec, cfg, out: Path) -> dict:
     res = []
     keep = {}
     for s in calib + test:
-        for mode, f in [("push (calibrated)", fbest), ("push (default)", dict(fc, release_offset=2.0)), ("no-push baseline", fbest)]:
-            m = _forward_metrics(rec, s, f, "dump" if "baseline" in mode else "push")
+        for mode, f in [("push (calibrated)", fbest), ("push (default)", dict(fc, release_offset=2.0)), ("no-push baseline", fbest),
+                        ("uniform baseline", fbest)]:
+            m = _forward_metrics(rec, s, f, "uniform" if mode.startswith("uniform") else "dump" if "baseline" in mode else "push")
             if m is None:
                 continue
             keep[(s, mode)] = m.pop("pred")
@@ -184,7 +189,8 @@ def temporal_validation(rec, cfg, out: Path) -> dict:
         L = rec.loads[rec.loads.period == s]
         ax.scatter(L.x, L.y, s=6, color=pl.CAT[1])
         r = tab[(tab.period == s) & (tab["mode"] == "push (calibrated)")].iloc[0]
-        pl.plan_axes(ax, g, f"{rec.periods.loc[s, 'end']:%m-%d}  W1 {r.w1_m:.1f} m", ticks=False)
+        lab = re.search(r"(\d{2})(\d{2})(\d{2})", str(rec.periods.loc[s, "survey"]))
+        pl.plan_axes(ax, g, (f"survey {lab.group(2)}-{lab.group(3)}" if lab else f"interval {s}") + f"  W1 {r.w1_m:.1f} m", ticks=False)
         ax.set_xticks([]); ax.set_yticks([])
     axs[0][0].plot([], [], color=pl.CAT[1], label="predicted deposit (push + avalanche)")
     axs[0][0].plot([], [], color=pl.INK, ls=":", label="no-push baseline")
@@ -215,7 +221,7 @@ def _twin_truth(rec, ds, cfg, rng, push_jitter, crest_rule="nearest"):
     for s, sv in enumerate(ds.surveys):
         Ls = loads[loads.period == s]
         if len(Ls):
-            creg = ndimage.binary_dilation(rec.diagnostics["snapshots"][s]["observed_before"], iterations=3) if s < len(rec.diagnostics["snapshots"]) else None
+            creg = ndimage.binary_dilation(rec.diagnostics["snapshots"][s]["observed_before"], iterations=max(1, int(round(3.0 / g.cell)))) if s < len(rec.diagnostics["snapshots"]) else None
             if creg is not None and not creg.any():
                 creg = None
             z, feet = fw.place_loads(z, Ls[["x", "y", "vol"]].values, g, fcfg, rng=rng, push_jitter=push_jitter,
@@ -235,7 +241,7 @@ def _twin_truth(rec, ds, cfg, rng, push_jitter, crest_rule="nearest"):
         noise = rng.normal(0, 0.02, z.shape)
         top = np.where(mask, z + noise, np.nan)
         bot = np.where(mask, prev, np.nan)
-        surveys.append(Survey(s, f"SYN_{s:02d}", "synthetic", sv.datetime, top, bot, mask.astype(int) * 2, {}))
+        surveys.append(Survey(s, f"SYN_{s:02d}", "synthetic", sv.datetime, top, bot, mask.astype(int) * 2, {}, sv.nominal))
         prev = z.copy()
     return truths, surveys, loads
 
@@ -303,6 +309,7 @@ def twin_experiment(rec, ds, cfg, out: Path, seed=7, drop_frac=0.15, gps_sigma=3
     agg = {k: bm.aggregate(SimpleNamespace(grid=ds.grid, cols=t), bg).reshape(-1, NP) for k, t in truths.items()}
     variants = [("CPST eps=2 m", {"movement.epsilon": 2.0}), ("CPST eps=6 m (base)", {}),
                 ("CPST eps=15 m", {"movement.epsilon": 15.0}), ("CPST eps=6, no uphill penalty", {"movement.alpha_up": 0.0}),
+                ("CPST eps=6, flat cost (no push term)", {"movement.cost": "flat"}),
                 ("Baseline: period-average (eps=1e4)", {"movement.epsilon": 1e4})]
     rows, alt = [], []
     sel = agg["loads"][:, P["T_F"]] > 25
@@ -320,7 +327,7 @@ def twin_experiment(rec, ds, cfg, out: Path, seed=7, drop_frac=0.15, gps_sigma=3
     tab.to_csv(out / "twin_experiment.csv", index=False)
 
     # ---- stress tests: truth placement rules CPST does not assume
-    key = ["CPST eps=6 m (base)", "Baseline: period-average (eps=1e4)"]
+    key = ["CPST eps=6 m (base)", "CPST eps=6, flat cost (no push term)", "Baseline: period-average (eps=1e4)"]
     for name in key:
         alt.append(_twin_score(name, "physics (nearest crest + 6 m jitter)", agg["loads"], recon[name], sel)[0])
         alt.append(_twin_score(name, "period-uniform mixing", agg["uniform"], recon[name], sel)[0])
@@ -381,7 +388,8 @@ def _key_metrics(name, r, df, base_df=None, top_bench=4484.0):
     top = df[df["zc"] > top_bench]
     trk = df[df["frac_fms"] >= 0.5]
     row = {"variant": name, "total_tonnes": t, "fms_tonnes": tf, "unattributed_tonnes": df["t_unattributed"].sum(),
-           "legacy_tonnes": df["t_legacy"].sum(), "cu_t_total": df["cu_t"].sum(), "au_kg_total": df["au_kg"].sum(),
+           "legacy_tonnes": df["t_legacy"].sum(), "record_period_tonnes": tf + df["t_unattributed"].sum(),
+           "cu_t_total": df["cu_t"].sum(), "au_kg_total": df["au_kg"].sum(),
            "tracked_blocks_tonnes": trk["tonnes"].sum(),
            "tracked_blocks_cu_pct": trk["cu_t"].sum() / max(trk["tonnes"].sum(), 1) * 100,
            "top_bench_cu_pct": top["cu_t"].sum() / max(top["tonnes"].sum(), 1) * 100,

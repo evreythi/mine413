@@ -1,3 +1,0 @@
-file,assigned_date,survey_time,reason,approved_by
-Topo_250328.dxf,2026-03-28,,"File name year '25' inconsistent with record: FMS dumps on 2026-03-28, face position lies beyond Topo_260327 and before Topo_250329; no 2025 FMS data exist. Re-dated to 2026-03-28 (QA-S02).",Survey lead (team review)
-Topo_250329.dxf,2026-03-29,,"As above; face advances beyond 2026-03-28 surface; FMS dumps on 2026-03-29 (QA-S02).",Survey lead (team review)

@@ -91,8 +91,8 @@ def write_manifest(cfg, files, outputs_root: Path, summary: dict, started: datet
         "git_commit": git_commit(), "spbm_source_sha256": source_hash(), "config_file": cfg.get("_path"), "config_hash": config_hash(cfg),
         "software": versions(),
         "inputs": [{"file": f.name, "kind": f.kind, "sha256": f.sha256, "bytes": f.size, "origin": f.origin} for f in files],
-        "manual_interventions": pd.read_csv(ROOT / cfg["inputs"]["survey_overrides"]).to_dict("records")
-        if (ROOT / cfg["inputs"]["survey_overrides"]).exists() else [],
+        "manual_interventions": pd.read_csv(ROOT / cfg["inputs"]["manual_interventions"], dtype=str).fillna("").to_dict("records")
+        if (ROOT / cfg["inputs"]["manual_interventions"]).exists() else [],
         "notes": notes, "key_results": summary, "outputs": outs,
     }
     with open(audit / "run_manifest.json", "w") as fh:

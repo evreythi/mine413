@@ -3,4 +3,4 @@
 Pipeline: ingest -> QA/QC -> surfaces/growth -> material movement -> block model
 -> validation -> uncertainty -> audit.  Run `python -m spbm --help`.
 """
-__version__ = "1.0.0"
+__version__ = "2.0.0"

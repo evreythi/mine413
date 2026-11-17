@@ -22,7 +22,7 @@ _OFFS = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 def crest_mask(z, cell, crest_slope_deg, relief=5.0, window=11.0):
     """Crest = gentle cell at the top edge of a real face. A face cell has a
     smoothed slope above `crest_slope_deg` and at least `relief` metres of
-    local drop within ~3 m (rejects small steps on the inferred platform)."""
+    local drop within ~5 m (rejects small steps on the inferred platform)."""
     zz = np.where(np.isfinite(z), z, np.nanmin(z))
     zs = ndimage.gaussian_filter(zz, 1.5 / cell)
     s = slope_deg(zs, cell)
@@ -88,7 +88,6 @@ def place_loads(z0, loads_xy_vol, g, fcfg, rng=None, push_jitter=0.0, sequential
     r = max(1, int(round(fcfg["deposit_radius"] / g.cell)))
     z = z0.copy()
     feet = []
-    batch = loads_xy_vol if sequential else loads_xy_vol
     def _crest(zz):
         c = crest_mask(zz, g.cell, fcfg["crest_slope_deg"])
         if crest_region is not None:
@@ -97,8 +96,8 @@ def place_loads(z0, loads_xy_vol, g, fcfg, rng=None, push_jitter=0.0, sequential
 
     crest = _crest(z)
     mobile_total = np.zeros_like(z)
-    for n, (x, y, v) in enumerate(batch):
-        if sequential and n % 1 == 0:
+    for x, y, v in loads_xy_vol:
+        if sequential:          # the crest moves as the pile grows
             crest = _crest(z)
         if not crest.any():
             crest = np.ones_like(z, bool)
