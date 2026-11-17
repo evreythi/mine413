@@ -236,9 +236,7 @@ def values() -> dict:
         columns={"FMS_input": "FMS input", "block_model_grid": "block model", "abs_diff_block_vs_input": "difference"})
     v["TABLE_BALANCE"] = md(bal, "Table 9.1 - FMS mass and metal balance", {"FMS input": "{:,.3f}", "block model": "{:,.3f}", "difference": "{:.1e}"})
     vr = pd.read_csv(OUT / "validation" / "volume_reconciliation.csv")
-    vr["item"] = vr["item"].replace({
-        "FMS volume (tonnes / density) (m3)": "FMS in-pile volume, T × f_v / Dens (m3)",
-        "FMS volume placed into observed fill (m3)": "volume placed into observed fill from loads, carried parcels and cuts (m3)"})
+    vr["item"] = vr["item"].str.replace("T x f_v", "T × f_v")
     v["TABLE_VOLUME"] = md(vr, "Table 9.2 - Volume reconciliation over the record", {"value": "{:,.6g}"})
     fw = fwd.copy()
     v["TABLE_FORWARD"] = md(fw.rename(columns={"w1_m": "W1 (m)", "capture": "capture", "centroid_err_m": "centroid error (m)"}),

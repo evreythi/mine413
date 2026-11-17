@@ -122,7 +122,7 @@ s = content("Each survey file is a change solid, not a surface", "Data and QA/QC
 fitImg(s, "solids", 0.5, 1.35, 8.4, 5.5);
 bullets(s, [
   "Every grid cell is crossed by exactly two faces: top = this survey, bottom = previous surface",
-  "Bottom of solid s equals top of solid s-1 to 0.000 m (P5-P95)",
+  "Bottom of solid s equals top of solid s-1 to 0.000 m on undisturbed consecutive-day overlaps; elsewhere it reveals dozer cuts",
   "So the files give measured daily fill directly, but only where change occurred",
   `${fmt(k.survey_volume_m3)} m³ in 10 solids, 03-15 to 03-29`,
 ], 9.1, 1.5, 3.7, 5.2, 15, "solid_facts");

@@ -10,7 +10,6 @@
 """
 from __future__ import annotations
 
-import copy
 import itertools
 import re
 from pathlib import Path
@@ -25,7 +24,7 @@ from . import forward as fw
 from . import plots as pl
 from .config import apply_overrides
 from .dataset import Dataset, Survey
-from .movement import NP, P, ColumnModel, load_props, prepare_loads, reconstruct, sinkhorn
+from .movement import NP, P, ColumnModel, load_props, reconstruct, sinkhorn
 from .surfaces import extend_outside
 
 
@@ -67,8 +66,8 @@ def volume_reconciliation(rec) -> pd.DataFrame:
         "  of which unobserved fill on first-surveyed cells (m3)": p["unobserved_fill_new_cells"].sum(),
         "cut / re-handled volume (m3)": p["cut_volume"].sum(),
         "sub-threshold change not modelled (m3)": p["noise_volume"].sum(),
-        "FMS volume (tonnes / density) (m3)": rec.loads["vol"].sum(),
-        "FMS volume placed into observed fill (m3)": p["placed_volume"].sum() - 0,
+        "FMS in-pile volume, T x f_v / Dens (m3)": rec.loads["vol"].sum(),
+        "volume placed into observed fill from loads, carried parcels and cuts (m3)": p["placed_volume"].sum(),
         "unattributed fill volume (m3)": p["unattributed_volume"].sum(),
         "FMS volume never reconciled (provisional) (m3)": rec.destinations.loc[rec.destinations["kind"].str.startswith("provisional"), "volume_in"].sum(),
         "max Sinkhorn column residual (relative)": p["sinkhorn_col_err"].max(),
@@ -125,7 +124,7 @@ def _forward_metrics(rec, s, fcfg, mode="push"):
     L = rec.loads[rec.loads.period == s]
     if len(L) == 0:
         return None
-    creg = ndimage.binary_dilation(snap["observed_before"], iterations=2)
+    creg = ndimage.binary_dilation(snap["observed_before"], iterations=max(1, int(round(2.0 / g.cell))))   # 2 m
     xyv = L[["x", "y", "vol"]].values
     if mode == "push":
         zp, _ = fw.place_loads(z0, xyv, g, fcfg, crest_region=creg)
@@ -222,7 +221,7 @@ def _twin_truth(rec, ds, cfg, rng, push_jitter, crest_rule="nearest"):
     for s, sv in enumerate(ds.surveys):
         Ls = loads[loads.period == s]
         if len(Ls):
-            creg = ndimage.binary_dilation(rec.diagnostics["snapshots"][s]["observed_before"], iterations=3) if s < len(rec.diagnostics["snapshots"]) else None
+            creg = ndimage.binary_dilation(rec.diagnostics["snapshots"][s]["observed_before"], iterations=max(1, int(round(3.0 / g.cell)))) if s < len(rec.diagnostics["snapshots"]) else None
             if creg is not None and not creg.any():
                 creg = None
             z, feet = fw.place_loads(z, Ls[["x", "y", "vol"]].values, g, fcfg, rng=rng, push_jitter=push_jitter,

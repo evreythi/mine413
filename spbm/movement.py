@@ -602,7 +602,7 @@ def reconstruct(ds, cfg, loads=None, rng=None, survey_bias=None, keep_plans=Fals
         from scipy import ndimage as ndi
         from .surfaces import extend_outside
         zcur = extend_outside(np.where(domain, cols.top.reshape(ny, nx), np.nan), domain)
-        creg = ndi.binary_dilation(observed.reshape(ny, nx), iterations=2)
+        creg = ndi.binary_dilation(observed.reshape(ny, nx), iterations=max(1, int(round(2.0 / g.cell))))   # 2 m
         _, feet = fw.place_loads(zcur, loads.iloc[post][["x", "y", "vol"]].values, g, cfg["forward"], sequential=True, crest_region=creg)
         for k, ft in zip(post, feet):
             ld = loads.iloc[k]

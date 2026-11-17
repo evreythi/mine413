@@ -10,7 +10,7 @@ The movement of material from a truck dump point to its final place in the pile 
 * **where material came from**: FMS dump coordinates, tonnage and grade (*sources*);
 * **where volume appeared**: the sequential survey change solids (*sinks*).
 
-Physics-only rules (push to the crest, roll down at the angle of repose) can predict the shape of a deposit, but they predict *where* fill appears only moderately well. Our forward model places 40% of predicted volume inside the observed fill footprint on unseen periods (Section 9.3). A reconstruction used for inventory must therefore be **constrained by the surveys**. The design principle is:
+Physics-only rules (push to the crest, roll down at the angle of repose) can predict the shape of a deposit, but they predict *where* fill appears only moderately well. Our forward model places only about half (53%) of its predicted volume inside the observed fill footprint on unseen periods (D6, Section 9.3). A reconstruction used for inventory must therefore be **constrained by the surveys**. The design principle is:
 
 > *Let the surveys decide **where** volume went, let the FMS decide **what** went there, and use a physically based transport cost (dozer push work over the real terrain) to decide **which** source filled **which** part of the observed fill, conserving mass and metal exactly.*
 
@@ -40,20 +40,20 @@ $$t_s = D\;00{:}00 + h_c,\qquad h_c = 31\text{ h}\;(D{+}1\;07{:}00)$$
 
 Period *s* is $(t_{s-1}, t_s]$; the first period starts $24$ h before $t_0$. A load with time $t_k$ belongs to period *s* if $t_{s-1} < t_k \le t_s$. Loads after the last cut-off are *provisional*. A period is a **gap period** if $t_s - t_{s-1} > 36$ h, or if more than 10% of previously surveyed cells inside solid *s* have $\text{bot}_s$ above the model surface by more than τ (a missing intermediate survey).
 
-**How $h_c$ was chosen.** The acquisition time is not supplied, so $h_c$ is scanned from 0 to 36 h in 0.5 h steps (`growth.temporal_alignment`). For each $h$ the loads are re-assigned to intervals, and two scale-free scores compare the interval FMS volume $\sum T/\text{Dens}$ with the surveyed solid volume: the Pearson correlation $r$, and the robust coefficient of variation of their ratio ($1.4826\,\text{MAD}/\text{median}$). Both scores are computed on intervals between consecutive-day surveys, which is a set fixed independently of $h$. The scan has a plateau from 30 h to 31.5 h ($r$ = 0.992, robust CV 0.08), against $r$ = 0.961 and robust CV 0.24 at 24 h (midnight). Independent evidence comes from the dump times. The FMS has almost no dumps between 06:00 and 07:30 (2 of 275), and none from 18:30 to 20:00 or from 00:00 to 01:30. These are shift-change and meal lulls. Any cut-off between 06:00 and 07:30 therefore assigns the same loads, and 07:00 (31 h) is the production-day convention at the end of that lull. The cut-off is sampled over 29-32 h in the Monte Carlo. A survey-specific cut-off can be set by a `survey_cutoff_hours` manual intervention.
+**How $h_c$ was chosen.** The acquisition time is not supplied, so $h_c$ is scanned from 0 to 36 h in 0.5 h steps (`growth.temporal_alignment`). For each $h$ the loads are re-assigned to intervals, and two scale-free scores compare the interval FMS volume $\sum T/\text{Dens}$ with the surveyed solid volume: the Pearson correlation $r$, and the robust coefficient of variation of their ratio ($1.4826\,\text{MAD}/\text{median}$). Both scores are computed on intervals between consecutive-day surveys, which is a set fixed independently of $h$. The scan has a plateau from 30 h to 31.5 h ($r$ = 0.992, robust CV 0.08), against $r$ = 0.961 and robust CV 0.23 at 24 h (midnight). Independent evidence comes from the dump times. The FMS has almost no dumps between 06:00 and 07:30 (2 of 275), and none from 18:30 to 20:00 or from 00:00 to 01:30. These are shift-change and meal lulls. Any cut-off between 06:00 and 07:30 therefore assigns the same loads, and 07:00 (31 h) is the production-day convention at the end of that lull. The cut-off is sampled over 29-32 h in the Monte Carlo. A survey-specific cut-off can be set by a `survey_cutoff_hours` manual intervention.
 
 An earlier version of this platform scanned only clock times 21:00-23:59 on day $D$. Its optimum (23:59) was the **end point of the search range**, not a maximum. That misassigned the early-morning dumps of each production day to the wrong interval, and it made 03-17 look like an FMS outage when it was a non-dumping day.
 
 ## 2.4 Volume conversion: volume factor and payload factor (A-06)
 
-For every interval, the measured net fill is $N_k$ = fill − cut, from the change solids. The FMS volume at the recorded density is $V_k = \sum_{i\in k} T_i/\text{Dens}_i$. On intervals whose FMS record is complete, $N_k/V_k$ is a stable 1.39-1.58. On intervals with FMS outages it is 2.2-2.4. The **volume factor** is the pooled ratio over the internally consistent intervals:
+For every interval, the measured net fill is $N_k$ = fill − cut, from the change solids. The FMS volume at the recorded density is $V_k = \sum_{i\in k} T_i/\text{Dens}_i$. On intervals whose FMS record is complete, $N_k/V_k$ is a stable 1.19-1.58 (the lowest value, 1.19 on 03-16, is dozer lag: part of that day's volume reaches the face in the next interval). On intervals with FMS outages it is 2.2-2.4. The **volume factor** is the pooled ratio over the internally consistent intervals:
 
 $$f_v = \frac{\sum_{k\in\mathcal K} N_k}{\sum_{k\in\mathcal K} V_k},\qquad \mathcal K = \{k : |r_k - \tilde r| \le 3 \cdot 1.4826\,\text{MAD}(r)\}$$
 
 The result is $f_v$ = 1.472, with $\mathcal K$ = intervals 1-6 and 8 (`spbm/volume.py`). The intervals are resampled (bootstrap) to give its distribution, P10-P90 1.40-1.52. Two hold-out tests check that $f_v$ predicts volume rather than just fitting it:
 
 * calibrate on the first half of the record and predict the second (mean absolute error 3.5% on the held-out consistent intervals, against 8.7% for a constant density and 32% for $f_v$ = 1);
-* leave one interval out (7.9%).
+* leave one interval out (8.0%).
 
 $f_v$ fixes the **in-pile volume** of a load. It does not say how many tonnes that volume holds. Write the true tonnes as $T\,f_{pay}$, where $f_{pay}$ is the payload factor (systematic under-recording). Then
 
@@ -61,7 +61,7 @@ $$v_i = \frac{T_i\,f_v}{\text{Dens}_i},\qquad m_i = T_i\,f_{pay},\qquad \rho_i =
 
 The in-pile volume $v_i$ is the same for **any** split between bulking ($\rho < \text{Dens}$) and under-recording ($f_{pay} > 1$). This split is not identifiable from the supplied data. The base case is $f_{pay}$ = 1: recorded tonnes are taken as measured, and the excess volume is bulking, giving an in-pile density of 1.40 t/m³. The Monte Carlo samples $f_{pay}$ from a triangular distribution on 1.00-1.19 with its mode at 1.00 (recorded payloads most likely). The upper bound takes the largest recorded load, 304 t, to 362 t, the rated payload of the largest haul trucks. Two further interpretations are reported as scenarios outside the ranges (D6, Section 10):
 
-* X1: all of the excess is payload under-recording. This is excluded, because the largest load would be 448 t.
+* X1: all of the excess is payload under-recording. This is excluded, because the largest load would be 447 t.
 * X2: the excess is loads missing from the FMS. This is not excluded by these data.
 
 # 3. The CPST algorithm (one period)
@@ -74,7 +74,7 @@ For a cell surveyed for the first time, the prior elevation $z^{0}_c$ is the sol
 
 $$z^{\text{inf}}_c = \max\!\big(B_c,\; z_n - d_{cn}\tan\phi\big),\qquad z^{0}_c = \begin{cases} z^{\text{inf}}_c & \text{if } z^{\text{inf}}_c < \text{bot}_s(c) - \tau\\ \text{bot}_s(c) & \text{otherwise}\end{cases}$$
 
-Here $n$ is the nearest surveyed cell, $d_{cn}$ the distance, $\phi = 37°$ and $B$ the fitted floor plane. "In front" is decided by the down-slope direction of the surveyed surface at $n$. The cell is in front if the vector $n\to c$ points down-slope (|cos| > 0.3); otherwise the cell is behind (on the platform). The difference $\text{bot}_s - z^{0}$ would be fill placed during the record that no solid captured (toe-clipped solids, missing surveys). With A-13b on, it joins this period's fill (about 7,200 m³ over the record). The calibrated volume factor shows why A-13b is off in the base case. Recorded loads already explain the *measured* fill of complete intervals to about 3%, so this extra volume would have to be unrecorded material on days whose FMS record is complete. A **legacy layer** (the pre-record core) from $\min(B_c, z^0_c)$ to $z^0_c$ is created with assumed properties (A-22).
+Here $n$ is the nearest surveyed cell, $d_{cn}$ the distance, $\phi = 37°$ and $B$ the fitted floor plane. "In front" is decided by the down-slope direction of the surveyed surface at $n$. Where that surface is steeper than 15°, the cell is in front if the vector $n\to c$ points down-slope (cos > 0.3) and behind (on the platform) if it points up-slope (cos < −0.3). Where the surface is flatter or the direction is ambiguous, the cell is behind if $n$ lies in the upper half of the pile height and in front otherwise. The difference $\text{bot}_s - z^{0}$ would be fill placed during the record that no solid captured (toe-clipped solids, missing surveys). With A-13b on, it joins this period's fill (about 7,200 m³ over the record). The calibrated volume factor shows why A-13b is off in the base case. Recorded loads already explain the *measured* fill of complete intervals to about 3%, so this extra volume would have to be unrecorded material on days whose FMS record is complete. A **legacy layer** (the pre-record core) from $\min(B_c, z^0_c)$ to $z^0_c$ is created with assumed properties (A-22).
 
 ## 3.2 Cuts (elevation decrease)
 
@@ -131,7 +131,7 @@ Each fill cell receives one new layer from $z_m(c)$ up to $z_m(c) + \sum_k P_{kc
 
 $$\boldsymbol\pi_{\text{layer},c} = \sum_{k} P_{kc}\,\boldsymbol\pi_k \;+\; P_{Uc}\,\boldsymbol\pi_U,\qquad \Sigma m^2_{c} = \sum_k \big(P_{kc}\,m_k/v_k\big)^2$$
 
-*Downslope behaviour* (D) is honoured because the layer top is the surveyed surface: faces are at the measured angle of repose (median 36.7°), and the material that formed them, including what rolled to the toe, is assigned by the transport plan. Within one period the layer is vertically homogeneous (A-19). *Mixing* (E) is the volume-weighted combination of sources in the same cell. Grades follow from metal over tonnes, so mixing of loads with different densities is handled correctly. *Surface reconciliation* (F) holds because the column marginals equal the observed fill: the model surface equals the survey (Section 9.2). The unattributed U volume carries the imputed properties $\boldsymbol\pi_U$ (A-21).
+*Downslope behaviour* (D) is honoured because the layer top is the surveyed surface: faces are at the measured angle of repose (median 36.7°), and the material that formed them, including what rolled to the toe, is assigned by the transport plan. Within one period the layer is vertically homogeneous (A-19). *Mixing* (E) is the volume-weighted combination of sources in the same cell. Grades follow from metal over tonnes, so mixing of loads with different densities is handled correctly. *Surface reconciliation* (F) holds because the column marginals equal the observed fill: the model surface equals the survey (D6, Section 9.2). The unattributed U volume carries the imputed properties $\boldsymbol\pi_U$ (A-21).
 
 ## 3.8 Sequential updating (I) and closing the record
 
@@ -146,14 +146,14 @@ After deposit, $z_m$ = column tops, the volume in column R becomes carried parce
 * Every source row of $\mathbf P$ sums exactly to the source volume, so no FMS tonne is created or lost.
 * Cuts move extensive properties from columns to sources and back into columns.
 * The dummy U adds volume only to the *unattributed* class; legacy volume is only in the *legacy* class. FMS totals are therefore checked separately from them.
-* Verification: FMS tonnes, Cu, Au and Ag in the final block model differ from the FMS input by 3×10⁻¹² (relative), i.e. floating-point round-off. This is enforced by the automated test `tests/test_real_data.py::test_mass_and_metal_conserved_exactly`.
+* Verification: FMS tonnes, Cu, Au and Ag in the final block model differ from the FMS input by less than 10⁻¹² (relative), i.e. floating-point round-off. This is enforced by the automated test `tests/test_real_data.py::test_mass_and_metal_conserved_exactly`.
 
 ## 3.10 Numerical stability (J)
 
 | Setting | Value | Effect tested |
 |---|---|---|
-| Grid cell | 1 m (0.5 and 2.5 m tested) | Robustness table, Section 9.6 |
-| Detection limit τ | 0.14 m (k = 1-4 tested) | Volume not moved: 96 m³ (0.2%) |
+| Grid cell | 1 m (0.5 and 2.5 m tested) | Robustness table (D6, Section 9.5) |
+| Detection limit τ | 0.14 m (k = 1-4 tested) | Volume not moved: 137 m³ (0.4%) |
 | Sinkhorn tolerance | 10⁻⁶ (10⁻⁴, 10⁻⁸ tested) | Column residual < 10⁻⁶ |
 | Log-domain Sinkhorn | always | No underflow with costs ≫ ε |
 | Time step | one survey interval (cut-off D+1 07:00, data-driven) | Gap periods flagged |
@@ -198,7 +198,7 @@ Used where no survey constrains the result (temporal validation, nowcasting, syn
 
 # 5. Block model construction (Task 5)
 
-* **Blocks**: 5 m × 5 m × 2 m, origin (511,290; 7,122,288; 4,474). Horizontal size: GPS error (σ ≈ 3 m) plus the mixing length (6 m) mean no information exists below about 5 m. Vertical size: 2 m gives 6-8 slices over the 13-15 m face, matching the vertical resolution of daily layers (median solid thickness 0.9-3.0 m). It also suits loader reclaim slices. Larger and smaller blocks were tested (tornado).
+* **Blocks**: 5 m × 5 m × 2 m, origin (511,290; 7,122,280; 4,474). Horizontal size: GPS error (σ ≈ 3 m) plus the mixing length (6 m) mean no information exists below about 5 m. Vertical size: 2 m gives 6-8 slices over the 13-15 m face, matching the vertical resolution of daily layers (median solid thickness 0.9-3.0 m). It also suits loader reclaim slices. Larger and smaller blocks were tested (tornado).
 * **Discretisation / partial blocks**: layers are integrated exactly into blocks (the fraction of each layer's thickness inside each 2 m slice). No sub-blocking is needed: each block carries its **fill fraction** and true material volume; partial blocks are exported, not rounded.
 * **Density**: in-pile density $\text{Dens}\cdot f_{pay}/f_v$ per load for FMS material (1.40 t/m³ on average in the base case). Imputed density for unattributed fill (same and adjacent periods). Mean in-pile density of the FMS loads for the pre-record core. Block density = tonnes / volume (derived, never averaged).
 * **Grade compositing / mixing**: tonnage-weighted via extensive metal. The within-block heterogeneity $s_{Cu} = \sqrt{\Sigma m g^2/\Sigma m - \bar g^2}$ is reported.
@@ -248,7 +248,7 @@ These are internal planning classes, **not** JORC/NI 43-101 resource categories.
 | Push-cost form (structural) | geodesic or flat, 50/50 |
 | Missing data | unattributed grade drawn by tonnage-weighted bootstrap of the period's loads |
 
-Blocks are accumulated on the base block grid. For each block we report P10/P50/P90 and the coefficient of variation of Cu, Au and tonnes. For the record-period inventory (FMS-tracked + unattributed) and for the whole pile we report P10/P50/P90 totals. **One-at-a-time sensitivity** (tornado) varies ε, α, $L_{\max}$, the push-cost form, $f_{pay}$, $f_v$, σz, survey cut-off, grid cell, block size and the A-13b switch individually. The cut-off, grid and σz variants re-calibrate $f_v$.
+Blocks are accumulated on the base block grid. For each block we report P10/P50/P90 and the coefficient of variation of Cu, Au and tonnes. For the record-period inventory (FMS-tracked + unattributed) and for the whole pile we report P10/P50/P90 totals. **One-at-a-time sensitivity** (tornado) varies ε, α, $L_{\max}$, the push-cost form, $f_{pay}$, $f_v$, σz, survey cut-off, grid cell, block size and the A-13b switch individually. The cut-off, grid, σz and A-13b variants re-calibrate $f_v$.
 
 **Scenarios outside the ranges.** The interpretations of the volume gap that the data cannot exclude (X2: missing loads) or that physics excludes (X1: all under-recording) are run as separate deterministic scenarios (`uncertainty.scenarios`). They are reported next to the ranges with an explicit "not included in those ranges" statement.
 

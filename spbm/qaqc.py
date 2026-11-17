@@ -12,7 +12,7 @@ import pandas as pd
 from scipy import ndimage
 
 from . import plots as pl
-from .surfaces import fit_base_plane, model_domain, slope_deg
+from .surfaces import fit_base_plane, slope_deg
 
 from .rules import RULES, record_rules
 

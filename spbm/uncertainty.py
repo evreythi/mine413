@@ -289,7 +289,7 @@ def scenarios(ds, cfg, bg, out: Path, verbose=True) -> pd.DataFrame:
     tab = pd.DataFrame(rows)
     tab.to_csv(out / "scenarios.csv", index=False)
     import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(figsize=(10.5, 3.9))
+    fig, ax = plt.subplots(figsize=(10.5, 4.3))
     y = np.arange(len(tab))[::-1]
     ax.barh(y, tab["fms_tonnes"] / 1e3, color=pl.CAT[0], label="FMS-tracked")
     ax.barh(y, tab["unattributed_tonnes"] / 1e3, left=tab["fms_tonnes"] / 1e3, color=pl.CAT[2], label="unattributed (surveyed, no FMS record)")
@@ -300,6 +300,6 @@ def scenarios(ds, cfg, bg, out: Path, verbose=True) -> pd.DataFrame:
     ax.set_yticklabels([f"{r.scenario}  {r.status.split(' (')[0]}" for r in tab.itertuples()])
     ax.set_xlabel("kt")
     ax.set_title("Volume-gap interpretations: tonnes held by the same surveyed volume", loc="left")
-    ax.legend(loc="lower right", fontsize=7.5)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.16), ncol=3, fontsize=7.5)   # below the axes: clear of the bars
     pl.save(fig, out / "fig_scenarios.png")
     return tab

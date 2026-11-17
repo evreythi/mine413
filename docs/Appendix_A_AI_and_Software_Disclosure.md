@@ -36,7 +36,7 @@ Data: `Data_Topo 2026.zip` (FMS records and survey solids) supplied by the cours
 
 | What was checked | Method | Result | Checked by (team member) |
 |---|---|---|---|
-| DXF interpretation as closed change solids | Independent check: divergence-theorem volume vs gridded volume; count of faces per cell; bottom(s) vs top(s−1) | Volumes agree to < 0.2%; 100% two-face cells; P5-P95 difference 0.000 m | |
+| DXF interpretation as closed change solids | Independent check: divergence-theorem volume vs gridded volume; count of faces per cell; bottom(s) vs top(s−1) | Volumes agree to < 0.2%; 100% two-face cells; P5-P95 difference 0.000 m on the five consecutive-day overlaps without re-handling (cuts or missing surveys on the other four) | |
 | Rasterisation | Unit test with an analytical box (`test_rasterize_closed_box`) | Pass | |
 | Sinkhorn solver | Unit tests: marginals and small-ε limit | Pass | |
 | Mass and metal conservation | End-to-end test (FMS in = block model out, Cu/Au/Ag) | Relative error < 10⁻⁹ | |

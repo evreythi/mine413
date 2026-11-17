@@ -50,7 +50,7 @@ subtitle: "Pit I HG stockpile - current state after the 2026-03-29 survey (provi
 >
 > **Two class tables.** This table is the *exact* split: every block's tonnes are divided among the classes. `summary_by_dominant_info_class.csv` instead counts each whole block under its dominant class, for maps and reclaim planning, so its class totals differ even though the grand total is the same.
 >
-> **Identical grades across classes** follow from the assumptions: legacy grade = FMS mean (A-22), and unattributed grade is imputed from the same loads (A-21).
+> **Why the class grades look the way they do.** The pre-record core has exactly the FMS mean grade because that is the assumption (A-22), not a measurement. The unattributed grade is higher than the FMS mean because it is imputed from the loads of the FMS-gap intervals and their neighbours (A-21), which were higher-grade days.
 >
 > **Grade units are as supplied and unconfirmed (QA-F04).**
 

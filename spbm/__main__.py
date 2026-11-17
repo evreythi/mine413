@@ -44,7 +44,6 @@ def main(argv=None):
         from .pipeline import run
         if a.cmd == "update":
             from . import io as sio
-            from .audit import update_registry
             files = sio.scan_sources(cfg, sio.load_interventions(cfg))
             reg = resolve(cfg["outputs"]["root"]) / "audit" / "data_registry.csv"
             import pandas as pd
@@ -56,7 +55,6 @@ def main(argv=None):
         fast = a.fast
         run(cfg, until=a.until, n_mc=a.mc, do_mc=not fast, do_twin=not fast, do_robust=not fast, do_sens=not fast, do_temporal=not fast)
     elif a.cmd == "qaqc":
-        from pathlib import Path
         from .dataset import load_dataset
         from .qaqc import run_qaqc
         ds = load_dataset(cfg)

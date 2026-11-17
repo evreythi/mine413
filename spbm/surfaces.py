@@ -5,8 +5,6 @@ import numpy as np
 from scipy import ndimage
 from scipy.spatial import Delaunay
 
-from .grid import Grid
-
 
 def fit_base_plane(ds, cfg) -> dict:
     """A-12: robust least-squares plane through toe cells (lowest elevations of
@@ -78,7 +76,7 @@ def infer_surface(z_known: np.ndarray, known: np.ndarray, B: np.ndarray, domain:
     h_known = (z_known - B)[known]
     H = np.percentile(h_known, 90) if h_known.size else 1.0
     # downslope direction of the known surface at the nearest known cell
-    zf = ndimage.gaussian_filter(np.where(known, z_known, zn), 1.5)
+    zf = ndimage.gaussian_filter(np.where(known, z_known, zn), 1.5 / cell)   # 1.5 m smoothing
     gy, gx = np.gradient(zf, cell)
     gnx, gny = -gx[jj, ii], -gy[jj, ii]
     gn = np.hypot(gnx, gny)

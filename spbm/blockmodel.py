@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .movement import NP, P, PROPS
+from .movement import NP, P
 
 INFO_CLASSES = ["FMS-reconciled", "Unattributed-imputed", "Legacy-assumed", "Provisional"]
 

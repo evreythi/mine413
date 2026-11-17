@@ -34,6 +34,7 @@ date: "November 2026 - platform version 2.0, model run {{RUN_ID}}"
 | **Record-period total** | **{{T_RP}}** | {{CU_RP}} | {{AU_RP}} | {{CUT_RP}} | {{AUK_RP}} | |
 
 * Monte Carlo (60 realisations) P10 / P50 / P90: record-period tonnes **{{MC_RP}} kt**; contained Cu {{MC_RP_CU}} kt (as-supplied units). The FMS-tracked Cu grade ranges over {{MC_FCU}} % (P10-P90).
+* **The base case sits at the low end of that range (about its P10).** This is by construction: the base case takes the recorded payloads as correct, and the only alternative sampled for them is under-recording, which can only add tonnes.
 * **What these ranges include and exclude.** The ranges cover:
   * GPS, payload and assay errors;
   * survey cut-off 29-32 h;
@@ -102,7 +103,7 @@ The full QA/QC is in D2 Section 2 and `outputs/qaqc/`. Every check is a named ru
 
 **Principal findings and their influence on the model.**
 
-* **Surveys are change solids (QA-S01).** Every rasterised cell is crossed by exactly two faces. The divergence-theorem volume equals the gridded volume, and the bottom of each solid equals the top of the previous one to 0.000 m (P5-P95) in overlaps. This turned a "partial surface" problem into a measured-fill problem.
+* **Surveys are change solids (QA-S01).** Every rasterised cell is crossed by exactly two faces. The divergence-theorem volume equals the gridded volume, and where consecutive daily surveys overlap without re-handling, the bottom of each solid equals the top of the previous one to 0.000 m (P5-P95); elsewhere the differences are dozer cuts or missing surveys (QA-S05, QA-S06). This turned a "partial surface" problem into a measured-fill problem.
 * **Survey timing (QA-S04).** The acquisition time is not recorded. A scan of the cut-off (below and Section 5) gives D+1 07:00.
 * **Mis-dated files and header dates (QA-S02, S03).** `Topo_250328/250329` were re-dated to 2026-03-28/29 by the logged interventions MI-001/MI-002. The DXF header units and dates are template values.
 * **Elevation decreases hidden in solids (QA-S06).** These are handled as dozer cuts, re-handled as transport sources.
@@ -154,7 +155,7 @@ The table below compares, per interval, the measured net fill (fill − revealed
 **What f_v means.** f_v fixes the in-pile **volume** of each load (T × f_v / Dens). How many **tonnes** that volume holds depends on why it is 47% larger than T/Dens, and the data cannot tell:
 
 * **Bulking.** If the FMS density is a bank (in-situ) density, f_v = 1.47 is an ordinary swell factor for blasted rock. Recorded tonnes are then correct, and the in-pile density is {{RHO_PILE}} t/m³. This is our base case.
-* **Under-recorded payloads.** Payload is passes × a nominal 38 t bucket. A larger real bucket factor would add tonnes. We allow up to 19% (f_pay = 1.19), at which the largest load (304 t) reaches 362 t, about the largest haul-truck rating. All of the excess (f_pay = 1.47) would need 448 t loads, which is excluded (X1).
+* **Under-recorded payloads.** Payload is passes × a nominal 38 t bucket. A larger real bucket factor would add tonnes. We allow up to 19% (f_pay = 1.19), at which the largest load (304 t) reaches 362 t, about the largest haul-truck rating. All of the excess (f_pay = 1.47) would need 447 t loads, which is excluded (X1).
 * **Missing loads.** About {{X2_SHARE}} of the volume on otherwise complete days would have to come from trucks or loads absent from the FMS (X2). This cannot be excluded.
 
 Version 1 of this report sampled the in-pile density only over κ = 0.80-1.05 times Dens. Its lowest value corresponds to f_v = 1.25, so the full bulking explanation (f_v ≈ 1.47, κ ≈ 0.68) was never tested, and most of the excess volume was booked as unattributed material. Section 10.2 reports all three interpretations.
@@ -365,7 +366,7 @@ The calibrated f_v fixes the in-pile volume of the FMS material. The scenarios b
 
 ![Tonnes held by the same surveyed volume under each interpretation.](../outputs/uncertainty/fig_scenarios.png)
 
-* **S0 and S1** bound the Monte Carlo range.
+* **S0 and S1** bound the Monte Carlo range. The base case S0 is its lower bound, so it falls near the Monte Carlo P10, not the P50: payload under-recording can only add tonnes.
 * **S2** (A-13b on) changes the class split rather than the total.
 * **X1** is excluded on physical grounds.
 * **X2 is not included in the reported ranges** because the evidence weighs against it, not because it is impossible. If the FMS density is a loose (truck-box) density, X2 or payload under-recording becomes the likelier explanation, and record-period tonnes rise to about {{X2_RP}} t. The basis of the FMS density must be confirmed (R-02).

@@ -50,14 +50,13 @@ def sections(df, bg, rec, out: Path, col="cu_pct", label="Cu (%)", cmap=pl.SEQ):
     import matplotlib.pyplot as plt
     a = _grid(df, bg, col)
     g = rec.grid
-    t = _grid(df, bg, "tonnes")
     # choose section lines through the tonnage-weighted centre of FMS material
     fms = df[df["t_fms"] > 0]
     xc = np.average(fms["xc"], weights=fms["t_fms"])
     yc = np.average(fms["yc"], weights=fms["t_fms"])
     ix = int((xc - bg.x0) // bg.dx)
     iy = int((yc - bg.y0) // bg.dy)
-    fig, (a1, a2) = plt.subplots(2, 1, figsize=(11, 7.5))
+    fig, (a1, a2) = plt.subplots(2, 1, figsize=(11, 8.2), gridspec_kw={"hspace": 0.38})
     vmin, vmax = np.nanpercentile(df[col], 2), np.nanpercentile(df[col], 98)
     # N-S section (constant x)
     sec = a[:, :, ix]

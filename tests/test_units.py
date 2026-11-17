@@ -4,7 +4,7 @@ import pytest
 
 from spbm.forward import avalanche
 from spbm.grid import Grid, rasterize_triangles
-from spbm.movement import NP, P, ColumnModel, bulk_props, sinkhorn
+from spbm.movement import P, ColumnModel, bulk_props, sinkhorn
 from spbm.surfaces import infer_surface
 
 
