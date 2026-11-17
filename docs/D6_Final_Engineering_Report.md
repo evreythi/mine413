@@ -2,7 +2,7 @@
 title: "Long-Term Stockpile Reconstruction and Block Modelling - Pit I HG Stockpile"
 subtitle: "D6 Final Engineering Report to Mine Management | MIN E 413 Surface Mining Methods and Operations Management, Fall 2026"
 author: "Long-Term Mine Planning Team: [Member 1], [Member 2], [Member 3], [Member 4], [Member 5]"
-date: "November 2026 - platform version 2.0, model run 20261008T173954"
+date: "November 2026 - platform version 2.0, model run 20261117T051048"
 ---
 
 # Executive Summary
@@ -34,6 +34,7 @@ date: "November 2026 - platform version 2.0, model run 20261008T173954"
 | **Record-period total** | **48,551** | 8.57 | 8.06 | 4,159 | 12.6 | |
 
 * Monte Carlo (60 realisations) P10 / P50 / P90: record-period tonnes **48.5 / 51.9 / 55.4 kt**; contained Cu 4.04 / 4.40 / 4.94 kt (as-supplied units). The FMS-tracked Cu grade ranges over 7.92 - 8.97 % (P10-P90).
+* **The base case sits at the low end of that range (about its P10).** This is by construction: the base case takes the recorded payloads as correct, and the only alternative sampled for them is under-recording, which can only add tonnes.
 * **What these ranges include and exclude.** The ranges cover:
   * GPS, payload and assay errors;
   * survey cut-off 29-32 h;
@@ -131,7 +132,7 @@ The full QA/QC is in D2 Section 2 and `outputs/qaqc/`. Every check is a named ru
 
 **Principal findings and their influence on the model.**
 
-* **Surveys are change solids (QA-S01).** Every rasterised cell is crossed by exactly two faces. The divergence-theorem volume equals the gridded volume, and the bottom of each solid equals the top of the previous one to 0.000 m (P5-P95) in overlaps. This turned a "partial surface" problem into a measured-fill problem.
+* **Surveys are change solids (QA-S01).** Every rasterised cell is crossed by exactly two faces. The divergence-theorem volume equals the gridded volume, and where consecutive daily surveys overlap without re-handling, the bottom of each solid equals the top of the previous one to 0.000 m (P5-P95); elsewhere the differences are dozer cuts or missing surveys (QA-S05, QA-S06). This turned a "partial surface" problem into a measured-fill problem.
 * **Survey timing (QA-S04).** The acquisition time is not recorded. A scan of the cut-off (below and Section 5) gives D+1 07:00.
 * **Mis-dated files and header dates (QA-S02, S03).** `Topo_250328/250329` were re-dated to 2026-03-28/29 by the logged interventions MI-001/MI-002. The DXF header units and dates are template values.
 * **Elevation decreases hidden in solids (QA-S06).** These are handled as dozer cuts, re-handled as transport sources.
@@ -215,7 +216,7 @@ The table below compares, per interval, the measured net fill (fill − revealed
 **What f_v means.** f_v fixes the in-pile **volume** of each load (T × f_v / Dens). How many **tonnes** that volume holds depends on why it is 47% larger than T/Dens, and the data cannot tell:
 
 * **Bulking.** If the FMS density is a bank (in-situ) density, f_v = 1.47 is an ordinary swell factor for blasted rock. Recorded tonnes are then correct, and the in-pile density is 1.40 t/m³. This is our base case.
-* **Under-recorded payloads.** Payload is passes × a nominal 38 t bucket. A larger real bucket factor would add tonnes. We allow up to 19% (f_pay = 1.19), at which the largest load (304 t) reaches 362 t, about the largest haul-truck rating. All of the excess (f_pay = 1.47) would need 448 t loads, which is excluded (X1).
+* **Under-recorded payloads.** Payload is passes × a nominal 38 t bucket. A larger real bucket factor would add tonnes. We allow up to 19% (f_pay = 1.19), at which the largest load (304 t) reaches 362 t, about the largest haul-truck rating. All of the excess (f_pay = 1.47) would need 447 t loads, which is excluded (X1).
 * **Missing loads.** About 32% of the volume on otherwise complete days would have to come from trucks or loads absent from the FMS (X2). This cannot be excluded.
 
 Version 1 of this report sampled the in-pile density only over κ = 0.80-1.05 times Dens. Its lowest value corresponds to f_v = 1.25, so the full bulking explanation (f_v ≈ 1.47, κ ≈ 0.68) was never tested, and most of the excess volume was booked as unattributed material. Section 10.2 reports all three interpretations.
@@ -446,8 +447,8 @@ When the dump position is uninformative, CPST's error is 0.68% Cu, practically t
 | variant | total_tonnes | fms_tonnes | unattributed_tonnes | legacy_tonnes | tracked_blocks_cu_pct | top_bench_cu_pct | mean_abs_block_cu_change |
 |---|---|---|---|---|---|---|---|
 | base (1 m cell, tol 1e-6) | 138,346 | 44,650 | 3,901 | 89,795 | 8.48 | 8.57 | 0.00 |
-| cell 0.5 m | 137,394 | 44,650 | 3,926 | 88,818 | 8.48 | 8.57 | 0.08 |
-| cell 2.5 m | 137,028 | 44,650 | 3,874 | 88,504 | 8.49 | 8.57 | 0.07 |
+| cell 0.5 m | 138,705 | 44,650 | 3,926 | 90,130 | 8.48 | 8.56 | 0.06 |
+| cell 2.5 m | 137,012 | 44,650 | 3,874 | 88,488 | 8.49 | 8.57 | 0.07 |
 | Sinkhorn tol 1e-4 | 138,346 | 44,650 | 3,902 | 89,795 | 8.48 | 8.57 | 0.00 |
 | Sinkhorn tol 1e-8 | 138,346 | 44,650 | 3,901 | 89,795 | 8.48 | 8.57 | 0.00 |
 | LoD k=1 (tau 0.07 m) | 138,400 | 44,650 | 3,956 | 89,795 | 8.48 | 8.57 | 0.01 |
@@ -585,7 +586,7 @@ The calibrated f_v fixes the in-pile volume of the FMS material. The scenarios b
 
 ![Tonnes held by the same surveyed volume under each interpretation.](../outputs/uncertainty/fig_scenarios.png)
 
-* **S0 and S1** bound the Monte Carlo range.
+* **S0 and S1** bound the Monte Carlo range. The base case S0 is its lower bound, so it falls near the Monte Carlo P10, not the P50: payload under-recording can only add tonnes.
 * **S2** (A-13b on) changes the class split rather than the total.
 * **X1** is excluded on physical grounds.
 * **X2 is not included in the reported ranges** because the evidence weighs against it, not because it is impossible. If the FMS density is a loose (truck-box) density, X2 or payload under-recording becomes the likelier explanation, and record-period tonnes rise to about 71,338 t. The basis of the FMS density must be confirmed (R-02).

@@ -1,6 +1,6 @@
 ---
 title: "D2 - Data and Assumption Register"
-subtitle: "MIN E 413 Term Project - Pit I HG stockpile reconstruction (platform version 2.0, run 20261008T173954)"
+subtitle: "MIN E 413 Term Project - Pit I HG stockpile reconstruction (platform version 2.0, run 20261117T051048)"
 ---
 
 This register is the controlled record of:
@@ -101,7 +101,7 @@ Record-level rules are defined once (`spbm/rules.py`) and used by both the QA re
 |---|---|---|---|---|
 | QA-F01 | No missing, invalid or duplicated fields; no repeated Cycle IDs | Error rules = 0 | None | - |
 | QA-F02 | **Payload is not weighed.** All 275 payloads are exact multiples of 38 t (38-304 t; 152 t = 155 loads), so payload = passes × nominal bucket | PAYLOAD_QUANTISED, PAYLOAD_OFF_QUANTUM = 0 | Per-load CV 8% (A-10); a *systematic* payload factor f_pay 1.00-1.19 (A-06). The largest load (304 t) sets the upper bound | Tonnage and metal uncertainty |
-| QA-F03 | **Grades are source-block values**, not load assays: 21 signatures. Cu 5.6-13.7%, Au 5.6-10.1 g/t, Ag 147-256 g/t, Dens 1.92-2.22 t/m³ | `grade_signatures.csv` | Best available grade per load. Grade error per signature (correlated across loads of a source), CV 10% (A-11) | Within-load homogeneity assumed |
+| QA-F03 | **Grades are source-block values**, not load assays: 21 signatures. Cu 5.8-13.7%, Au 5.6-10.1 g/t, Ag 147-256 g/t, Dens 1.92-2.22 t/m³ | `grade_signatures.csv` | Best available grade per load. Grade error per signature (correlated across loads of a source), CV 10% (A-11) | Within-load homogeneity assumed |
 | QA-F04 | Grade magnitudes are very high for a Cu-Au mine (mean 8.4% Cu, 8.0 g/t Au) | GRADE_UNITS_UNCONFIRMED | Units used **as supplied**, labelled in every output, stated in the executive summary | Absolute metal values depend on unit confirmation; relative patterns do not |
 | QA-F05 | 33 Cycle IDs out of chronological order; 2 records share a timestamp (03-19 21:40, different positions) | ID_OUT_OF_ORDER, TIME_DUPLICATE | Information only. The timestamp defines order | None |
 | QA-F06 | **Dump Z is unreliable.** Where the cell had been surveyed before the dump, Z minus that surface has median −0.3 m and P10/P90 −2.5/+3.6 m (n = 197). Two dumps lie outside the [interval start, interval end] surface envelope by more than 5 m | LOC_Z_INCONSISTENT = 2 | Z not used by the algorithm; only X/Y is used (A-29) | Removes a noisy input |
@@ -114,7 +114,7 @@ Record-level rules are defined once (`spbm/rules.py`) and used by both the QA re
 
 | ID | Finding | Evidence | Action / treatment | Influence |
 |---|---|---|---|---|
-| QA-S01 | **Each DXF is a closed change solid, not a surface.** 100% of cells are crossed by exactly two faces. The divergence-theorem volume equals the gridded volume (e.g. 2,868 vs 2,867 m³). The bottom of solid *s* equals the top of solid *s−1* wherever they overlap (P5-P95 = 0.000 m) | `survey_qaqc.csv` (SOLID_NOT_CLOSED = 0) | Top = surface at survey *s*; bottom = surface before it; only changed areas are present | Gives measured fill per interval (M) |
+| QA-S01 | **Each DXF is a closed change solid, not a surface.** 100% of cells are crossed by exactly two faces. The divergence-theorem volume equals the gridded volume (e.g. 2,868 vs 2,867 m³). On the five overlaps between consecutive daily surveys without re-handling (03-16, 03-19, 03-20, 03-21, 03-29), the bottom of solid *s* equals the top of solid *s−1* exactly (P5-P95 = 0.000 m); the other four overlaps differ where material was cut or a survey is missing (QA-S05, QA-S06) | `survey_qaqc.csv` (SOLID_NOT_CLOSED = 0) | Top = surface at survey *s*; bottom = surface before it; only changed areas are present | Gives measured fill per interval (M) |
 | QA-S02 | File names `Topo_250328`/`Topo_250329` carry year 2025. The FMS shows dumping on 2026-03-28/29, the faces advance beyond the 2026-03-27 solid, and their bottoms match its top | SURVEY_NAME_YEAR | Re-dated by **MI-001, MI-002** (reason, author, date recorded; files not renamed) | Chronology |
 | QA-S03 | DXF header: `$INSUNITS = 1` (inches), `$MEASUREMENT = 0` (imperial), `$TDUPDATE` 2025-11-14 in all files | DXF_UNITS_HEADER, DXF_SAVED_BEFORE_SURVEY | Header ignored; data are metres (Section 1) | None, once recognised |
 | QA-S04 | **Survey acquisition time not supplied** | `temporal_alignment.csv`, `dump_time_of_day.csv` | Cut-off D+1 07:00 (A-05, Section 2.4) | Assignment of loads to intervals |
@@ -125,7 +125,7 @@ Record-level rules are defined once (`spbm/rules.py`) and used by both the QA re
 | QA-S09 | Triangle edge median 0.93-1.15 m, so the native resolution is about 1 m | `edge_median_m` | Simulation grid 1 m (A-24) | Resolution |
 | QA-S10 | Face slopes (cells > 25°): median 36.7°, mode 37.0°, P75 38.5° | `fig_qaqc_repose.png` | Angle of repose 37° (A-03) | Forward model, inference |
 | QA-S11 | Toe elevations define a near-horizontal floor: plane 4,475.08 m, dip 0.29°, residual sd 0.26 m | `fig_qaqc_floor_plane.png` | Floor plane (A-12) | Pre-record core thickness |
-| QA-S12 | Survey precision cannot be estimated from repeat surveys (bottoms are copies of previous tops). 8-16% of solid area is thinner than 0.1 m | `sliver_frac_lt_0.1m` | σz = 0.05 m assumed; detection limit τ = 0.14 m; changes below τ are not moved | Negligible volume |
+| QA-S12 | Survey precision cannot be estimated from repeat surveys (bottoms are copies of previous tops). 7-16% of solid area is thinner than 0.1 m | `sliver_frac_lt_0.1m` | σz = 0.05 m assumed; detection limit τ = 0.14 m; changes below τ are not moved | Negligible volume |
 
 ## 2.4 Survey timing (A-05)
 
@@ -193,7 +193,7 @@ What f_v means is **not identifiable** from these data. The in-pile volume of a 
 
 The platform carries the split as the payload factor f_pay (true tonnes = T × f_pay, in-pile density = Dens × f_pay / f_v). The base case is f_pay = 1 (recorded tonnes; in-pile density 1.40 t/m³). The Monte Carlo samples f_pay from 1.00 to 1.19 (triangular, most likely 1.00), where the upper bound takes the largest load of 304 t to 362 t, about the largest haul-truck rating. Two interpretations fall outside that range:
 
-* **X1** (all of the excess is payload under-recording). This is excluded, because the largest load would be 448 t.
+* **X1** (all of the excess is payload under-recording). This is excluded, because the largest load would be 447 t.
 * **X2** (the excess is loads missing from the FMS, Dens being the in-pile density). This cannot be excluded from these data. It is reported as a separate scenario, "not included in the ranges" (D6, Section 10).
 
 If Dens is a loose (truck-box) density, bulking by a further 47% is implausible, and X2 or under-recording becomes the more likely explanation. **Confirming the basis of Dens is the single most valuable data item for the tonnage estimate** (Section 5).
@@ -222,7 +222,7 @@ Columns follow the course outline, Task 4: Assumption | Need | Justification | C
 | A-01 | Coordinates of FMS and surveys share one projected mine grid (m); no transformation; DXF header units ignored | Overlay data | Dumps lie on and behind surveyed crests; consistent elevations; header unit implausible (QA-S03) | Systematic offset would bias push distances | Visual + statistical check (QA-F06, F09) |
 | A-02 | `Topo_2503xx` files are 2026 surveys | Chronology | QA-S02 evidence (FMS dates, face progression, bottom = previous top) | Sequence error | Interventions MI-001/002 |
 | A-03 | Angle of repose 37° | Forward model; inference of unseen faces | Measured mode 37.0°, median 36.7° of surveyed faces; typical 35-40° for blasted rock | Shape of inferred faces and nowcast | S (forward calibration 35/37/39°) |
-| A-04 | DXF solids record accretion only; bottom = previous surface | Derive fill per interval | QA-S01, QA-S06 | Misread change | Verified on all 9 overlaps |
+| A-04 | DXF solids record accretion only; bottom = previous surface | Derive fill per interval | QA-S01, QA-S06 | Misread change | Checked on all 9 overlaps: 5 match exactly, 4 show cuts or a missing survey (QA-S05, QA-S06) |
 | A-05 | A survey labelled D closes its interval at D+1 07:00 (31 h after 00:00 of D); the first interval is 24 h long | Assign loads to intervals | Cut-off scan plateau 30-31.5 h; shift-change lull 06:00-07:30 (Section 2.4) | Loads shift one interval | S (29/32 h), MC (29-32 h, each with its own f_v calibration) |
 | A-06 | In-pile volume = T × f_v / Dens, f_v calibrated (auto, 1.472); true tonnes = T × f_pay, base f_pay = 1.0 (excess volume = bulking; in-pile density 1.40 t/m³) | Convert tonnes to volume and back | f_v hold-out error 3.5% vs 32% for f_v = 1 (Section 2.5). The bulking/under-recording split is not identifiable | Record-period tonnes +47% if the excess is missing loads (X2) | MC (f_v bootstrap; f_pay triangular 1.00-1.19, mode 1.00); S (f_v 1.35/1.60, f_pay 1.19); Sc (X1 excluded, X2 not included) |
 | A-07 | Truck GPS horizontal error σ = 3 m | Uncertainty | Typical HP GPS on haul trucks 1-5 m; dump-event latency | Destination of individual loads | MC |
@@ -233,11 +233,11 @@ Columns follow the course outline, Task 4: Assumption | Need | Justification | C
 | A-12 | Floor = plane fitted to toe cells (4,475.08 m, 0.29° dip) | Bottom of model | Toe elevations consistent across surveys (sd 0.26 m) | Pre-record core volume ±0.26 m × area | Reported; floor residual map |
 | A-13 | Never-surveyed cells: behind the crest = flat platform at the nearest crest elevation; in front of the face = face continued at 37° to the floor | Geometry where no survey exists | Truck-operated platform is flat; faces at repose | Pre-record core volume and extent | Geometry class "inferred"; reported separately |
 | A-13b | **Off in the base case.** (If on: first-surveyed cells in front of an earlier face were at its repose extrapolation; a solid bottom above it is fill not captured by any solid.) | Option for toe-clipped solids | With f_v calibrated, recorded loads explain measured fill of complete days to ~3%, leaving no room for ~7,200 m³ of unrecorded fill | About 7,200 m³ moves from the pre-record core to unattributed | S (switch); Sc (S2) |
-| A-14 | Model domain = convex hull of surveyed change and dump locations | Lateral limit of the pile | No full-pile survey supplied | The back of the pile outside the hull is not modelled | Stated limitation; R-01 |
+| A-14 | Model domain = convex hull of surveyed change and dump locations | Lateral limit of the pile | No full-pile survey supplied | The back of the pile outside the hull is not modelled | Stated limitation; R-03 |
 | A-15 | Within an interval's measured fill, dozer push follows least total push work (optimal transport over a slope-aware geodesic cost) | Unknown dozer trajectories | Operators minimise push distance; OT is the classical earth-moving formulation. **Evidence is weak**: in the twins the push cost helps only when the truth follows the same physics, and a flat cost (no push term) does better otherwise | Block grades change by about 0.2% Cu on average (flat vs geodesic); totals unchanged | MC samples geodesic/flat 50/50; tornado; twin ablation; tracer trials (R-06) |
 | A-16 | Uphill push penalty α = 4 m per m of lift | Prevent implausible uphill pushes | Dozer production falls sharply uphill (grade correction factors, Caterpillar Performance Handbook). The twin with α = 0 is no worse | Allocation across the crest | S (1/10), MC U(1, 10), twin (α = 0) |
 | A-17 | Maximum effective push distance 90 m (geodesic) | Limit movement | Dozing is generally economical to about 100 m | Loads may be retained on the platform | S (50/130), MC U(50, 130) |
-| A-18 | Mixing length ε = 6 m (entropy regularisation) | Degree of mixing | GPS error (3 m), blade spill, rolling on the face; twin favours small-moderate ε | Over- or under-mixing of grades | S (2/15), MC U(2, 15), twin |
+| A-18 | Mixing length ε = 6 m (entropy regularisation) | Degree of mixing | GPS error (3 m), blade spill, rolling on the face; in the twin 6 m and 15 m do about equally well and 2 m is worse | Over- or under-mixing of grades | S (2/15), MC U(2, 15), twin |
 | A-19 | Within one interval, the fill of a column is vertically homogeneous | Vertical placement | Daily fill is built by many interleaved loads | Vertical grade resolution limited to the interval layer (0.5-3 m) | Inherent; documented |
 | A-20 | Elevation decrease below an earlier surface = material removed by dozer/slumping and re-handled in the same interval | Solids omit cuts (QA-S06) | Dozers trim crests while pushing | Cut volume re-mixed | Reported per interval |
 | A-21 | Unattributed fill has the tonnage-weighted mean grade and in-pile density of FMS loads in the same and adjacent intervals | FMS gaps (QA-F07) | Material placed in the same days most likely came from the same faces | Grade of 3,901 t is imputed | MC bootstrap of grades; separate class |
@@ -245,12 +245,12 @@ Columns follow the course outline, Task 4: Assumption | Need | Justification | C
 | A-23 | FMS volume not seen in an interval's fill is retained on the platform and pushed later (dozer lag) | Timing mismatch | Paddock dumping and pushing later is normal practice | Grade appears in the next interval's fill | Carried volume reported |
 | A-24 | Simulation grid 1 m, vertical integration exact (layers) | Numerics | Matches survey triangle size (QA-S09) | Edge effects | Robustness 0.5/2.5 m |
 | A-25 | Block size 5 × 5 × 2 m, partial blocks kept with fill fraction | Planning unit | Information resolution about 5 m (GPS + mixing); 2 m gives several layers per face height and suits loader slices | Smoothing of grade | S (2 × 2 × 1, 10 × 10 × 4) |
-| A-26 | Tonnes as reported by the FMS; no moisture correction (wet/dry basis unknown) | Units | No moisture data | Systematic tonnage bias of a few % | Stated; R-05 |
+| A-26 | Tonnes as reported by the FMS; no moisture correction (wet/dry basis unknown) | Units | No moisture data | Systematic tonnage bias of a few % | Stated; R-04 |
 | A-27 | No particle-size segregation of grade down the face | Not observable | No size-grade data | Toe vs crest grade bias | Stated limitation |
 | A-28 | No time-dependent settlement after placement | Not observable | Short record (2 weeks) | Small volume bias | Absorbed in the f_v calibration |
 | A-29 | Dump Z is not used | QA-F06 | Unreliable | None | - |
 | A-30 | Boundary conditions: material cannot leave the domain; outside the domain is not modelled | Numerics | Domain covers all observed change | None inside the domain | - |
-| A-31 | Missing data: FMS gaps → unattributed class; survey gaps → gap intervals; no synthetic loads are invented | Missing-data treatment | Transparency over completeness | Unattributed share | Reported; R-02 |
+| A-31 | Missing data: FMS gaps → unattributed class; survey gaps → gap intervals; no synthetic loads are invented | Missing-data treatment | Transparency over completeness | Unattributed share | Reported; R-01 |
 | A-32 | Records sharing an identical X/Y/Z with ≥ 2 others (LOC_DEFAULT), or > 100 m from every solid (LOC_OUTSIDE_DOMAIN), have an **unknown** dump location: uniform push cost over their interval's fill | 14 records have an impossible location (QA-F10) | Identical coordinates to 0.01 m over 12 days, below the floor | Allocation of 2.4 kt within its intervals | Unit and real-data tests; `fms_location_unknown` intervention for further cases |
 
 # 5. Data that would most reduce uncertainty (value of information)

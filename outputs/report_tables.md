@@ -130,8 +130,8 @@
 |   of which unobserved fill on first-surveyed cells (m3) | 0.00 |
 | cut / re-handled volume (m3) | 564.99 |
 | sub-threshold change not modelled (m3) | 136.74 |
-| FMS volume (tonnes / density) (m3) | 31,849.11 |
-| FMS volume placed into observed fill (m3) | 32,241.25 |
+| FMS in-pile volume, T x f_v / Dens (m3) | 31,849.11 |
+| volume placed into observed fill from loads, carried parcels and cuts (m3) | 32,241.25 |
 | unattributed fill volume (m3) | 2,869.27 |
 | FMS volume never reconciled (provisional) (m3) | 169.64 |
 | max Sinkhorn column residual (relative) | 0.00 |

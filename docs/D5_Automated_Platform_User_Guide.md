@@ -55,7 +55,7 @@ Sources are listed in `inputs.sources` (default: the original `Data_Topo 2026.zi
 
 ```bash
 python -m spbm run                 # full analysis, about 35 min (60 Monte Carlo realisations)
-python -m spbm run --fast          # about 30 s: base reconstruction, block model, QA/QC, balances only
+python -m spbm run --fast          # about 1 min: base reconstruction, block model, QA/QC, balances and volume-gap scenarios
 python -m spbm run --mc 200        # more realisations
 ```
 

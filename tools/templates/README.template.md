@@ -35,7 +35,7 @@ See Appendix A and D1 (DEC-11 to DEC-17).
 ```bash
 pip install -r requirements.txt
 python -m pytest -q          # 67 tests (unit, real data, platform), about 3 min
-python -m spbm run --fast    # base reconstruction and block model (~1.5 min)
+python -m spbm run --fast    # base reconstruction, block model and scenarios (~1 min)
 python -m spbm run           # full analysis incl. Monte Carlo, validation, sensitivity, scenarios (~40 min)
 python tools/fill_report.py  # refresh numbers in D2/D4/D6/README from the latest run
 python tools/build_docs.py   # rebuild DOCX/PDF/XLSX/PPTX documents

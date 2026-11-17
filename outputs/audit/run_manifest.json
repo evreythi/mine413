@@ -1,21 +1,21 @@
 {
-  "run_id": "20261008T173954",
-  "started": "2026-10-08T17:39:54",
-  "finished": "2026-10-08T18:42:45",
-  "git_commit": "d690c57",
-  "spbm_source_sha256": "4ad240d499f43e5b",
+  "run_id": "20261117T051048",
+  "started": "2026-11-17T05:10:48",
+  "finished": "2026-11-17T05:42:41",
+  "git_commit": "1cd6592",
+  "spbm_source_sha256": "5393b91c25d041b9",
   "config_file": "/home/user/mine413/config/project.yaml",
   "config_hash": "bcd25f6089be",
   "software": {
-    "python": "3.13.16",
-    "platform": "Linux-6.18.44-fc-v80-x86_64-with-glibc2.39",
+    "python": "3.13.18",
+    "platform": "Linux-6.18.44-fc-v553-x86_64-with-glibc2.39",
     "spbm": "2.0.0",
     "numpy": "2.5.3",
     "scipy": "1.18.1",
     "pandas": "3.0.5",
     "matplotlib": "3.11.2",
-    "ezdxf": "1.4.4",
-    "pyyaml": "6.0.1"
+    "ezdxf": "1.4.5",
+    "pyyaml": "6.0.3"
   },
   "inputs": [
     {
@@ -204,6 +204,14 @@
   },
   "outputs": [
     {
+      "path": "audit/change_report.md",
+      "bytes": 2978
+    },
+    {
+      "path": "audit/config_used.json",
+      "bytes": 3563
+    },
+    {
       "path": "audit/data_registry.csv",
       "bytes": 1871
     },
@@ -217,7 +225,7 @@
     },
     {
       "path": "audit/run_log.csv",
-      "bytes": 249
+      "bytes": 336
     },
     {
       "path": "audit/survey_register.csv",
@@ -261,11 +269,11 @@
     },
     {
       "path": "blockmodel/fig_bm_sections_cu_pct.png",
-      "bytes": 167771
+      "bytes": 169138
     },
     {
       "path": "blockmodel/fig_bm_sections_frac_fms.png",
-      "bytes": 169596
+      "bytes": 171888
     },
     {
       "path": "blockmodel/stockpile_block_model.csv",
@@ -433,7 +441,7 @@
     },
     {
       "path": "report_tables.md",
-      "bytes": 21457
+      "bytes": 21495
     },
     {
       "path": "summary.json",
@@ -445,11 +453,11 @@
     },
     {
       "path": "uncertainty/fig_scenarios.png",
-      "bytes": 74181
+      "bytes": 73561
     },
     {
       "path": "uncertainty/fig_sens_tornado.png",
-      "bytes": 207259
+      "bytes": 207304
     },
     {
       "path": "uncertainty/fig_unc_block_maps.png",
@@ -477,7 +485,7 @@
     },
     {
       "path": "uncertainty/sensitivity_oat.csv",
-      "bytes": 6285
+      "bytes": 6288
     },
     {
       "path": "validation/fig_val_forward_test.png",
@@ -517,7 +525,7 @@
     },
     {
       "path": "validation/robustness_numerical.csv",
-      "bytes": 1969
+      "bytes": 1970
     },
     {
       "path": "validation/twin_alternative_truths.csv",
@@ -529,7 +537,7 @@
     },
     {
       "path": "validation/volume_reconciliation.csv",
-      "bytes": 566
+      "bytes": 608
     }
   ]
 }
