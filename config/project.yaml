@@ -2,8 +2,8 @@
 # SPBM - Stockpile Block Model platform : project configuration
 # ---------------------------------------------------------------------
 # Every engineering parameter lives here (never hard-coded in the code).
-# The comment "A-xx" links a parameter to the Assumption Register
-# (docs/D2_Data_and_Assumption_Register.md). Changing a value here and
+# The comment "A-xx" links a parameter to the assumption list in
+# METHOD.md (Section 10). Changing a value here and
 # re-running `python -m spbm run` reproduces the whole analysis.
 # =====================================================================
 
@@ -99,7 +99,7 @@ density:
   legacy_density: null  # null -> tonnage-weighted mean in-pile density of FMS loads
 
 movement:
-  # A-15..A-19 - see docs/D3 for equations
+  # A-15..A-19 - see METHOD.md Section 3 for the equations
   # A-15: push cost. "geodesic" = slope-aware dozer push distance (base case);
   # "flat" = no push term: every source may fill any fill cell of its interval
   # at equal cost (pure survey-constrained allocation). The synthetic twins
@@ -138,7 +138,7 @@ blockmodel:
   cutoff_cu: [0, 4, 6, 8, 9, 10, 11, 12]
 
 confidence:
-  # Block confidence classes (see D3 section 7)
+  # Block confidence classes (see METHOD.md Section 5.1)
   high:   {min_tracked: 0.8, max_cv: 0.10}
   medium: {min_tracked: 0.5, max_cv: 0.20}
   low:    {min_tracked: 0.2}

@@ -1,4 +1,4 @@
-"""Task 6 - validation and reconciliation.
+"""Validation and reconciliation.
 
 1. Mass / metal balance (FMS in  ==  model out, by class).
 2. Geometry: reconstructed vs surveyed surfaces.

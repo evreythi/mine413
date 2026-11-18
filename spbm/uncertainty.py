@@ -1,4 +1,4 @@
-"""Task 7 - uncertainty (Monte Carlo) and one-at-a-time sensitivity analysis."""
+"""Uncertainty (Monte Carlo) and one-at-a-time sensitivity analysis."""
 from __future__ import annotations
 
 import time

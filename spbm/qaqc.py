@@ -1,4 +1,4 @@
-"""Task 1 - data investigation and quality assessment.
+"""Data investigation and quality assessment.
 
 No record is deleted. Every check adds a flag column; the treatment of each
 flag is documented in FLAG_RULES (and in the Data/Assumption Register).

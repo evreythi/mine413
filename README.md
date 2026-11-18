@@ -1,96 +1,108 @@
-# MIN E 413 Term Project - Long-Term Stockpile Reconstruction and Block Modelling
+# SPBM: stockpile reconstruction and block model
 
-This project reconstructs how truck-dumped material moved through the Pit I copper-gold HG stockpile. It also builds a 3-D block model of tonnage, Cu, Au, Ag, contained metal and uncertainty. Everything is delivered as a reproducible in-house platform (`spbm`, version 2.0).
+`spbm` reconstructs how truck-dumped material moved through the Pit I copper-gold HG stockpile and builds a 3-D block model of tonnage, Cu, Au, Ag, contained metal and uncertainty.
 
-**Method in one sentence:** the survey change solids say *where* volume appeared, the FMS says *what* was dumped and where, and an entropy-regularised optimal-transport allocation over a slope-aware dozer push cost decides *which* load filled *which* part of the observed fill. Mass and metal are conserved exactly. Anything the data cannot explain is labelled as unattributed or assumed, never hidden.
+**Method in one sentence:** the survey change solids say *where* volume appeared, the FMS says *what* was dumped and where, and an entropy-regularised optimal-transport allocation over a slope-aware dozer push cost decides *which* load filled *which* part of the observed fill. Mass and metal are conserved exactly. Anything the data cannot explain is kept in its own class (unattributed or pre-record), never mixed with measured material.
 
-**Version 2.0** combines this platform (A) with the stronger ideas of an independent implementation of the same brief (B, `MINE413_TERM_PROJECT-B.zip`), following a reviewer's comparison:
+The mathematics, algorithm, validation design and every assumption (A-01 to A-32) are in **[METHOD.md](METHOD.md)**.
 
-* the survey cut-off scanned over 0-36 h (it is D+1 07:00, not 23:59);
-* a calibrated and hold-out-tested volume factor;
-* the record-period inventory reported first, with scenarios that say what the ranges exclude;
-* the DXF unit-header finding and a 40-rule QA catalogue;
-* unknown-location treatment of default-position loads;
-* a hashed raw store, and manual interventions that require a reason, author and date;
-* 67 tests (previously 10).
+## Requirements
 
-See Appendix A and D1 (DEC-11 to DEC-17).
-
-## Deliverables
-
-| # | Deliverable | File(s) |
-|---|---|---|
-| D1 | Team Charter and Work Plan | `docs/D1_Team_Charter_and_Work_Plan.md` (+ `docs/build/*.docx/.pdf`) |
-| D2 | Data and Assumption Register | `docs/D2_Data_and_Assumption_Register.md`, `docs/build/D2_Data_and_Assumption_Register.xlsx` |
-| D3 | Technical Methodology and Algorithm | `docs/D3_Technical_Methodology_and_Algorithm.md` |
-| D4 | Stockpile Block Model and Outputs | `docs/D4_Block_Model_and_Outputs.md`, `outputs/blockmodel/` (CSV, VTK, summaries, figures) |
-| D5 | Automated Analysis Platform | `spbm/` (source), `config/`, `tests/`, `docs/D5_Automated_Platform_User_Guide.md` |
-| D6 | Final Engineering Report | `docs/D6_Final_Engineering_Report.md` → `docs/build/D6_Final_Engineering_Report.pdf/.docx` |
-| D7 | Presentation | `docs/build/D7_Presentation.pptx` (speaker notes assign each member's part) |
-| D8 | Individual teamwork reflection + peer assessment | `docs/D8_..._TEMPLATE.md` (**each student completes their own**) |
-| D9 | Individual ethics and equity assessment | `docs/D9_..._TEMPLATE.md` (**each student completes their own**) |
-
-## Quick start
+Python 3.10 or later on Windows, macOS or Linux. All dependencies are open source.
 
 ```bash
+python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python -m pytest -q          # 67 tests (unit, real data, platform), about 3 min
-python -m spbm run --fast    # base reconstruction, block model and scenarios (~1 min)
-python -m spbm run           # full analysis incl. Monte Carlo, validation, sensitivity, scenarios (~40 min)
-python tools/fill_report.py  # refresh numbers in D2/D4/D6/README from the latest run
-python tools/build_docs.py   # rebuild DOCX/PDF/XLSX/PPTX documents
 ```
 
-Rebuilding the documents also needs `pandoc`, Node.js (`cd tools && npm install` for pptxgenjs) and Playwright/Chromium for PDF rendering. The analysis itself needs only Python.
+## Running
 
-New data: drop files into `data/inbox/` (or `python -m spbm ingest <path>`) and run `python -m spbm update` (see D5). Corrections go in `config/manual_interventions.csv`, never into the raw files.
-
-## Repository layout
-
-```
-Data_Topo 2026.zip                  raw data as supplied (ingested into data/raw_store/, never modified)
-MINE413_TERM_PROJECT-B.zip          independent implementation B (reference only; not executed)
-Surface_Mining_..._Project.pdf      project brief
-config/project.yaml                 every parameter, tagged with its assumption ID (A-xx)
-config/manual_interventions.csv     the only way to correct data (id, type, target, value, reason, author, date)
-spbm/                               platform source code (see D3 Section 9 for the module map)
-tests/                              automated tests (unit, real data, platform)
-tools/                              report filler and templates, diagrams, document and presentation build
-examples/demo_update.sh             demonstration of the update workflow
-outputs/                            results of the submitted run (all reproducible)
-docs/                               deliverables (Markdown sources) and docs/build/ (DOCX, PDF, XLSX, PPTX)
+```bash
+python -m pytest -q                # 67 tests (unit, real data, platform), about 3 min
+python -m pytest -q -m "not slow"  # skip the end-to-end pipeline test
+python -m spbm run --fast          # base reconstruction, block model, QA/QC, balances, scenarios (about 1 min)
+python -m spbm run                 # full analysis incl. Monte Carlo, validation, sensitivity (about 40 min)
+python -m spbm run --mc 200        # more Monte Carlo realisations
 ```
 
-`data/raw_store/` and `data/cache/` are generated on the first run and are not committed.
+The run is deterministic: the base case has no randomness and the Monte Carlo uses the fixed seed in the configuration, so re-running gives identical numbers.
 
-## Key results (base case, run `20261117T051048`)
+Other commands:
 
-**Material placed during the record (15-31 March), tied to surveyed fill:**
+```bash
+python -m spbm ingest PATH ...     # add files, folders or zips to the managed raw store
+python -m spbm update              # import new data from data/inbox/ and re-run
+python -m spbm qaqc                # data checks only
+python -m spbm status              # registered input files and run log
+python -m spbm run --fast --until "2026-03-23 07:00" --out outputs_demo   # model with data up to a date
+```
+
+`examples/demo_update.sh` builds a model with the data available on 22 March, updates it with the rest, and prints the change report.
+
+## Inputs
+
+| Input | Format |
+|---|---|
+| `Data_Topo 2026.zip` | The supplied data: FMS dump records (CSV) and the survey change solids (DXF). Never modified |
+| FMS | CSV with columns `Cycle ID, Truck PayLoad, Au, Ag, Cu, Dens, X (Dump Event), Y (Dump Event), Z (Dump Event), Dump_tstamp` |
+| Surveys | DXF with 3DFACE entities forming a closed change solid; the file name contains the nominal date as `YYMMDD` |
+| `config/project.yaml` | Every parameter, tagged with its assumption ID |
+| `config/manual_interventions.csv` | The only way to correct data (`id, type, target, value, reason, author, date, approved_by`); a row without reason, author or date stops the run |
+
+On the first run every source file is hashed (SHA-256) and copied once into `data/raw_store/`; the analysis reads only from there. New data go into `data/inbox/` (or `python -m spbm ingest <path>`), followed by `python -m spbm update`.
+
+Intervention types: `survey_date`, `survey_cutoff_hours`, `fms_exclude`, `fms_location_unknown`, `supersede`. The two supplied rows (MI-001, MI-002) re-date `Topo_250328.dxf` and `Topo_250329.dxf` to 2026.
+
+## Steps the platform runs
+
+1. **Ingest and QA/QC** (`io.py`, `dataset.py`, `rules.py`, `qaqc.py`): hash and register inputs, apply interventions, check every FMS record and survey file against the rule catalogue. Records are flagged, never deleted.
+2. **Growth and timing** (`growth.py`, `volume.py`): scan the survey cut-off (result: D+1 07:00), calibrate the volume factor f_v and test it on held-out intervals.
+3. **Surfaces** (`grid.py`, `surfaces.py`): rasterise the change solids on a 1 m grid, fit the floor plane, infer the pre-record surface.
+4. **Reconstruction** (`movement.py`): for each survey interval, compute cuts, fill and the push cost, solve the transport problem (log-domain Sinkhorn), deposit layers; carry retained material forward; place loads after the last survey with the forward model (`forward.py`).
+5. **Block model** (`blockmodel.py`, `bmviz.py`): integrate layers into 5 × 5 × 2 m blocks, with provenance, information and confidence classes.
+6. **Validation** (`validation.py`): mass and metal balance, geometry check, forward-model temporal test, synthetic twin, numerical robustness.
+7. **Uncertainty** (`uncertainty.py`): Monte Carlo, one-at-a-time sensitivity, volume-gap scenarios.
+8. **Audit** (`audit.py`): run manifest (input hashes, configuration, code identity, library versions), model-version history and change report.
+
+## Outputs
+
+Everything is written to `outputs/` (not committed; regenerate with `python -m spbm run`).
+
+| Folder / file | Content |
+|---|---|
+| `blockmodel/` | Block model (CSV, VTK), block definition, summaries by class, confidence, bench; grade-tonnage; figures |
+| `movement/` | Destination of each load, transport plans of every interval, surfaces as ESRI ASCII grids |
+| `qaqc/` | Rule catalogue, records with one column per rule, daily coverage, grade signatures, survey QA, figures |
+| `growth/` | Interval reconciliation, cut-off scan, volume-factor calibration and hold-out, figures |
+| `validation/` | Mass/metal balance, inventory by class, geometry, temporal test, twin, robustness |
+| `uncertainty/` | Monte Carlo realisations and summary, sensitivity table, scenarios, figures |
+| `audit/` | Data registry, ingest log, survey register, interventions applied, run manifest, configuration used, run log, change report |
+| `history/<run_id>/` | Manifest and key tables of every model version |
+| `summary.json`, `summary_tables.md` | Key numbers and tables of the run |
+
+## Base-case results
 
 | Class | Tonnes | Cu % | Au g/t | Basis |
 |---|---|---|---|---|
 | FMS-tracked (survey-reconciled + provisional) | 44,650 | 8.42 | 8.00 | measured tonnes and grades |
 | Unattributed (surveyed fill, no FMS record) | 3,901 | 10.22 | 8.82 | imputed grade |
-| **Record-period total** | **48,551** | 8.57 | 8.06 | |
+| **Record period (15-31 March)** | **48,551** | 8.57 | 8.06 | |
 
-* Monte Carlo P10/P50/P90: record-period tonnes 48.5 / 51.9 / 55.4 kt; contained Cu 4.04 / 4.40 / 4.94 kt.
-* **Not included in those ranges:** the reading that the 47% volume excess is loads missing from the FMS rather than bulking. Under that reading, record-period tonnes are 71,338 t (+47%). See D6 Section 10.2.
-* Survey cut-off D+1 07:00. Volume factor f_v = 1.472, predicting held-out intervals to 3.5%. The independent implementation B found 1.476.
-* FMS mass and metal balance: exact (relative error < 1e-9). Geometry RMSE vs survey: 0.03 m.
-* Synthetic known-truth test: block Cu RMSE 0.68% (r = 0.93); without the push term 0.75%; single mean grade 1.87%. When the truth does not follow our push physics, the flat cost does better (0.53% vs 0.68%). The push cost is physically motivated and costs nothing, but on these data it cannot be shown to improve the answer, so the Monte Carlo samples both cost forms.
+* Monte Carlo P10/P50/P90 of record-period tonnes: 48.5 / 51.9 / 55.4 kt. The base case sits near P10 because the only sampled alternative for payloads (under-recording) adds tonnes.
+* If the 47% volume excess is loads missing from the FMS rather than bulking, record-period tonnes are 71,338 t (scenario X2, outside the ranges).
+* Survey cut-off D+1 07:00; volume factor f_v = 1.472 (hold-out error 3.5%).
+* FMS mass and metal are conserved exactly (relative error < 1e-9); model surface vs survey RMSE 0.03 m.
+* Pre-record core 89,795 t (inferred geometry, assumed grade); whole modelled pile 138,346 t.
 
-**Pre-record core and whole pile.** The core below the earliest surveyed surfaces holds 89,795 t. Its geometry is inferred and its grade assumed. The whole modelled pile is 138,346 t (P10/P50/P90 135 / 147 / 158 kt). 64.9% of that is the pre-record core, with an assumed grade.
+Grade units are as supplied and unconfirmed (8.4% Cu / 8.0 g/t Au is about ten times typical Cu-Au feed). Confirm with Geology before using any contained-metal figure.
 
-> **Grade units are as supplied and unconfirmed.** 8.4% Cu / 8.0 g/t Au is roughly an order of magnitude above typical Cu-Au feed. Confirm with Geology before using any contained-metal figure. Pre-record and unattributed grades equal or derive from the FMS mean by assumption (A-22, A-21).
+## Layout
 
-> Version 1 of this repository reported 202 kt for the whole pile. That number rested on a survey-time artefact and an untested density assumption, and it is superseded.
-
-Every number is traced to `outputs/audit/run_manifest.json`; the full tables are in `outputs/report_tables.md`.
-
-## What the team still has to do before submission
-
-1. Enter names in `config/team.yaml`. This fills every `[Member n]` in the built documents, the deck and the zip name. Sign D1. Keep the meeting log and contribution record (D1 §8) from what actually happens, including the proposer and approver of each decision (DEC-01 to DEC-17).
-2. Each member writes their own **D8** (reflection + confidential peer assessment) and **D9** (ethics/equity response) from the templates.
-3. Complete the verification log in **Appendix A** (AI/software disclosure, including the A + B integration) and confirm the course AI policy.
-4. Rehearse D7 (speaker notes assign each member's part).
-5. Re-run `python tools/fill_report.py` and `python tools/build_docs.py` after any edit, then `python tools/make_submission.py` to create the Canvas zip.
+```
+Data_Topo 2026.zip     supplied data (read into data/raw_store/ on first run)
+config/                parameters and manual interventions
+spbm/                  platform source code
+tests/                 unit, real-data and platform tests
+examples/              update demonstration
+METHOD.md              mathematics, algorithm, validation and assumptions
+```

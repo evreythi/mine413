@@ -6,7 +6,7 @@ Each rule has an ID, a level, a severity and a treatment. Severity:
   warning - modelled, with the treatment stated (e.g. location unknown);
   info    - recorded for traceability, no change to the model.
 
-The context-free record rules live here so that the QA report and the
+The context-free record rules live here so that the QA tables and the
 engine (movement.prepare_loads) use exactly the same definitions. Rules that
 need the surveys (location vs footprints, Z envelope, timing) are evaluated
 in spbm.qaqc.
@@ -79,7 +79,7 @@ RULES = {
     "PAYLOAD_QUANTISED": ("dataset", "info", "Every payload is a multiple of 38 t (pass count x nominal bucket)",
                           "Payload treated as an estimate (A-10): per-load CV and systematic payload factor"),
     "GRADE_UNITS_UNCONFIRMED": ("dataset", "warning", "Mean Cu 8.4 % and Au 8 g/t are about 10x typical Cu-Au feed",
-                                "Units used as supplied; flagged in the executive summary (QA-F04)"),
+                                "Units used as supplied; to be confirmed with Geology before any contained-metal figure is used"),
 }
 
 

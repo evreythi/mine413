@@ -1,4 +1,4 @@
-"""End-to-end workflow (Task 8). Each step writes to outputs/<step>/."""
+"""End-to-end workflow. Each step writes to outputs/<step>/."""
 from __future__ import annotations
 
 import json
@@ -221,4 +221,4 @@ def _tables_md(root, q, ptab, st, vb, inv, vr, geo, tv, tw, mc, cal=None, scen=N
         parts += ["## Synthetic twin experiment", _md(tw["table"]), ""]
     if mc is not None:
         parts += ["## Monte Carlo global summary", _md(mc["global"].reset_index()), ""]
-    (root / "report_tables.md").write_text("\n".join(parts))
+    (root / "summary_tables.md").write_text("\n".join(parts))

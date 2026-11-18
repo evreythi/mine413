@@ -1,4 +1,4 @@
-"""Shared figure style (static PNG figures for reports).
+"""Shared figure style (static PNG figures).
 
 Colour rules: categorical hues in a fixed order; sequential = one hue light->dark;
 diverging = blue <-> red with a neutral grey midpoint; thin marks; recessive grid.

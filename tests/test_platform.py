@@ -1,4 +1,4 @@
-"""Platform tests (Task 8): command line, managed raw store, manual
+"""Platform tests: command line, managed raw store, manual
 interventions in the engine, audit trail and incremental updating."""
 import dataclasses
 import json

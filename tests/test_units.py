@@ -80,13 +80,9 @@ def test_infer_surface_platform_and_front():
 
 
 def test_markdown_tables_escape_pipes():
-    import importlib.util
     import pandas as pd
-    from pathlib import Path
-    spec = importlib.util.spec_from_file_location("fill_report", Path(__file__).resolve().parents[1] / "tools" / "fill_report.py")
-    fr = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fr)
-    txt = fr.md(pd.DataFrame({"a": ["|x| > 3"], "b": [1]}), "t")
+    from spbm.pipeline import _md
+    txt = _md(pd.DataFrame({"a": ["|x| > 3"], "b": [1]}))
     row = [l for l in txt.splitlines() if "x" in l][0]
     assert row.count(" | ") == 1 and "\\|x\\|" in row
 
@@ -155,9 +151,9 @@ def test_every_config_assumption_is_in_the_register():
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     ids = set(re.findall(r"\bA-\d+\b", (root / "config" / "project.yaml").read_text()))
-    reg = (root / "tools" / "templates" / "D2_Data_and_Assumption_Register.template.md").read_text()
+    reg = (root / "METHOD.md").read_text()
     missing = sorted(i for i in ids if not re.search(rf"\b{i}\b", reg))
-    assert not missing, f"config cites assumptions not in D2: {missing}"
+    assert not missing, f"config cites assumptions not in METHOD.md: {missing}"
 
 
 # ------------------------------------------------------------ QA rules

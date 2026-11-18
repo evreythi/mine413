@@ -1,4 +1,4 @@
-"""Task 2 - characterisation of stockpile growth and FMS <-> survey reconciliation."""
+"""Characterisation of stockpile growth and FMS <-> survey reconciliation."""
 from __future__ import annotations
 
 from pathlib import Path
