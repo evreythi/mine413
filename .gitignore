@@ -7,5 +7,4 @@ data/extracted/
 data/raw_store/
 data/inbox/*
 !data/inbox/.gitkeep
-outputs/
 outputs_demo/

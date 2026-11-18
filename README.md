@@ -66,7 +66,7 @@ Intervention types: `survey_date`, `survey_cutoff_hours`, `fms_exclude`, `fms_lo
 
 ## Outputs
 
-Everything is written to `outputs/` (not committed; regenerate with `python -m spbm run`).
+Everything is written to `outputs/`. The results of the full run `20261118T182336` (60 Monte Carlo realisations) are included; `python -m spbm run` reproduces them exactly.
 
 | Folder / file | Content |
 |---|---|
@@ -80,7 +80,7 @@ Everything is written to `outputs/` (not committed; regenerate with `python -m s
 | `history/<run_id>/` | Manifest and key tables of every model version |
 | `summary.json`, `summary_tables.md` | Key numbers and tables of the run |
 
-## Base-case results
+## Base-case results (run `20261118T182336`)
 
 | Class | Tonnes | Cu % | Au g/t | Basis |
 |---|---|---|---|---|
@@ -103,6 +103,7 @@ Data_Topo 2026.zip     supplied data (read into data/raw_store/ on first run)
 config/                parameters and manual interventions
 spbm/                  platform source code
 tests/                 unit, real-data and platform tests
+outputs/               results of the full run
 examples/              update demonstration
 METHOD.md              mathematics, algorithm, validation and assumptions
 ```
