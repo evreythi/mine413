@@ -1,28 +1,29 @@
----
-title: "D3 - Technical Methodology and Algorithm"
-subtitle: "Constrained Push-and-Settle Transport (CPST) for stockpile reconstruction and block modelling"
----
+# Method: how SPBM works
 
-# 1. Purpose and design philosophy
+This file explains the model behind SPBM: the idea, the maths, the steps and every assumption. Each main section starts with a short **In plain words** summary; the detail follows for anyone who wants to check it. Settings are in `config/project.yaml`, each tagged with its assumption number (A-xx, listed in Section 10).
 
-The movement of material from a truck dump point to its final place in the pile is never observed. Two kinds of observation constrain it:
+# 1. The idea
 
-* **where material came from**: FMS dump coordinates, tonnage and grade (*sources*);
-* **where volume appeared**: the sequential survey change solids (*sinks*).
+> **In plain words.** Nobody sees where a truckload ends up once the dozers push it over the edge. But we know what each truck dumped and where (truck records), and we know where the pile grew (surveys). SPBM matches the two: the surveys say *where* new material went, the truck records say *what* it was, and the least dozer pushing decides *which* load went *where*. Every recorded tonne and every gram of metal is kept.
 
-Physics-only rules (push to the crest, roll down at the angle of repose) can predict the shape of a deposit, but they predict *where* fill appears only moderately well. Our forward model places only about half (53%) of its predicted volume inside the observed fill footprint on unseen periods (D6, Section 9.3). A reconstruction used for inventory must therefore be **constrained by the surveys**. The design principle is:
+Two kinds of observation constrain the movement of material:
 
-> *Let the surveys decide **where** volume went, let the FMS decide **what** went there, and use a physically based transport cost (dozer push work over the real terrain) to decide **which** source filled **which** part of the observed fill, conserving mass and metal exactly.*
+* **where material came from**: FMS dump coordinates, tonnage and grade (the *sources*);
+* **where volume appeared**: the survey change solids, one per survey (the *sinks*).
 
-This is a classical earth-moving problem. Optimal transport was formulated by Monge (1781) to move *déblais* (cuts) to *remblais* (fills) with minimum work. We use its modern entropy-regularised form (Cuturi, 2013; Peyré and Cuturi, 2019), where the regularisation strength is a physically interpretable **mixing length**. We name the method **CPST: Constrained Push-and-Settle Transport**. A separate **forward physics model** (dozer push to crest + avalanche cellular automaton at the angle of repose) is used for prediction (temporal validation), for loads not yet surveyed (nowcast), and to generate known-truth data (synthetic twin validation).
+Physics rules alone (push to the crest, roll down the face at the angle of repose) predict the *shape* of the pile well, but not *where* new fill appears: our physics model puts only about half (53%) of its predicted volume where the next survey actually shows fill (Section 8). The inventory therefore has to be **tied to the surveys**. The rule is:
 
-![Platform workflow](figures/fig_workflow.png)
+> *The surveys decide **where** volume went, the FMS decides **what** went there, and the dozer push effort over the real ground decides **which** load filled **which** part of the new fill. Mass and metal are kept exactly.*
+
+Mathematically this is an *optimal transport* problem: moving material from sources to destinations with the least total work. We use its modern smoothed (entropy-regularised) form (Cuturi, 2013; Peyré and Cuturi, 2019), where the amount of smoothing has a physical meaning: a **mixing length**, how far loads get smeared into each other. We call the method **CPST** (Constrained Push-and-Settle Transport). A separate **physics model** (push to the crest, then let the material roll down until it is stable) is used where there is no survey to follow: to test predictions, to place loads dumped after the last survey, and to create test data with a known answer.
 
 # 2. Data model
 
+> **In plain words.** The site is divided into 1 m squares. For each square the model keeps a stack of layers, oldest at the bottom, and each layer remembers how many tonnes and how much metal it holds and where it came from. Truck records are split into periods ending at each survey (the survey is taken to cover everything dumped up to 07:00 the next morning). Tonnes are turned into volume with a factor measured from the surveys.
+
 ## 2.1 Grid and survey change solids
 
-A regular grid of cell size $\Delta$ = 1 m (A-24) covers all data plus a 6 m margin. Its origin is snapped to a 10 m lattice so that grids of different resolution share block boundaries. Each survey file *s* is a closed triangulated solid (QA-S01). It is rasterised at cell centres $c$ by barycentric interpolation. The highest face through a centre gives $\text{top}_s(c)$ and the lowest gives $\text{bot}_s(c)$. Cells crossed by no face are outside the solid. The implementation is vectorised (`spbm/grid.py::rasterize_triangles`) and independent of face winding.
+A regular grid of cell size $\Delta$ = 1 m (A-24) covers all data plus a 6 m margin. Its origin is snapped to a 10 m lattice so that grids of different resolution share block boundaries. Each survey file *s* is a closed triangulated change solid. It is rasterised at cell centres $c$ by barycentric interpolation. The highest face through a centre gives $\text{top}_s(c)$ and the lowest gives $\text{bot}_s(c)$. Cells crossed by no face are outside the solid. The implementation is vectorised (`spbm/grid.py::rasterize_triangles`) and independent of face winding.
 
 ## 2.2 State: stratigraphic columns
 
@@ -59,14 +60,14 @@ $f_v$ fixes the **in-pile volume** of a load. It does not say how many tonnes th
 
 $$v_i = \frac{T_i\,f_v}{\text{Dens}_i},\qquad m_i = T_i\,f_{pay},\qquad \rho_i = \text{Dens}_i\,\frac{f_{pay}}{f_v}$$
 
-The in-pile volume $v_i$ is the same for **any** split between bulking ($\rho < \text{Dens}$) and under-recording ($f_{pay} > 1$). This split is not identifiable from the supplied data. The base case is $f_{pay}$ = 1: recorded tonnes are taken as measured, and the excess volume is bulking, giving an in-pile density of 1.40 t/m³. The Monte Carlo samples $f_{pay}$ from a triangular distribution on 1.00-1.19 with its mode at 1.00 (recorded payloads most likely). The upper bound takes the largest recorded load, 304 t, to 362 t, the rated payload of the largest haul trucks. Two further interpretations are reported as scenarios outside the ranges (D6, Section 10):
+The in-pile volume $v_i$ is the same for **any** split between bulking ($\rho < \text{Dens}$) and under-recording ($f_{pay} > 1$). This split is not identifiable from the supplied data. The base case is $f_{pay}$ = 1: recorded tonnes are taken as measured, and the excess volume is bulking, giving an in-pile density of 1.40 t/m³. The Monte Carlo samples $f_{pay}$ from a triangular distribution on 1.00-1.19 with its mode at 1.00 (recorded payloads most likely). The upper bound takes the largest recorded load, 304 t, to 362 t, the rated payload of the largest haul trucks. Two further interpretations are run as scenarios outside the ranges (Section 7):
 
 * X1: all of the excess is payload under-recording. This is excluded, because the largest load would be 447 t.
 * X2: the excess is loads missing from the FMS. This is not excluded by these data.
 
 # 3. The CPST algorithm (one period)
 
-![CPST algorithm](figures/fig_algorithm.png)
+> **In plain words.** For each period between two surveys: (1) find where the survey shows new material (fill) and where material was removed (cuts); (2) list what could have made that fill: the period's truckloads, material the dozers cut, and material left on the platform from before; (3) work out how hard it is to push each source to each fill spot over the real ground; (4) share the sources out over the fill so the total pushing is smallest, with a little mixing; (5) add the result as a new layer. Fill that no truck explains is labelled *unattributed*; trucks with nowhere to go wait for the next period.
 
 ## 3.1 Prior surface and legacy material (first-surveyed cells)
 
@@ -88,14 +89,14 @@ with the detection limit $\tau = k\sqrt2\,\sigma_z$ = 0.14 m (A-08, A-09).
 
 ## 3.4 Sources
 
-* **Loads** $k$ of the period: $v_k = T_k f_v/\text{Dens}_k$ m³ and $m_k = T_k f_{pay}$ t (Section 2.4), located at the dump cell. Properties per m³: $\boldsymbol\pi_k = \boldsymbol\Pi(m_k, g_k)/v_k$ (question A: *initial placement* is a point parcel at the reported X/Y; GPS uncertainty is handled by Monte Carlo, Section 7). Records whose position is a default or stuck FMS position (QA rule LOC_DEFAULT: 14 records, 2,356 t sharing one X/Y/Z) or more than 100 m from every solid (LOC_OUTSIDE_DOMAIN) have an **unknown location** (A-32). They are not given an imputed position. Their push-cost row is instead uniform (the median of the located sources' costs), so they fill whatever part of the period's fill the located loads do not claim.
+* **Loads** $k$ of the period: $v_k = T_k f_v/\text{Dens}_k$ m³ and $m_k = T_k f_{pay}$ t (Section 2.4), located at the dump cell. Properties per m³: $\boldsymbol\pi_k = \boldsymbol\Pi(m_k, g_k)/v_k$ (initial placement is a point parcel at the reported X/Y; GPS uncertainty is handled by Monte Carlo, Section 7). Records whose position is a default or stuck FMS position (QA rule LOC_DEFAULT: 14 records, 2,356 t sharing one X/Y/Z) or more than 100 m from every solid (LOC_OUTSIDE_DOMAIN) have an **unknown location** (A-32). They are not given an imputed position. Their push-cost row is instead uniform (the median of the located sources' costs), so they fill whatever part of the period's fill the located loads do not claim.
 * **Carried parcels** from the previous period (A-23), at their original dump cell.
 * **Cut sources** $j$ (Section 3.2).
 * **Dummy source U** (unattributed) with volume $V_F = \sum_c b_c$.
 
 Sinks are the fill cells $c$, plus a **dummy sink R** (retained on the platform) with capacity $V_S = \sum_k v_k + \sum_j V_j$. The problem is balanced: $\sum a = V_S + V_F = \sum b$.
 
-## 3.5 Push cost (questions B, C)
+## 3.5 Push cost
 
 On the pre-period surface $z$ (surveyed or inferred), a directed 8-neighbour graph is built. The edge weight from cell $i$ to neighbour $j$ is
 
@@ -103,21 +104,25 @@ $$w_{ij} = \ell_{ij} + \alpha \max(0,\, z_j - z_i)$$
 
 where $\ell_{ij}$ = 1 or √2 m and α = 4 is the uphill penalty (A-16). The push cost is the geodesic (Dijkstra) distance $C_{kc} = \min_{\text{paths}} \sum w$, with $C_{kc} = \infty$ if $C_{kc} > L_{\max}$ = 90 m (A-17). Dummy costs: $C_{kR} = c_R$ = 90 m, $C_{Uc} = c_U$ = 90 m, $C_{UR} = 0$. Because $c_R + c_U > L_{\max}$, a load is always sent to reachable fill before being retained. U fills only the volume that available sources cannot (*partial optimal transport*).
 
-*Direction* (B) is therefore the least-work route over the actual terrain: down-slope pushes are cheap, pushing over a crest and down the face is cheap, uphill is expensive. The survey decides which face sector actually received fill.
+*Direction* is therefore the least-work route over the actual terrain: down-slope pushes are cheap, pushing over a crest and down the face is cheap, uphill is expensive. The survey decides which face sector actually received fill.
 
-**What the push cost contributes (evidence).** The platform can replace the push cost by a flat cost (`movement.cost: flat`, $C_{kc} = 0$ for every fill cell of the interval, dummy costs unchanged). That leaves only the survey constraint: each interval's sources fill that interval's measured fill, and unrecorded and retained volume stay in their own classes. In the synthetic twins (D6, Sections 6 and 9.4), the results depend on the truth:
+**What the push cost contributes (evidence).** The platform can replace the push cost by a flat cost (`movement.cost: flat`, $C_{kc} = 0$ for every fill cell of the interval, dummy costs unchanged). That leaves only the survey constraint: each interval's sources fill that interval's measured fill, and unrecorded and retained volume stay in their own classes. In the synthetic twins (Section 8), the results depend on the truth:
 
 * when the truth follows our own push physics, the push cost lowers block Cu RMSE by about 0.07% Cu;
 * when it does not (random crest, or uniform mixing within each interval), the push cost raises the error, and the flat variant wins by 0.15-0.2% Cu;
 * dropping only the uphill penalty (α = 0) is no worse than α = 4.
 
-On the real data, the two forms change block grades by about 0.2% Cu on average and leave all totals unchanged. **The push cost is physically motivated and costs nothing, but on these two weeks of data it cannot be shown to improve the answer.** It stays in the base case, the Monte Carlo samples both forms (Section 7), and tracer trials are the way to settle it. *Distance* (C) is set by the capacity constraint: material stops where observed accommodation space exists, and the least-cost assignment is used. Movement beyond $L_{\max}$ is not allowed. Material that finds no reachable fill stays on the platform (R) and is carried to the next period (dozer lag).
+On the real data, the two forms change block grades by about 0.2% Cu on average and leave all totals unchanged. **The push cost is physically motivated and costs nothing, but on these two weeks of data it cannot be shown to improve the answer.** It stays in the base case, the Monte Carlo samples both forms (Section 7), and tracer trials are the way to settle it. *Distance* is set by the capacity constraint: material stops where observed accommodation space exists, and the least-cost assignment is used. Movement beyond $L_{\max}$ is not allowed. Material that finds no reachable fill stays on the platform (R) and is carried to the next period (dozer lag).
 
-## 3.6 Allocation: entropic optimal transport (questions E, F, G, H)
+## 3.6 Allocation: entropic optimal transport
 
 $$\mathbf P^\star = \arg\min_{\mathbf P \ge 0} \;\sum_{k,c} P_{kc} C_{kc} \;-\; \varepsilon H(\mathbf P)\quad \text{s.t.}\;\; \mathbf P\mathbf 1 = \mathbf a,\;\; \mathbf P^\top\mathbf 1 = \mathbf b,\qquad H(\mathbf P) = -\sum P_{kc}(\log P_{kc} - 1)$$
 
-The solution is $P_{kc} = \exp\big((f_k + g_c - C_{kc})/\varepsilon\big)$. It is computed by **log-domain Sinkhorn** iterations (numerically stable with infinite costs):
+The solution is $P_{kc} = u_k\,K_{kc}\,v_c$ with $K_{kc} = \exp(-C_{kc}/\varepsilon)$ ($K = 0$ for infinite costs). It is computed by **Sinkhorn** iterations, alternately scaling the rows and the columns to their marginals:
+
+$$u_k \leftarrow \frac{a_k}{\sum_c K_{kc} v_c},\qquad v_c \leftarrow \frac{b_c}{\sum_k K_{kc} u_k}$$
+
+These are matrix-vector products, which is fast. If $K$ would come too close to the smallest number the computer can hold ($C/\varepsilon > 200$, only with very short mixing lengths), the same updates run in the log domain ($f = \varepsilon \log u$, $g = \varepsilon \log v$, LSE = log-sum-exp):
 
 $$f_k \leftarrow \varepsilon\log a_k - \varepsilon\,\text{LSE}_c\!\left(\tfrac{g_c - C_{kc}}{\varepsilon}\right),\qquad g_c \leftarrow \varepsilon\log b_c - \varepsilon\,\text{LSE}_k\!\left(\tfrac{f_k - C_{kc}}{\varepsilon}\right)$$
 
@@ -125,15 +130,15 @@ Iteration stops when $\sum_k |\sum_c P_{kc} - a_k| / \sum a < 10^{-6}$ (max. 500
 
 **ε is the mixing length** (A-18). As ε → 0 the plan becomes the work-minimising deterministic assignment (no mixing beyond what is geometrically forced). As ε → ∞ every source is spread uniformly over the period's fill, giving the "period-average" model. ε = 6 m represents GPS error, blade spill and rolling on the face. Its effect is quantified by the twin experiment, the tornado and the Monte Carlo.
 
-## 3.7 Deposit (questions D, E, F, I)
+## 3.7 Deposit
 
 Each fill cell receives one new layer from $z_m(c)$ up to $z_m(c) + \sum_k P_{kc}/\Delta^2$, which equals the surveyed $\text{top}_s(c)$ to solver tolerance:
 
 $$\boldsymbol\pi_{\text{layer},c} = \sum_{k} P_{kc}\,\boldsymbol\pi_k \;+\; P_{Uc}\,\boldsymbol\pi_U,\qquad \Sigma m^2_{c} = \sum_k \big(P_{kc}\,m_k/v_k\big)^2$$
 
-*Downslope behaviour* (D) is honoured because the layer top is the surveyed surface: faces are at the measured angle of repose (median 36.7°), and the material that formed them, including what rolled to the toe, is assigned by the transport plan. Within one period the layer is vertically homogeneous (A-19). *Mixing* (E) is the volume-weighted combination of sources in the same cell. Grades follow from metal over tonnes, so mixing of loads with different densities is handled correctly. *Surface reconciliation* (F) holds because the column marginals equal the observed fill: the model surface equals the survey (D6, Section 9.2). The unattributed U volume carries the imputed properties $\boldsymbol\pi_U$ (A-21).
+*Downslope behaviour* is honoured because the layer top is the surveyed surface: faces are at the measured angle of repose (median 36.7°), and the material that formed them, including what rolled to the toe, is assigned by the transport plan. Within one period the layer is vertically homogeneous (A-19). *Mixing* is the volume-weighted combination of sources in the same cell. Grades follow from metal over tonnes, so mixing of loads with different densities is handled correctly. *Surface reconciliation* holds because the column marginals equal the observed fill: the model surface equals the survey (geometry RMSE 0.03 m). The unattributed U volume carries the imputed properties $\boldsymbol\pi_U$ (A-21).
 
-## 3.8 Sequential updating (I) and closing the record
+## 3.8 Sequential updating and closing the record
 
 After deposit, $z_m$ = column tops, the volume in column R becomes carried parcels, and the next period starts from this state. After the last survey:
 
@@ -141,25 +146,25 @@ After deposit, $z_m$ = column tops, the volume in column R becomes carried parce
 2. Parcels still retained are spread (Gaussian kernel, σ = 6 m) over **unsurveyed** platform cells around their dump point.
 3. Loads after the last survey are placed by the forward model (Section 4) and flagged *Provisional*. When the next survey is imported they are automatically reconciled like any other load.
 
-## 3.9 Mass and metal conservation (G, H)
+## 3.9 Mass and metal conservation
 
 * Every source row of $\mathbf P$ sums exactly to the source volume, so no FMS tonne is created or lost.
 * Cuts move extensive properties from columns to sources and back into columns.
 * The dummy U adds volume only to the *unattributed* class; legacy volume is only in the *legacy* class. FMS totals are therefore checked separately from them.
 * Verification: FMS tonnes, Cu, Au and Ag in the final block model differ from the FMS input by less than 10⁻¹² (relative), i.e. floating-point round-off. This is enforced by the automated test `tests/test_real_data.py::test_mass_and_metal_conserved_exactly`.
 
-## 3.10 Numerical stability (J)
+## 3.10 Numerical stability
 
 | Setting | Value | Effect tested |
 |---|---|---|
-| Grid cell | 1 m (0.5 and 2.5 m tested) | Robustness table (D6, Section 9.5) |
+| Grid cell | 1 m (0.5 and 2.5 m tested) | `validation/robustness_numerical.csv` |
 | Detection limit τ | 0.14 m (k = 1-4 tested) | Volume not moved: 137 m³ (0.4%) |
 | Sinkhorn tolerance | 10⁻⁶ (10⁻⁴, 10⁻⁸ tested) | Column residual < 10⁻⁶ |
-| Log-domain Sinkhorn | always | No underflow with costs ≫ ε |
+| Sinkhorn form | scaling updates; log domain if $C/\varepsilon > 200$ | No underflow; same iterates either way |
 | Time step | one survey interval (cut-off D+1 07:00, data-driven) | Gap periods flagged |
 | Block size | 5 × 5 × 2 m (2 × 2 × 1 and 10 × 10 × 4 tested) | Tornado |
 
-Typical convergence takes 30-660 Sinkhorn iterations per interval. A full reconstruction takes about 15 s.
+Typical convergence takes 30-660 Sinkhorn iterations per interval. A full reconstruction takes about 2-3 s on one core.
 
 ## 3.11 Pseudocode
 
@@ -179,7 +184,7 @@ for s in 0..S-1:
     sources <- carried + loads(period s) + cut_sources
     a <- [v_k ..., V_fill],  b <- [b_c ..., V_sources]
     C <- geodesic_cost(surface, alpha, L_max) ; add dummy costs c_R, c_U, 0
-    P <- sinkhorn_log(a, b, C, eps) ; P <- rescale_rows(P, a)
+    P <- sinkhorn(a, b, C, eps) ; P <- rescale_rows(P, a)
     for c in fill: append layer sum_k P[k,c]*pi_k + P[U,c]*pi_U to columns[c]
     carried <- {k : P[k,R] > 0}            # dozer lag
     observed[F] <- True
@@ -190,13 +195,17 @@ blocks <- integrate layers into 5x5x2 m blocks (exact partial-layer fractions)
 
 # 4. Forward (predictive) physics model
 
+> **In plain words.** A simple simulation of what a dozer and gravity do: push the load to the nearest edge, drop it over, and let it slide until no slope is steeper than the angle of repose.
+
 Used where no survey constrains the result (temporal validation, nowcasting, synthetic truth). Code: `spbm/forward.py`.
 
 1. **Crest detection.** On the surface smoothed with a 1.5 m Gaussian, a face cell has slope > 20° and at least 5 m of local relief within 11 m. Crest cells are gentle cells adjacent to a face and near the local maximum. Only crests within the surveyed area are used.
 2. **Dozer push.** Each load is pushed to the nearest crest cell and released down-slope onto the face (release offset 0-4 m, calibrated), as a disc of radius 2-5 m (calibrated).
 3. **Gravity / avalanche cellular automaton.** Only the newly placed (*mobile*) material may move. For each cell $i$ and neighbour $j$, the excess is $e_{ij} = \max(0, z_i - z_j - \ell_{ij}\tan\phi)$. The cell releases $o_i = \min(\tfrac12\max_j e_{ij},\, \text{mobile}_i)$, distributed to neighbours in proportion to $e_{ij}$. This repeats until $\max o_i < 0.01$ m. Volume is conserved exactly (unit test). Slopes relax to ≤ φ.
 
-# 5. Block model construction (Task 5)
+# 5. Block model construction
+
+> **In plain words.** The layers are cut into 5 × 5 × 2 m blocks. Each block gets its tonnes, grades (always metal ÷ tonnes, never an average of grades), the truckloads it contains, and a confidence class.
 
 * **Blocks**: 5 m × 5 m × 2 m, origin (511,290; 7,122,280; 4,474). Horizontal size: GPS error (σ ≈ 3 m) plus the mixing length (6 m) mean no information exists below about 5 m. Vertical size: 2 m gives 6-8 slices over the 13-15 m face, matching the vertical resolution of daily layers (median solid thickness 0.9-3.0 m). It also suits loader reclaim slices. Larger and smaller blocks were tested (tornado).
 * **Discretisation / partial blocks**: layers are integrated exactly into blocks (the fraction of each layer's thickness inside each 2 m slice). No sub-blocking is needed: each block carries its **fill fraction** and true material volume; partial blocks are exported, not rounded.
@@ -216,7 +225,7 @@ Fields exported per block: indices and centroid, dimensions, volume, fill fracti
 | Low | ≥ 20% FMS-tracked |
 | Uninformed | < 20% FMS-tracked (legacy or unattributed dominated) |
 
-These are internal planning classes, **not** JORC/NI 43-101 resource categories. Public reporting would require a Competent/Qualified Person.
+These are internal planning classes, **not** JORC/NI 43-101 resource categories. Public disclosure would require a Competent/Qualified Person.
 
 # 6. Information types
 
@@ -229,7 +238,9 @@ These are internal planning classes, **not** JORC/NI 43-101 resource categories.
 | Legacy grade/density, unattributed grade, payload factor $f_{pay}$ (bulking vs under-recording split), φ in unsurveyed areas | Assumed |
 | Location of each load inside the fill, block grades, uncertainty ranges | Model-generated |
 
-# 7. Uncertainty methodology (Task 7)
+# 7. Uncertainty methodology
+
+> **In plain words.** We re-run the whole model 60 times, each time nudging the uncertain inputs (GPS position, tonnes, grades, survey timing, mixing, dozer behaviour) within reasonable limits. The spread of the answers gives the low / likely / high range (P10 / P50 / P90). Separately, each assumption is changed on its own to see which ones matter most.
 
 **Monte Carlo** (60 realisations, seed 413). Each realisation runs the full reconstruction with jointly sampled inputs:
 
@@ -250,9 +261,11 @@ These are internal planning classes, **not** JORC/NI 43-101 resource categories.
 
 Blocks are accumulated on the base block grid. For each block we report P10/P50/P90 and the coefficient of variation of Cu, Au and tonnes. For the record-period inventory (FMS-tracked + unattributed) and for the whole pile we report P10/P50/P90 totals. **One-at-a-time sensitivity** (tornado) varies ε, α, $L_{\max}$, the push-cost form, $f_{pay}$, $f_v$, σz, survey cut-off, grid cell, block size and the A-13b switch individually. The cut-off, grid, σz and A-13b variants re-calibrate $f_v$.
 
-**Scenarios outside the ranges.** The interpretations of the volume gap that the data cannot exclude (X2: missing loads) or that physics excludes (X1: all under-recording) are run as separate deterministic scenarios (`uncertainty.scenarios`). They are reported next to the ranges with an explicit "not included in those ranges" statement.
+**Scenarios outside the ranges.** The interpretations of the volume gap that the data cannot exclude (X2: missing loads) or that physics excludes (X1: all under-recording) are run as separate deterministic scenarios (`uncertainty.scenarios`). Their results (`uncertainty/scenarios.csv`) are kept separate from the ranges and are not included in them.
 
-# 8. Validation methodology (Task 6)
+# 8. Validation methodology
+
+> **In plain words.** We check that the books balance (tonnes and metal in = out), that the model surface matches the survey, that the physics model can predict surveys it never saw, and that the method gets close to the right answer on made-up data where the answer is known.
 
 | Area | Metric |
 |---|---|
@@ -282,10 +295,52 @@ Blocks are accumulated on the base block grid. For each block we report P10/P50/
 | Uncertainty / sensitivity / scenarios | `spbm/uncertainty.py` |
 | Audit trail | `spbm/audit.py` |
 | Orchestration / CLI | `spbm/pipeline.py`, `spbm/__main__.py` |
+| Several CPU cores: cases and steps run side by side (results identical to one core) | `spbm/parallel.py` |
+| Web page: data choice, parameters, uploads, runs with progress, results | `spbm/web.py`, `spbm/webui/index.html` |
+
+# 10. Assumptions
+
+**S** = tested one at a time (sensitivity); **MC** = sampled in the Monte Carlo; **Sc** = run as a separate scenario.
+
+| ID | Assumption (value / rule) | Need | Justification | Consequence if wrong | Treatment |
+|---|---|---|---|---|---|
+| A-01 | Coordinates of FMS and surveys share one projected mine grid (m); no transformation; DXF header units ignored | Overlay data | Dumps lie on and behind surveyed crests; consistent elevations; header unit implausible (rule DXF_UNITS_HEADER) | Systematic offset would bias push distances | Visual and statistical check (dumps vs surveyed surfaces) |
+| A-02 | `Topo_2503xx` files are 2026 surveys | Chronology | FMS dates, face progression, bottom = previous top (rule SURVEY_NAME_YEAR) | Sequence error | Interventions MI-001/002 |
+| A-03 | Angle of repose 37° | Forward model; inference of unseen faces | Measured mode 37.0°, median 36.7° of surveyed faces; typical 35-40° for blasted rock | Shape of inferred faces and nowcast | S (forward calibration 35/37/39°) |
+| A-04 | DXF solids record accretion only; bottom = previous surface | Derive fill per interval | Every file is a closed solid; cuts are not stored as solids | Misread change | Checked on all 9 overlaps: 5 match exactly, 4 show cuts or a missing survey |
+| A-05 | A survey labelled D closes its interval at D+1 07:00 (31 h after 00:00 of D); the first interval is 24 h long | Assign loads to intervals | Cut-off scan plateau 30-31.5 h; shift-change lull 06:00-07:30 (Section 2.3) | Loads shift one interval | S (29/32 h), MC (29-32 h, each with its own f_v calibration) |
+| A-06 | In-pile volume = T × f_v / Dens, f_v calibrated (auto, 1.472); true tonnes = T × f_pay, base f_pay = 1.0 (excess volume = bulking; in-pile density 1.40 t/m³) | Convert tonnes to volume and back | f_v hold-out error 3.5% vs 32% for f_v = 1 (Section 2.4). The bulking/under-recording split is not identifiable | Record-period tonnes +47% if the excess is missing loads (X2) | MC (f_v bootstrap; f_pay triangular 1.00-1.19, mode 1.00); S (f_v 1.35/1.60, f_pay 1.19); Sc (X1 excluded, X2 not included) |
+| A-07 | Truck GPS horizontal error σ = 3 m | Uncertainty | Typical HP GPS on haul trucks 1-5 m; dump-event latency | Destination of individual loads | MC |
+| A-08 | Survey vertical precision σz = 0.05 m | Detection limit, uncertainty | Typical drone photogrammetry/LiDAR on rock piles 0.03-0.10 m | Noise counted as fill | S (0.025/0.15), MC (per-survey bias 0.05 m) |
+| A-09 | Detection limit τ = 2·√2·σz = 0.14 m | Ignore noise | Standard LoD for DEM differencing (95%) | Small volume not moved | Robustness (k = 1 to 4) |
+| A-10 | Payload error CV 8% per load; payload = passes × 38 t | Tonnage uncertainty | Pass-count payload (all payloads are multiples of 38 t); industry payload-monitor accuracy ±5-10% | Tonnes and metal | MC (systematic part via f_pay, A-06) |
+| A-11 | Grade of a load = its source signature; homogeneous within a load; signature error CV 10% | Assign grade | Only data available (21 source signatures, not load assays) | Block grade variance under-represented | MC (correlated by signature) |
+| A-12 | Floor = plane fitted to toe cells (4,475.08 m, 0.29° dip) | Bottom of model | Toe elevations consistent across surveys (sd 0.26 m) | Pre-record core volume ±0.26 m × area | Reported; floor residual map |
+| A-13 | Never-surveyed cells: behind the crest = flat platform at the nearest crest elevation; in front of the face = face continued at 37° to the floor | Geometry where no survey exists | Truck-operated platform is flat; faces at repose | Pre-record core volume and extent | Geometry class "inferred"; reported separately |
+| A-13b | **Off in the base case.** (If on: first-surveyed cells in front of an earlier face were at its repose extrapolation; a solid bottom above it is fill not captured by any solid.) | Option for toe-clipped solids | With f_v calibrated, recorded loads explain measured fill of complete days to ~3%, leaving no room for ~7,200 m³ of unrecorded fill | About 7,200 m³ moves from the pre-record core to unattributed | S (switch); Sc (S2) |
+| A-14 | Model domain = convex hull of surveyed change and dump locations | Lateral limit of the pile | No full-pile survey supplied | The back of the pile outside the hull is not modelled | Stated limitation |
+| A-15 | Within an interval's measured fill, dozer push follows least total push work (optimal transport over a slope-aware geodesic cost) | Unknown dozer trajectories | Operators minimise push distance; OT is the classical earth-moving formulation. **Evidence is weak**: in the twins the push cost helps only when the truth follows the same physics, and a flat cost (no push term) does better otherwise | Block grades change by about 0.2% Cu on average (flat vs geodesic); totals unchanged | MC samples geodesic/flat 50/50; tornado; twin ablation; tracer trials |
+| A-16 | Uphill push penalty α = 4 m per m of lift | Prevent implausible uphill pushes | Dozer production falls sharply uphill (grade correction factors, Caterpillar Performance Handbook). The twin with α = 0 is no worse | Allocation across the crest | S (1/10), MC U(1, 10), twin (α = 0) |
+| A-17 | Maximum effective push distance 90 m (geodesic) | Limit movement | Dozing is generally economical to about 100 m | Loads may be retained on the platform | S (50/130), MC U(50, 130) |
+| A-18 | Mixing length ε = 6 m (entropy regularisation) | Degree of mixing | GPS error (3 m), blade spill, rolling on the face; in the twin 6 m and 15 m do about equally well and 2 m is worse | Over- or under-mixing of grades | S (2/15), MC U(2, 15), twin |
+| A-19 | Within one interval, the fill of a column is vertically homogeneous | Vertical placement | Daily fill is built by many interleaved loads | Vertical grade resolution limited to the interval layer (0.5-3 m) | Inherent; documented |
+| A-20 | Elevation decrease below an earlier surface = material removed by dozer/slumping and re-handled in the same interval | Solids omit cuts | Dozers trim crests while pushing | Cut volume re-mixed | Reported per interval |
+| A-21 | Unattributed fill has the tonnage-weighted mean grade and in-pile density of FMS loads in the same and adjacent intervals | FMS gaps | Material placed in the same days most likely came from the same faces | Grade of 3,901 t is imputed | MC bootstrap of grades; separate class |
+| A-22 | Pre-record core (legacy): in-pile density and grade = FMS mean | Populate blocks below the pre-record surface | No information supplied | 89,795 t carry an **assumed** grade | Class "Legacy-assumed", confidence "Uninformed"; reported after the record-period inventory, never as measured |
+| A-23 | FMS volume not seen in an interval's fill is retained on the platform and pushed later (dozer lag) | Timing mismatch | Paddock dumping and pushing later is normal practice | Grade appears in the next interval's fill | Carried volume reported |
+| A-24 | Simulation grid 1 m, vertical integration exact (layers) | Numerics | Matches survey triangle size (median edge about 1 m) | Edge effects | Robustness 0.5/2.5 m |
+| A-25 | Block size 5 × 5 × 2 m, partial blocks kept with fill fraction | Planning unit | Information resolution about 5 m (GPS + mixing); 2 m gives several layers per face height and suits loader slices | Smoothing of grade | S (2 × 2 × 1, 10 × 10 × 4) |
+| A-26 | Tonnes as reported by the FMS; no moisture correction (wet/dry basis unknown) | Units | No moisture data | Systematic tonnage bias of a few % | Stated |
+| A-27 | No particle-size segregation of grade down the face | Not observable | No size-grade data | Toe vs crest grade bias | Stated limitation |
+| A-28 | No time-dependent settlement after placement | Not observable | Short record (2 weeks) | Small volume bias | Absorbed in the f_v calibration |
+| A-29 | Dump Z is not used | Z minus prior surface scatters by metres | Unreliable | None | - |
+| A-30 | Boundary conditions: material cannot leave the domain; outside the domain is not modelled | Numerics | Domain covers all observed change | None inside the domain | - |
+| A-31 | Missing data: FMS gaps → unattributed class; survey gaps → gap intervals; no synthetic loads are invented | Missing-data treatment | Transparency over completeness | Unattributed share | Reported |
+| A-32 | Records sharing an identical X/Y/Z with ≥ 2 others (LOC_DEFAULT), or > 100 m from every solid (LOC_OUTSIDE_DOMAIN), have an **unknown** dump location: uniform push cost over their interval's fill | 14 records have an impossible location | Identical coordinates to 0.01 m over 12 days, below the floor | Allocation of 2.4 kt within its intervals | Unit and real-data tests; `fms_location_unknown` intervention for further cases |
+
 
 # References
 
-* Monge, G. (1781). *Mémoire sur la théorie des déblais et des remblais.* Histoire de l'Académie Royale des Sciences de Paris.
 * Cuturi, M. (2013). Sinkhorn distances: lightspeed computation of optimal transport. *Advances in Neural Information Processing Systems* 26.
 * Peyré, G. and Cuturi, M. (2019). Computational optimal transport. *Foundations and Trends in Machine Learning* 11(5-6), 355-607.
 * Chizat, L., Peyré, G., Schmitzer, B. and Vialard, F.-X. (2018). Scaling algorithms for unbalanced optimal transport problems. *Mathematics of Computation* 87, 2563-2609.

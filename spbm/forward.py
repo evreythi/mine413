@@ -78,12 +78,10 @@ def disc(shape, j, i, r_cells):
 
 def place_loads(z0, loads_xy_vol, g, fcfg, rng=None, push_jitter=0.0, sequential=False, B=None, crest_region=None,
                 crest_rule="nearest"):
-    """Push each load to the nearest crest and let it avalanche.
-    crest_rule="random" (used only for stress-testing the reconstruction)
-    sends each load to a random crest cell, so the dump position carries no
-    information about where the material ends up.
-    loads_xy_vol: array (n,3) of x, y, volume.  Returns final surface and, if
-    sequential, a list of per-load footprints (thickness arrays)."""
+    """Push each load (rows of x, y, volume) to the nearest crest and let it
+    avalanche. Returns the final surface and, if `sequential`, each load's
+    footprint (thickness array). crest_rule="random" sends loads to a random
+    crest cell instead (only for stress-testing the reconstruction)."""
     tanphi = np.tan(np.radians(fcfg["repose_deg"]))
     r = max(1, int(round(fcfg["deposit_radius"] / g.cell)))
     z = z0.copy()

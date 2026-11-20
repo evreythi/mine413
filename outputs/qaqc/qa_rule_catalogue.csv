@@ -38,4 +38,4 @@ FMS_SILENCE,dataset,warning,No FMS record for more than 24 h inside an interval,
 VOLUME_RATIO_OUTLIER,dataset,warning,Interval's surveyed fill / FMS volume outside median +/- 3 robust SD,3,,interval 0 (ratio 2.35); interval 7 (ratio 2.32); interval 9 (ratio 2.17),Excluded from the f_v calibration; the unexplained fill is unattributed volume
 SURVEY_CHANGE_NO_FMS,dataset,warning,A day with a survey change solid but no FMS record,0,,,Fill is unattributed
 PAYLOAD_QUANTISED,dataset,info,Every payload is a multiple of 38 t (pass count x nominal bucket),1,,275 records,Payload treated as an estimate (A-10): per-load CV and systematic payload factor
-GRADE_UNITS_UNCONFIRMED,dataset,warning,Mean Cu 8.4 % and Au 8 g/t are about 10x typical Cu-Au feed,1,,"mean Cu 8.42 %, Au 8.00 g/t",Units used as supplied; flagged in the executive summary (QA-F04)
+GRADE_UNITS_UNCONFIRMED,dataset,warning,Mean Cu 8.4 % and Au 8 g/t are about 10x typical Cu-Au feed,1,,"mean Cu 8.42 %, Au 8.00 g/t",Units used as supplied; to be confirmed with Geology before any contained-metal figure is used

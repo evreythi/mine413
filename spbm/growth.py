@@ -1,4 +1,4 @@
-"""Task 2 - characterisation of stockpile growth and FMS <-> survey reconciliation."""
+"""Characterisation of stockpile growth and FMS <-> survey reconciliation."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -50,7 +50,7 @@ def temporal_alignment(ds, cfg, out: Path) -> pd.DataFrame:
                 ratio = vol[s] / fv[s]
                 row[f"r_{name}"] = float(np.corrcoef(fv[s], vol[s])[0, 1])
                 med = np.median(ratio)
-                # robust coefficient of variation (1.4826 MAD / median): one FMS-outage interval does not dominate it
+                # robust CV (1.4826 MAD / median): one FMS-outage interval cannot dominate it
                 row[f"ratio_rcv_{name}"] = float(1.4826 * np.median(np.abs(ratio - med)) / med) if np.all(fv[s] > 0) else np.nan
         row["loads_after_last_survey"] = int((k >= len(ends)).sum())
         row["empty_intervals"] = int((fv[sets["all"]] == 0).sum())

@@ -1,0 +1,1105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPBM Stockpile Model</title>
+<style>
+:root {
+  --bg: #f6f5f1; --surface: #ffffff; --surface-2: #efede7; --border: #dcd9d0;
+  --text: #22211d; --muted: #6a675e; --accent: #1f5fae; --accent-soft: #dce8f7;
+  --ok: #1b7f4f; --ok-soft: #dcf1e6; --warn: #a15c00; --warn-soft: #f8ead3;
+  --bad: #b3261e; --bad-soft: #f8dedb; --code: #f1efe9;
+  --c-fms: #1f5fae; --c-unat: #e07b2a; --c-leg: #a8a395;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161614; --surface: #201f1c; --surface-2: #2a2925; --border: #3a3833;
+    --text: #ecebe6; --muted: #a29f95; --accent: #79aef0; --accent-soft: #1f3350;
+    --ok: #5cc58f; --ok-soft: #173a29; --warn: #e6a64a; --warn-soft: #3d2c12;
+    --bad: #f08a82; --bad-soft: #43201d; --code: #2a2925;
+    --c-fms: #79aef0; --c-unat: #f09a56; --c-leg: #7d796e;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161614; --surface: #201f1c; --surface-2: #2a2925; --border: #3a3833;
+  --text: #ecebe6; --muted: #a29f95; --accent: #79aef0; --accent-soft: #1f3350;
+  --ok: #5cc58f; --ok-soft: #173a29; --warn: #e6a64a; --warn-soft: #3d2c12;
+  --bad: #f08a82; --bad-soft: #43201d; --code: #2a2925;
+  --c-fms: #79aef0; --c-unat: #f09a56; --c-leg: #7d796e;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); }
+code, pre, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+h1, h2, h3 { line-height: 1.25; margin: 0 0 .5em; }
+h2 { font-size: 22px; letter-spacing: -.01em; }
+h3 { font-size: 16px; }
+p { margin: 0 0 .8em; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+/* header */
+header { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+.bar { display: flex; align-items: center; gap: 16px; min-height: 58px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 650; }
+.brand small { font-weight: 400; color: var(--muted); }
+.logo { width: 28px; height: 28px; }
+nav { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+nav button {
+  background: none; border: 0; color: var(--muted); font: inherit; font-weight: 550;
+  padding: 8px 12px; border-radius: 8px; cursor: pointer;
+}
+nav button:hover { color: var(--text); background: var(--surface-2); }
+nav button[aria-selected="true"] { color: var(--accent); background: var(--accent-soft); }
+.theme { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 6px 9px; cursor: pointer; font: inherit; }
+
+main { padding: 28px 0 64px; }
+section[hidden] { display: none; }
+.lead { font-size: 17px; color: var(--muted); max-width: 760px; }
+.grid { display: grid; gap: 16px; }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow); min-width: 0; }
+.card h3 { margin-bottom: .4em; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.block { margin-top: 28px; }
+
+/* KPI tiles */
+.kpi .label { font-size: 13px; color: var(--muted); }
+.kpi .value { font-size: 26px; font-weight: 650; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.kpi .sub { font-size: 13px; color: var(--muted); }
+
+/* steps */
+.steps { counter-reset: s; list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.steps li { counter-increment: s; position: relative; padding: 14px 16px 14px 56px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.steps li::before {
+  content: counter(s); position: absolute; left: 16px; top: 14px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; display: grid; place-items: center;
+}
+.steps b { display: block; }
+.eq { background: var(--code); border-radius: 8px; padding: 10px 14px; margin: 8px 0 12px; font-family: "Cambria Math", "STIX Two Math", Georgia, serif; font-size: 16px; overflow-x: auto; white-space: nowrap; }
+.eq i { font-style: italic; }
+.diagram { width: 100%; height: auto; display: block; }
+.diagram text { fill: var(--text); font: 13px system-ui, sans-serif; }
+.diagram .t2 { fill: var(--muted); font-size: 11.5px; }
+.diagram .box { fill: var(--surface-2); stroke: var(--border); }
+.diagram .boxa { fill: var(--accent-soft); stroke: var(--accent); }
+.diagram .ln { stroke: var(--muted); stroke-width: 1.5; fill: none; marker-end: url(#arr); }
+.diagram #arr path { fill: var(--muted); }
+
+/* tags */
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.tag.ok { background: var(--ok-soft); color: var(--ok); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.bad { background: var(--bad-soft); color: var(--bad); }
+.tag.info { background: var(--accent-soft); color: var(--accent); }
+.note { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+.note.info { border-color: var(--accent); background: var(--accent-soft); }
+
+/* upload */
+.drop {
+  display: block; border: 2px dashed var(--border); border-radius: 12px; padding: 28px 16px; text-align: center;
+  background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s;
+}
+.drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop strong { display: block; font-size: 16px; margin-bottom: 4px; }
+.filelist { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.filelist li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); flex-wrap: wrap; }
+.filelist .nm { font-weight: 550; overflow-wrap: anywhere; }
+.filelist .sz { color: var(--muted); font-size: 13px; margin-left: auto; }
+.mini { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; flex-basis: 100%; }
+.mini span { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+
+/* buttons & forms */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; font: inherit; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 9px 16px; border-radius: 9px;
+}
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .btn.primary { color: #10233d; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #10233d; } }
+.btn.primary:hover { filter: brightness(1.07); }
+.btn.danger { color: var(--bad); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.link { border: 0; background: none; padding: 2px 6px; color: var(--muted); font-weight: 500; }
+.btn.link:hover { color: var(--bad); background: none; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.opt { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; background: var(--surface); }
+.opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.opt input { margin-top: 4px; }
+input[type=number] { font: inherit; width: 80px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
+select { font: inherit; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); max-width: 100%; }
+
+/* progress */
+.prog { height: 12px; background: var(--surface-2); border-radius: 6px; overflow: hidden; margin: 10px 0 6px; }
+.prog span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .6s ease; }
+.prog.done span { background: var(--ok); }
+.prog.fail span { background: var(--bad); }
+.prog.run span { background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.25) 50%, rgba(255,255,255,0) 100%); background-size: 200px 100%; animation: sh 1.4s linear infinite; background-repeat: no-repeat; background-color: var(--accent); }
+@keyframes sh { from { background-position: -200px 0; } to { background-position: 1200px 0; } }
+.stagelist { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 4px; font-size: 14px; }
+.stagelist li { display: flex; gap: 8px; align-items: center; color: var(--muted); }
+.stagelist li.sub { padding-left: 22px; font-size: 13.5px; }
+.stagelist li.done { color: var(--text); }
+.stagelist li.now { color: var(--accent); font-weight: 600; }
+.dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid currentColor; flex: none; }
+.stagelist li.done .dot { background: var(--ok); border-color: var(--ok); }
+.stagelist li.now .dot { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+pre.log { background: var(--code); border-radius: 8px; padding: 12px; max-height: 320px; overflow: auto; margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* tables */
+.tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+th { background: var(--surface-2); font-weight: 600; position: sticky; top: 0; white-space: nowrap; }
+td.n { text-align: right; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+tr.total td { font-weight: 650; }
+
+/* stacked bar */
+.stack { display: flex; height: 26px; border-radius: 6px; overflow: hidden; margin: 10px 0 8px; }
+.stack span { display: block; height: 100%; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+/* range */
+.range { position: relative; height: 34px; margin: 6px 0 2px; }
+.range .track { position: absolute; left: 0; right: 0; top: 15px; height: 4px; background: var(--surface-2); border-radius: 2px; }
+.range .band { position: absolute; top: 11px; height: 12px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 4px; }
+.range .tick { position: absolute; top: 6px; width: 2px; height: 22px; background: var(--accent); }
+.range .base { position: absolute; top: 4px; width: 10px; height: 10px; margin-left: -5px; transform: rotate(45deg); background: var(--c-unat); }
+.range-lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* figures */
+.figs { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.fig { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; cursor: zoom-in; margin: 0; }
+.fig img { width: 100%; aspect-ratio: 4/3; object-fit: contain; background: #fff; display: block; }
+.fig figcaption { padding: 8px 10px; font-size: 13px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 14px; }
+.chips button { font: inherit; font-size: 13px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.chips button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+dialog { border: 0; border-radius: 12px; padding: 0; max-width: min(96vw, 1400px); background: var(--surface); color: var(--text); }
+dialog::backdrop { background: rgba(0,0,0,.7); }
+dialog img { display: block; max-width: 100%; max-height: 82vh; background: #fff; }
+dialog .cap { padding: 10px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+dialog .cap span { margin-right: auto; }
+
+.empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+.dl { display: flex; flex-wrap: wrap; gap: 8px; }
+.steplist { display: grid; gap: 6px; }
+.step { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); cursor: pointer; }
+.step:has(input:checked) { border-color: var(--accent); }
+.step.fixed { cursor: default; opacity: .75; }
+.step input { margin-top: 4px; }
+.step .tm { margin-left: auto; color: var(--muted); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.seg button { font: inherit; font-size: 14px; border: 0; background: var(--surface); color: var(--muted); padding: 7px 14px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.seg button:disabled { opacity: .45; cursor: not-allowed; }
+.pgroup { margin-top: 22px; }
+.pgroup h3 { margin-bottom: 8px; }
+.prm { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 6px 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin-bottom: 8px; }
+.prm.changed { border-color: var(--warn); box-shadow: inset 3px 0 0 var(--warn); }
+.prm .lab { font-weight: 600; }
+.prm .hlp { font-size: 13px; color: var(--muted); grid-column: 1; }
+.prm .ctl { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.prm .ctl .in { display: flex; gap: 6px; align-items: center; }
+.prm .ctl input[type=text], .prm .ctl input[type=number], .prm .ctl select { width: 100%; font: inherit; padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); }
+.prm .ctl .unit { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.prm .off { font-size: 12px; color: var(--muted); }
+.prm .off button { font: inherit; font-size: 12px; border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0 0 0 4px; }
+.prm .bad { font-size: 12px; color: var(--bad); }
+.savebar { position: sticky; bottom: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; margin-top: 20px; box-shadow: 0 -2px 12px rgba(0,0,0,.08); z-index: 5; }
+textarea.yaml { width: 100%; min-height: 420px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--code); color: var(--text); resize: vertical; }
+.chg { font-size: 13px; margin: 6px 0 0; padding-left: 18px; }
+.chg code { font-size: 12px; }
+@media (max-width: 640px) { .prm { grid-template-columns: 1fr; } .prm .ctl { grid-column: 1; grid-row: auto; } }
+footer { color: var(--muted); font-size: 13px; padding: 24px 0 40px; border-top: 1px solid var(--border); }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 14px; z-index: 50; max-width: calc(100vw - 32px); }
+@media (max-width: 640px) {
+  .bar { padding: 8px 0; }
+  nav { margin-left: 0; width: 100%; }
+  nav button { padding: 6px 9px; }
+  .kpi .value { font-size: 22px; }
+  .steps li { padding-left: 50px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap bar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><path d="M2 27 L11 12 L15 16 L20 8 L30 27 Z" fill="var(--accent)" opacity=".85"/><path d="M2 27 H30" stroke="var(--text)" stroke-width="2"/></svg>
+      <div>SPBM <small>Stockpile reconstruction &amp; block model</small></div>
+    </div>
+    <nav role="tablist">
+      <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+      <button role="tab" data-tab="how">How it works</button>
+      <button role="tab" data-tab="params">Parameters</button>
+      <button role="tab" data-tab="run">Upload &amp; run</button>
+      <button role="tab" data-tab="results">Results</button>
+    </nav>
+    <button class="theme" id="theme" title="Switch light / dark">◐</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ======================================================== OVERVIEW -->
+<section id="tab-overview">
+  <h2>What this is</h2>
+  <p class="lead">SPBM reconstructs how truck-dumped material moved through a long-term ore stockpile, and builds a 3-D block model of tonnes, Cu, Au, Ag and contained metal, with an uncertainty range for every number.</p>
+
+  <div class="grid g3 block">
+    <div class="card">
+      <h3>The problem</h3>
+      <p>Trucks dump ore at the top of the pile and dozers push it over the edge. Nobody records where each load finally ends up, so the grade inside the pile is unknown.</p>
+    </div>
+    <div class="card">
+      <h3>The data</h3>
+      <p><b>FMS records</b> say what each truck dumped, where and when.<br><b>Survey change solids</b> say where new volume appeared between surveys.</p>
+    </div>
+    <div class="card">
+      <h3>The answer</h3>
+      <p>Each load is matched to the part of the surveyed fill it most plausibly made, with the least dozer push work. Mass and metal are conserved exactly.</p>
+    </div>
+  </div>
+
+  <div class="block">
+    <h3>What it produces</h3>
+    <div class="grid g4">
+      <div class="card small"><b>Block model</b><br>5 × 5 × 2 m blocks as CSV (for mine-planning software) and VTK (for ParaView), with grade, tonnes, source loads and confidence class.</div>
+      <div class="card small"><b>Inventory</b><br>Tonnes and grade, split into FMS-tracked, unattributed and pre-record material, so measured and assumed material are never mixed.</div>
+      <div class="card small"><b>Uncertainty</b><br>Monte Carlo P10 / P50 / P90 ranges, a sensitivity table, and scenarios for interpretations the data cannot rule out.</div>
+      <div class="card small"><b>Audit trail</b><br>Hash of every input, the configuration, the code version, and a change report between model versions.</div>
+    </div>
+  </div>
+
+  <div class="block" id="ov-latest">
+    <h3>Latest results</h3>
+    <div class="empty card" id="ov-empty">Loading…</div>
+    <div class="grid g4" id="ov-kpis"></div>
+  </div>
+
+  <div class="block row">
+    <button class="btn primary" data-go="run">Upload data and run →</button>
+    <button class="btn" data-go="how">How it works</button>
+    <button class="btn" data-go="params">Change parameters</button>
+    <button class="btn" data-go="results">See all results</button>
+  </div>
+</section>
+
+<!-- ======================================================== HOW IT WORKS -->
+<section id="tab-how" hidden>
+  <h2>How it works</h2>
+  <p class="lead">The surveys decide <em>where</em> volume went, the FMS decides <em>what</em> went there, and a physically based push cost decides <em>which</em> load filled <em>which</em> part of the fill. Full mathematics and all 32 assumptions are in <code>METHOD.md</code>.</p>
+
+  <div class="card block">
+    <svg class="diagram" viewBox="0 0 980 230" role="img" aria-label="Workflow: FMS and surveys feed QA, timing and volume calibration, then the transport reconstruction, block model, validation and uncertainty">
+      <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z"/></marker></defs>
+      <rect class="box" x="10" y="30" width="150" height="56" rx="8"/><text x="85" y="54" text-anchor="middle">FMS dump records</text><text class="t2" x="85" y="72" text-anchor="middle">what, where, when</text>
+      <rect class="box" x="10" y="140" width="150" height="56" rx="8"/><text x="85" y="164" text-anchor="middle">Survey solids</text><text class="t2" x="85" y="182" text-anchor="middle">where volume appeared</text>
+      <rect class="box" x="210" y="85" width="150" height="56" rx="8"/><text x="285" y="109" text-anchor="middle">QA/QC + timing</text><text class="t2" x="285" y="127" text-anchor="middle">rules, cut-off, f_v</text>
+      <rect class="boxa" x="410" y="85" width="170" height="56" rx="8"/><text x="495" y="109" text-anchor="middle" font-weight="600">CPST reconstruction</text><text class="t2" x="495" y="127" text-anchor="middle">optimal transport per interval</text>
+      <rect class="box" x="630" y="85" width="140" height="56" rx="8"/><text x="700" y="109" text-anchor="middle">Block model</text><text class="t2" x="700" y="127" text-anchor="middle">5 × 5 × 2 m</text>
+      <rect class="box" x="820" y="20" width="150" height="50" rx="8"/><text x="895" y="50" text-anchor="middle">Validation</text>
+      <rect class="box" x="820" y="88" width="150" height="50" rx="8"/><text x="895" y="118" text-anchor="middle">Uncertainty</text>
+      <rect class="box" x="820" y="156" width="150" height="50" rx="8"/><text x="895" y="186" text-anchor="middle">Audit trail</text>
+      <path class="ln" d="M160 58 C185 58 185 105 208 108"/>
+      <path class="ln" d="M160 168 C185 168 185 120 208 118"/>
+      <path class="ln" d="M360 113 H408"/>
+      <path class="ln" d="M580 113 H628"/>
+      <path class="ln" d="M770 105 C795 100 795 48 818 45"/>
+      <path class="ln" d="M770 113 H818"/>
+      <path class="ln" d="M770 121 C795 126 795 178 818 181"/>
+    </svg>
+  </div>
+
+  <h3 class="block">The steps</h3>
+  <ol class="steps">
+    <li><b>Ingest and check the data</b>Every file is fingerprinted (SHA-256) and stored once; raw files are never edited. A catalogue of 40 rules flags bad records and survey problems. Records are flagged, never silently deleted. Corrections go only through <code>config/manual_interventions.csv</code>, each with a reason, author and date.</li>
+    <li><b>Line up time and volume</b>Survey times are not supplied, so the cut-off hour is scanned to find where FMS volume best matches surveyed volume (result: the next day at 07:00, a shift change). A volume factor converts tonnes to in-pile volume, and is tested on intervals it was not fitted to.
+      <div class="eq">v<sub>i</sub> = T<sub>i</sub> · f<sub>v</sub> / Dens<sub>i</sub> &nbsp;&nbsp;&nbsp; f<sub>v</sub> = Σ net fill / Σ FMS volume (over consistent intervals)</div></li>
+    <li><b>Build the surfaces</b>Each survey solid is rasterised on a 1 m grid, giving a top and bottom elevation per cell. A floor plane is fitted to the toe, and the surface under the earliest surveys is inferred.</li>
+    <li><b>Reconstruct the movement (CPST)</b>For each survey interval: <em>sources</em> are the loads dumped, material cut by dozers, and material carried from earlier; <em>sinks</em> are the cells where the survey shows new fill. The cost of moving a source to a sink is the dozer push distance over the real terrain, with uphill pushing penalised:
+      <div class="eq">w<sub>ij</sub> = ℓ<sub>ij</sub> + α · max(0, z<sub>j</sub> − z<sub>i</sub>) &nbsp;&nbsp;&nbsp; C<sub>kc</sub> = shortest-path push distance (≤ 90 m)</div>
+      The loads are then shared out over the fill so that the total pushing is as small as possible, with a little mixing allowed (the mixing length ε = 6 m covers GPS error and spill). Mathematically this is an “optimal transport” problem, solved with the Sinkhorn method:
+      <div class="eq">min<sub>P ≥ 0</sub> Σ P<sub>kc</sub> C<sub>kc</sub> − ε H(P) &nbsp;&nbsp; subject to &nbsp; P 1 = a (load volumes), &nbsp; P<sup>T</sup> 1 = b (surveyed fill)</div>
+      Two extra “bins” keep the books honest: fill that no truck explains is labelled <em>unattributed</em>, and truck volume that finds no fill waits on the platform and is pushed in the next period.</li>
+    <li><b>Build the block model</b>Layers are integrated exactly into 5 × 5 × 2 m blocks. Grades are always metal ÷ tonnes, never averaged. Each block keeps its tonnes by class, its contributing loads and a confidence class (High / Medium / Low / Uninformed).</li>
+    <li><b>Validate</b>Mass and metal balance against the FMS; model surface against the survey; a forward physics model tested on survey intervals it never saw; and a synthetic “twin” where the true answer is known.</li>
+    <li><b>Quantify uncertainty</b>A Monte Carlo run re-does the whole reconstruction with GPS error, tonnage error, grade error, survey error, cut-off, mixing length, push penalty and cost form all sampled together. A one-at-a-time sensitivity table and separate scenarios cover what the ranges do not.</li>
+    <li><b>Record the audit trail</b>The run manifest stores input hashes, the configuration, the code version and library versions. Each run is archived, and a change report compares it with the previous version.</li>
+  </ol>
+
+  <div class="grid g2 block">
+    <div class="card">
+      <h3>Information classes</h3>
+      <p class="small"><span class="tag info">FMS-tracked</span> measured tonnes and grades, placed by the reconstruction.<br>
+      <span class="tag warn">Unattributed</span> surveyed fill with no FMS record; grade imputed from loads of the same days.<br>
+      <span class="tag">Pre-record</span> the core of the pile that existed before the record; geometry inferred and grade assumed.</p>
+    </div>
+    <div class="card">
+      <h3>What the data cannot settle</h3>
+      <p class="small">Surveyed volume is about 47% more than the FMS tonnes would fill at their recorded density. That can be bulking, payload under-recording or missing loads, and the data cannot tell these apart. The base case treats it as bulking; the other readings are run as scenarios and reported separately.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================== RUN -->
+<section id="tab-run" hidden>
+  <h2>Upload &amp; run</h2>
+  <p class="lead">Choose which data to model, add files if needed, pick the settings and the steps, then start the run.</p>
+
+  <div class="card block">
+    <h3>1. Which data?</h3>
+    <div class="seg" id="dataseg">
+      <button data-ds="example" aria-pressed="true">Example data (Data_Topo 2026.zip)</button>
+      <button data-ds="own">My own data</button>
+    </div>
+    <p class="small" id="datanote" style="margin:10px 0 0"></p>
+    <div class="note small" id="ownhelp" hidden>
+      <b>What to upload:</b> the truck (FMS) records as <code>.csv</code> with the columns <code>Cycle ID, Truck PayLoad, Au, Ag, Cu, Dens, X (Dump Event), Y (Dump Event), Z (Dump Event), Dump_tstamp</code>, and one survey change solid per survey as <code>.dxf</code> whose file name contains the survey date as YYMMDD (for example <code>PadB_260402.dxf</code>). A <code>.zip</code> of them also works. Coordinates must be metres, with the truck records and the surveys on the same grid.
+      <br><b>Check the settings for your site</b> on the Parameters tab. A few defaults were set for the example stockpile, such as the survey time of day (cut-off), the bucket size used for the payload check and the angle of repose. The volume factor is worked out from your own data.
+      <br>Your files are kept apart from the example data (in <code>data/own/</code>), and data corrections go in <code>data/own/manual_interventions.csv</code>.
+    </div>
+  </div>
+
+  <div class="grid g2 block">
+    <div>
+      <h3>2. Add files <span class="muted small" id="addopt">(optional)</span></h3>
+      <label class="drop" id="drop">
+        <input type="file" id="file" multiple accept=".csv,.dxf,.zip" hidden>
+        <strong>Drop files here or click to choose</strong>
+        <span class="muted small">FMS <code>.csv</code> · survey <code>.dxf</code> (name contains the date as YYMMDD) · <code>.zip</code></span>
+      </label>
+      <ul class="filelist" id="uploads"></ul>
+      <h3 class="block" style="margin-top:20px">Waiting to be used</h3>
+      <ul class="filelist" id="inbox"></ul>
+      <p class="muted small" style="margin-top:8px">Files are registered when the next run starts. After that they stay part of this data set even if removed from the waiting list; a corrected file with the same name needs a <code>supersede</code> correction.</p>
+      <button class="btn danger" id="clearown" hidden style="margin-top:6px">Clear my data and start over</button>
+    </div>
+
+    <div>
+      <h3>3. Settings</h3>
+      <div class="seg" id="cfgseg">
+        <button data-cfg="default" aria-pressed="true">Default (config/project.yaml)</button>
+        <button data-cfg="custom" id="cfgcustom">Custom</button>
+      </div>
+      <p class="muted small" id="cfgnote" style="margin-top:8px"></p>
+
+      <h3 style="margin-top:20px">4. Choose what to run</h3>
+      <div class="row" style="margin-bottom:10px">
+        <span class="small muted">Presets:</span>
+        <button class="btn" data-preset="fast" style="padding:5px 12px">Fast</button>
+        <button class="btn" data-preset="full" style="padding:5px 12px">Everything</button>
+        <button class="btn" data-preset="core" style="padding:5px 12px">Core only</button>
+      </div>
+      <div class="steplist" id="steplist"></div>
+      <h3 style="margin-top:18px">5. Speed</h3>
+      <div class="row">
+        <div class="seg" id="speedseg">
+          <button data-speed="low">Low</button><button data-speed="medium">Medium</button><button data-speed="high" aria-pressed="true">High</button><button data-speed="custom">Custom</button>
+        </div>
+        <span id="customwrap" hidden class="small">cores <input type="number" id="workers" min="1" value="1"></span>
+      </div>
+      <p class="muted small" id="speednote" style="margin-top:8px"></p>
+      <div class="row" style="margin-top:14px">
+        <button class="btn primary" id="go">Start run</button>
+        <button class="btn danger" id="stop" hidden>Cancel</button>
+        <span class="muted small" id="est" style="margin-left:auto"></span>
+      </div>
+      <p class="muted small" style="margin-top:10px" id="outnote"></p>
+    </div>
+  </div>
+
+  <div class="card block" id="jobcard" hidden>
+    <div class="row">
+      <h3 style="margin:0">Progress</h3>
+      <span class="tag" id="jobtag">idle</span>
+      <span class="muted small" id="jobtime" style="margin-left:auto"></span>
+    </div>
+    <div class="prog" id="prog"><span></span></div>
+    <div class="row small"><span id="jobstage" class="muted"></span><span id="jobpct" class="muted" style="margin-left:auto"></span></div>
+    <ul class="stagelist" id="stages"></ul>
+    <details style="margin-top:12px"><summary class="small muted" style="cursor:pointer">Live log</summary><pre class="log mono" id="log"></pre></details>
+    <div class="row" id="jobdone" hidden style="margin-top:12px"><button class="btn primary" data-go="results">View results →</button></div>
+  </div>
+
+  <div class="block">
+    <h3>Files already registered <span class="muted small" id="reglabel"></span></h3>
+    <div id="registered"></div>
+  </div>
+</section>
+
+<!-- ======================================================== PARAMETERS -->
+<section id="tab-params" hidden>
+  <h2>Parameters</h2>
+  <p class="lead">Change any model value or assumption, then run with <b>Custom</b> parameters. Changes are saved to <code>config/project_custom.yaml</code> and runs with them write to their own folders (<code>outputs_custom/</code>, or <code>outputs_own_custom/</code> for your own data), so the default settings and results are never touched.</p>
+  <div class="note info small" id="pstatus"></div>
+  <div class="row block" style="margin-top:14px">
+    <div class="seg" id="pmode"><button data-pm="form" aria-pressed="true">Form</button><button data-pm="yaml">Edit all (YAML)</button></div>
+    <button class="btn" id="preset" style="margin-left:auto">Reset everything to default</button>
+  </div>
+
+  <div id="pform"></div>
+
+  <div id="pyaml" hidden>
+    <p class="small muted" style="margin-top:16px">The complete configuration, including sensitivity ranges and everything not on the form. The <code>inputs</code> and <code>outputs</code> sections are fixed and will be reset when saved. Every form field is still validated.</p>
+    <textarea class="yaml" id="yamltxt" spellcheck="false"></textarea>
+  </div>
+
+  <div class="savebar row">
+    <span class="small" id="pdirty">No unsaved changes.</span>
+    <button class="btn" id="pdiscard" style="margin-left:auto">Discard edits</button>
+    <button class="btn primary" id="psave">Save custom parameters</button>
+  </div>
+</section>
+
+<!-- ======================================================== RESULTS -->
+<section id="tab-results" hidden>
+  <div class="row"><h2 style="margin:0">Results</h2><span class="tag" id="runid"></span>
+    <div class="seg" id="resdata" style="margin-left:auto"><button data-rd="example" aria-pressed="true">Example data</button><button data-rd="own">My own data</button></div>
+    <div class="seg" id="resparams"><button data-rp="default" aria-pressed="true">Default</button><button data-rp="custom">Custom</button></div>
+    <button class="btn" id="reload">Refresh</button></div>
+  <p class="muted small" id="runmeta" style="margin-top:6px"></p>
+  <div class="note small" id="chgnote" hidden></div>
+  <div class="note small" id="stalenote" hidden></div>
+  <div id="res-empty" class="empty card" hidden>No results in this folder yet. Start a run from <a href="#run" data-go="run">Upload &amp; run</a>.</div>
+
+  <div id="res">
+    <div class="grid g4 block" id="kpis"></div>
+
+    <div class="grid g2 block">
+      <div class="card">
+        <h3>Whole pile by information class</h3>
+        <div class="stack" id="stack"></div>
+        <div class="legend" id="stackleg"></div>
+        <p class="small muted" style="margin-top:10px">Only the FMS-tracked part has measured grades. The pre-record core has inferred geometry and an assumed grade.</p>
+      </div>
+      <div class="card">
+        <h3>Record-period tonnes: uncertainty</h3>
+        <div id="mcrange"></div>
+        <p class="small muted" id="mcnote" style="margin-top:8px"></p>
+      </div>
+    </div>
+
+    <div class="note" id="gradenote">Grade units are as supplied and unconfirmed (mean Cu about 8.4% and Au about 8 g/t, around ten times typical Cu-Au feed). Confirm with Geology before using any contained-metal figure.</div>
+
+    <div class="block">
+      <h3>Scenarios for the volume gap</h3>
+      <div id="scen"></div>
+    </div>
+
+    <div class="block">
+      <h3>Checks</h3>
+      <div class="grid g3" id="checks"></div>
+    </div>
+
+    <div class="block">
+      <h3>Figures</h3>
+      <div class="chips" id="figchips"></div>
+      <div class="figs" id="figs"></div>
+    </div>
+
+    <div class="block">
+      <div class="row"><h3 style="margin:0">Tables</h3><select id="tblsel" style="margin-left:auto"></select></div>
+      <p class="small muted" id="tblpath" style="margin:6px 0"></p>
+      <div id="tbl"></div>
+    </div>
+
+    <div class="block">
+      <h3>Downloads</h3>
+      <div class="dl" id="dl"></div>
+    </div>
+
+    <div class="block">
+      <h3>Run history</h3>
+      <div id="hist"></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="wrap">SPBM · runs locally with <code>python -m spbm serve</code>. Method: <code>METHOD.md</code>. Parameters: <code>config/project.yaml</code>.</footer>
+
+<dialog id="lb"><img id="lbimg" alt=""><div class="cap"><span id="lbcap"></span><a class="btn" id="lbdl" download>Download</a><button class="btn" id="lbx">Close</button></div></dialog>
+
+<script>
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (v, d = 0) => v == null || isNaN(v) ? "–" : Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const kt = v => fmt(v / 1000, 1) + " kt";
+const bytes = n => n > 1e9 ? fmt(n / 1e9, 2) + " GB" : n > 1e6 ? fmt(n / 1e6, 1) + " MB" : fmt(n / 1e3, 0) + " kB";
+const dur = s => s == null ? "" : s < 60 ? Math.round(s) + " s" : Math.floor(s / 60) + " min " + String(Math.round(s % 60)).padStart(2, "0") + " s";
+function toast(msg) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), 3800); }
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+/* ---------- theme & tabs ---------- */
+try { const t = localStorage.getItem("spbm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+$("#theme").onclick = () => {
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+  const nxt = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = nxt;
+  try { localStorage.setItem("spbm-theme", nxt); } catch (e) {}
+};
+function show(tab) {
+  $$("nav [data-tab]").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === tab));
+  $$("main > section").forEach(s => s.hidden = s.id !== "tab-" + tab);
+  if (location.hash !== "#" + tab) history.replaceState(null, "", "#" + tab);
+  if (tab === "results") loadResults();
+  if (tab === "run") refreshState();
+  if (tab === "params") loadParams();
+  scrollTo(0, 0);
+}
+$$("nav [data-tab]").forEach(b => b.onclick = () => show(b.dataset.tab));
+document.addEventListener("click", e => { const g = e.target.closest("[data-go]"); if (g) { e.preventDefault(); show(g.dataset.go); } });
+
+/* ---------- tables ---------- */
+const isNum = v => v !== "" && v != null && !isNaN(Number(v));
+function cell(v) {
+  if (!isNum(v)) return `<td>${esc(v)}</td>`;
+  const x = Number(v), a = Math.abs(x);
+  let s;
+  if (a !== 0 && (a < 1e-3 || a >= 1e9)) s = x.toExponential(2);
+  else if (Number.isInteger(x)) s = fmt(x, 0);
+  else s = fmt(x, a >= 1000 ? 0 : a >= 10 ? 2 : 3);
+  return `<td class="n">${s}</td>`;
+}
+function table(d, opts = {}) {
+  if (!d || !d.columns) return `<p class="muted small">Not produced by this run${opts.fast ? " (full analysis only)" : ""}.</p>`;
+  const cols = d.columns.map((c, i) => c === "" && i === 0 ? "" : c);
+  const body = d.rows.map(r => `<tr class="${opts.totalRow && /total/i.test(r[0]) ? "total" : ""}">${r.map(cell).join("")}</tr>`).join("");
+  return `<div class="tablewrap"><table><thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></div>` +
+    (d.truncated ? `<p class="small muted">First ${d.rows.length} rows shown; download the CSV for all of it.</p>` : "");
+}
+
+/* ---------- overview ---------- */
+function kpiHtml(label, value, sub) { return `<div class="card kpi"><div class="label">${esc(label)}</div><div class="value">${value}</div><div class="sub">${sub || ""}</div></div>`; }
+function kpis(k) {
+  const mc = k.mc_record_period_tonnes_p10_p50_p90;
+  return [
+    kpiHtml("Record-period tonnes", fmt(k.tonnes_record_period), (mc ? `P10–P90 ${kt(mc[0])} – ${kt(mc[2])}` : "Monte Carlo not run") + ""),
+    kpiHtml("Record-period Cu grade", fmt(100 * k.cu_t_record_period / k.tonnes_record_period, 2) + "%", `${fmt(k.cu_t_record_period)} t contained Cu`),
+    kpiHtml("Whole modelled pile", fmt(k.total_tonnes) + " t", `incl. ${fmt(k.tonnes_legacy)} t pre-record core`),
+    kpiHtml("Volume factor f_v", fmt(k.volume_factor, 3), `hold-out error ${fmt(100 * k.volume_factor_holdout_mae, 1)}%`),
+    kpiHtml("Mass balance", Math.abs(k.mass_balance_rel_err_ppm) < 1e-3 ? "exact" : fmt(k.mass_balance_rel_err_ppm, 3) + " ppm", "FMS tonnes in = tonnes in blocks"),
+    kpiHtml("Surface vs survey", fmt(k.geometry_rmse_m, 2) + " m", "RMSE of model top vs latest survey"),
+    kpiHtml("Survey cut-off", "D+1 " + String(Math.floor((k.survey_cutoff_hours - 24))).padStart(2, "0") + ":" + String(Math.round((k.survey_cutoff_hours % 1) * 60)).padStart(2, "0"), `${k.n_surveys} surveys, ${fmt(k.n_fms_records)} FMS records`),
+    kpiHtml("Blocks", fmt(k.blocks), `${k.block_size.join(" × ")} m`),
+  ].join("");
+}
+async function loadOverview() {
+  try {
+    const r = await api("/api/results");
+    if (!r.available) { $("#ov-empty").hidden = false; $("#ov-empty").textContent = "No results yet. Upload data or start a run."; return; }
+    $("#ov-empty").hidden = true;
+    $("#ov-kpis").innerHTML = kpis(r.summary.key_results).split("</div></div>").slice(0, 4).join("</div></div>") + "</div></div>";
+  } catch (e) { $("#ov-empty").textContent = "Could not reach the platform: " + e.message; }
+}
+
+/* ---------- run tab ---------- */
+// optional steps: id (as in --skip), label, seconds in a timed full run ("mc" is per realisation), what it gives
+// per step: seconds on one core on the example data ("mc" per realisation),
+// label, description, and the best speed-up its cases allow (null = number of realisations)
+const STEP_INFO = {
+  align: [0.5, "Survey cut-off scan", "Re-checks the 31 h cut-off against the data (the configured cut-off is used either way).", 1],
+  mc: [2.5, "Monte Carlo uncertainty", "P10/P50/P90 for every block and total.", null],
+  figures: [7, "Figures", "Growth, block-model and uncertainty plots.", 1],
+  temporal: [55, "Forward-model temporal test", "Predicts survey intervals the model never saw.", 30],
+  twin: [75, "Synthetic twin experiment", "Tests the reconstruction on data with a known answer.", 2.5],
+  robust: [75, "Numerical robustness", "Re-runs with other grid sizes, tolerances and detection limits.", 1.5],
+  scenarios: [12, "Volume-gap scenarios", "Bulking vs under-recording vs missing loads.", 5],
+  sensitivity: [170, "Sensitivity analysis", "One-at-a-time tornado over the main assumptions.", 3.4],
+};
+const ORDER = ["align", "mc", "figures", "temporal", "twin", "robust", "scenarios", "sensitivity"];
+const PRESETS = { fast: ["mc", "temporal", "twin", "robust", "sensitivity"], full: [], core: ORDER.slice() };
+const CORE_S = 13;
+let polling = null, lastJobRunning = false, runCfg = "default", runData = "example", ST = null, CLOCK = null;
+// Elapsed time counts up every second from the run's start; the time left
+// counts down between server updates instead of jumping.
+function roundLeft(s) { return s < 90 ? Math.max(5, Math.round(s / 5) * 5) : Math.round(s / 30) * 30; }
+function tickClock() {
+  if (!CLOCK) return;
+  const j = CLOCK.job, now = Date.now() / 1000 + CLOCK.offset;
+  const elapsed = j.running ? now - j.started : j.elapsed_s;
+  let txt = j.workers + (j.workers === 1 ? " core" : " cores") + " · elapsed " + dur(Math.floor(elapsed));
+  if (j.running && j.eta_s != null) {
+    const left = Math.max(j.eta_s - (Date.now() / 1000 - CLOCK.at), 0);
+    txt += left > 0 ? " · about " + dur(roundLeft(left)) + " left" : " · almost done";
+  }
+  $("#jobtime").textContent = txt;
+}
+setInterval(tickClock, 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && ST) refreshState(); });
+const SET_LABEL = { default: "example data · default settings", custom: "example data · custom settings",
+                    own_default: "my data · default settings", own_custom: "my data · custom settings" };
+const setKey = (data, params) => (data === "own" ? "own_" : "") + params;
+
+function renderSteps() {
+  $("#steplist").innerHTML =
+    `<label class="step fixed"><input type="checkbox" checked disabled><span><b>Core</b> <span class="small muted">(always runs)</span><br><span class="small muted">Import, data checks, f_v calibration, reconstruction, block model, mass/metal balance, audit trail.</span></span><span class="tm">~${CORE_S} s</span></label>` +
+    ORDER.map(id => {
+      const [s, label, what] = STEP_INFO[id];
+      const extra = id === "mc" ? `<br><span class="small">Realisations <input type="number" id="mc" min="1" max="1000" value="${ST ? ST.default_mc : 60}"></span>` : "";
+      return `<label class="step"><input type="checkbox" data-step="${id}" checked><span><b>${label}</b><br><span class="small muted">${what}</span>${extra}</span><span class="tm" data-tm="${id}"></span></label>`;
+    }).join("");
+  setPreset("fast");
+}
+function setPreset(name) { $$("[data-step]").forEach(c => c.checked = !PRESETS[name].includes(c.dataset.step)); estimate(); }
+function skipList() { return $$("[data-step]").filter(c => !c.checked).map(c => c.dataset.step); }
+let speed = "high";
+try { speed = localStorage.getItem("spbm-speed") || "high"; } catch (e) {}
+const SLOW = ["mc", "temporal", "twin", "robust", "scenarios", "sensitivity"];
+function oneCore(id) { return STEP_INFO[id][0] * (id === "mc" ? nMC() : 1); }
+function onW(id, w) {               // a step's time on w cores
+  const cap = STEP_INFO[id][3] === null ? nMC() : STEP_INFO[id][3];
+  return oneCore(id) / Math.max(1, Math.min(cap, w * 0.85));
+}
+function maxW() { return ST && ST.machine ? ST.machine.max_workers : 1; }
+function nWorkers() {
+  if (!ST || !ST.machine) return 1;
+  if (speed === "custom") return Math.max(1, Math.min(maxW(), Number($("#workers").value) || 1));
+  return ST.machine.modes[speed];
+}
+function renderSpeed() {
+  if (!ST || !ST.machine) return;
+  const m = ST.machine, md = m.modes;
+  document.querySelectorAll("#speedseg button").forEach(b => {
+    b.setAttribute("aria-pressed", b.dataset.speed === speed);
+    if (md[b.dataset.speed]) b.textContent = b.dataset.speed[0].toUpperCase() + b.dataset.speed.slice(1) + " (" + md[b.dataset.speed] + ")";
+  });
+  $("#customwrap").hidden = speed !== "custom";
+  $("#workers").max = m.max_workers;
+  if (Number($("#workers").value) > m.max_workers) $("#workers").value = m.max_workers;
+  const w = nWorkers();
+  $("#speednote").innerHTML = `This computer: <b>${m.cores}</b> cores${m.ram_gb ? `, <b>${m.ram_gb} GB</b> memory` : ""}. ` +
+    `Up to <b>${m.max_workers}</b> can be used (one core is kept free${m.ram_gb ? ", about 0.6 GB memory each" : ""}). ` +
+    `This run uses <b>${w}</b>. Low keeps the computer free for other work; High is fastest. Results are the same either way.`;
+  estimate();
+}
+document.getElementById("speedseg").addEventListener("click", e => {
+  const b = e.target.closest("[data-speed]"); if (!b) return;
+  speed = b.dataset.speed;
+  try { localStorage.setItem("spbm-speed", speed); } catch (err) {}
+  renderSpeed();
+});
+document.getElementById("workers").addEventListener("input", renderSpeed);
+function nMC() { return Math.max(1, Math.min(1000, Number($("#mc") && $("#mc").value) || 60)); }
+function estimate() {
+  const w = nWorkers(), on = id => $(`[data-step="${id}"]`).checked;
+  ORDER.forEach(id => { const el = $(`[data-tm="${id}"]`); if (el) el.textContent = "~" + dur(onW(id, w)); });
+  let s = CORE_S + ORDER.filter(id => on(id) && !SLOW.includes(id)).reduce((a, id) => a + oneCore(id), 0);
+  const slow = SLOW.filter(on);
+  if (slow.length) {
+    // with several cores the slow steps run side by side: limited by the total
+    // work over the cores, or by the step whose own cases cannot be spread further
+    s += w > 1 ? Math.max(slow.reduce((a, id) => a + oneCore(id), 0) / (0.85 * w), ...slow.map(id => onW(id, w)))
+               : slow.reduce((a, id) => a + oneCore(id), 0);
+  }
+  $("#est").textContent = "estimated " + dur(s) + " on the example data" + (w > 1 && slow.length > 1 ? " (slow steps side by side)" : "");
+}
+$("#steplist").addEventListener("change", estimate);
+$("#steplist").addEventListener("input", estimate);
+document.addEventListener("click", e => { const b = e.target.closest("[data-preset]"); if (b) setPreset(b.dataset.preset); });
+
+function setRunCfg(c) {
+  if (c === "custom" && !(ST && ST.custom_config)) { toast("Save custom settings on the Parameters tab first"); return; }
+  runCfg = c;
+  document.querySelectorAll("#cfgseg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.cfg === c));
+  updateOutNote();
+}
+function updateOutNote() {
+  const k = setKey(runData, runCfg), root = ST ? ST.result_sets[k].root : k;
+  const replaces = k === "default"
+    ? " and replace the default results for the example data. Every run is archived in <code>history/</code> and compared with the previous one in the change report."
+    : ". Other results are not touched.";
+  $("#outnote").innerHTML = `Results go to <code>${esc(root)}/</code>` + replaces;
+}
+function setRunData(d) {
+  runData = d;
+  document.querySelectorAll("#dataseg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.ds === d));
+  const own = d === "own";
+  $("#ownhelp").hidden = !own;
+  $("#clearown").hidden = !own;
+  $("#addopt").textContent = own ? "(needed)" : "(optional)";
+  $("#datanote").innerHTML = own
+    ? "Only the files you upload here are used. The example data is left out."
+    : "The supplied example stockpile (<code>Data_Topo 2026.zip</code>) is always included. Files you add here are modelled together with it.";
+  if (ST) renderData();
+  updateOutNote();
+}
+$("#dataseg").addEventListener("click", e => { const b = e.target.closest("[data-ds]"); if (b) setRunData(b.dataset.ds); });
+$("#clearown").onclick = async () => {
+  if (!confirm("Remove all files uploaded as your own data (waiting and registered)? Results already produced are kept.")) return;
+  try { await api("/api/own/clear", { method: "POST" }); toast("Your data was cleared"); refreshState(); } catch (e) { toast(e.message); }
+};
+function renderData() {
+  const ds = ST.datasets[runData];
+  renderInbox(ds.inbox);
+  $("#reglabel").textContent = "(" + ds.label.toLowerCase() + ")";
+  const reg = ds.registered;
+  $("#registered").innerHTML = reg ? table(reg) : `<p class="muted small">None yet. Files are registered when a run starts.</p>`;
+}
+$("#cfgseg").addEventListener("click", e => { const b = e.target.closest("[data-cfg]"); if (b) setRunCfg(b.dataset.cfg); });
+
+function renderJob(j) {
+  const card = $("#jobcard");
+  if (!j) { card.hidden = true; $("#go").disabled = false; $("#stop").hidden = true; return; }
+  card.hidden = false;
+  const ok = !j.running && j.returncode === 0, fail = !j.running && j.returncode !== 0;
+  $("#jobtag").className = "tag " + (j.running ? "info" : ok ? "ok" : "bad");
+  $("#jobtag").textContent = (SET_LABEL[j.set] || j.set) + " · " + (j.running ? "running" : ok ? "finished" : "stopped (exit " + j.returncode + ")");
+  $("#prog").className = "prog " + (j.running ? "run" : ok ? "done" : "fail");
+  $("#prog span").style.width = Math.max(2, 100 * j.progress) + "%";
+  $("#jobpct").textContent = j.running ? Math.round(100 * j.progress) + "% (estimated)" : "";
+  const now = j.stages.find(s => s.state === "now");
+  $("#jobstage").textContent = j.running ? (now ? now.label : "starting") : ok ? "Run " + (j.run_id || "") + " complete" : "The run did not finish; see the log below.";
+  // the clock ticks in the page (see tickClock); here we only record what the server knows
+  CLOCK = { job: j, offset: j.now - Date.now() / 1000, at: Date.now() / 1000 };
+  tickClock();
+  const log = $("#log"), atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
+  log.textContent = "$ " + j.cmd + "\n" + j.log.join("\n");
+  if (atEnd) log.scrollTop = log.scrollHeight;
+  $("#stages").innerHTML = j.stages.map(s => {
+    const cls = s.state === "done" ? "done" : s.state === "now" ? "now" : "";
+    const extra = s.state === "now" && /^Monte Carlo/.test(s.label) && j.mc_done ? ` <span class="small">(${j.mc_done[0]} / ${j.mc_done[1]})</span>` : "";
+    return `<li class="${cls}${s.label.startsWith("· ") ? " sub" : ""}"><span class="dot"${s.state === "failed" ? ' style="background:var(--bad);border-color:var(--bad)"' : ""}></span>${esc(s.label)}${extra}</li>`;
+  }).join("");
+  $("#go").disabled = j.running;
+  $("#stop").hidden = !j.running;
+  $("#jobdone").hidden = !ok;
+  $("#jobdone button").dataset.set = j.set;
+  if (lastJobRunning && !j.running) { toast(ok ? "Run finished" : "Run stopped"); loadOverview(); resultsLoaded = false; if (ok) { resData = j.set.startsWith("own") ? "own" : "example"; resParams = j.set.endsWith("custom") ? "custom" : "default"; } }
+  lastJobRunning = j.running;
+}
+
+function renderInbox(files) {
+  $("#inbox").innerHTML = files.length ? files.map(f =>
+    `<li><span class="nm">${esc(f.name)}</span><span class="sz">${bytes(f.bytes)}</span><button class="btn link" data-rm="${esc(f.name)}" title="Remove from inbox">Remove</button></li>`).join("")
+    : `<li class="muted small">${runData === "own" ? "Nothing waiting. Upload your FMS and survey files above." : "Nothing waiting. Runs use the example data and anything already registered."}</li>`;
+}
+$("#inbox").addEventListener("click", async e => {
+  const b = e.target.closest("[data-rm]"); if (!b) return;
+  try { await api("/api/inbox/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: b.dataset.rm, data: runData }) }); refreshState(); }
+  catch (err) { toast(err.message); }
+});
+
+async function refreshState() {
+  try {
+    const s = await api("/api/state");
+    const first = !ST; ST = s;
+    if (first) { renderSteps(); renderSpeed(); }
+    renderData();
+    $("#cfgcustom").disabled = !s.custom_config;
+    $("#cfgnote").innerHTML = s.custom_config ? `Custom settings are saved. <a href="#params" data-go="params">Review them</a>.`
+      : `To change values or assumptions, use the <a href="#params" data-go="params">Parameters</a> tab.`;
+    if (runCfg === "custom" && !s.custom_config) runCfg = "default";
+    setRunCfg(runCfg);
+    renderJob(s.job);
+    schedule(s.job && s.job.running);
+  } catch (e) { toast("Could not reach the platform: " + e.message); }
+}
+function schedule(running) { clearTimeout(polling); if (running) polling = setTimeout(refreshState, 1500); }
+
+function upload(file) {
+  const li = document.createElement("li");
+  li.innerHTML = `<span class="nm">${esc(file.name)}</span><span class="sz">${bytes(file.size)}</span><span class="mini"><span></span></span>`;
+  $("#uploads").append(li);
+  return new Promise(res => {
+    const x = new XMLHttpRequest();
+    x.open("PUT", "/api/upload?data=" + runData + "&name=" + encodeURIComponent(file.name));
+    x.upload.onprogress = e => { if (e.lengthComputable) $(".mini span", li).style.width = (100 * e.loaded / e.total) + "%"; };
+    x.onload = () => {
+      let msg = ""; try { msg = JSON.parse(x.responseText).error || ""; } catch (e) {}
+      if (x.status === 200) { li.querySelector(".sz").innerHTML = `<span class="tag ok">uploaded</span>`; setTimeout(() => li.remove(), 2500); }
+      else { li.querySelector(".mini").remove(); li.querySelector(".sz").innerHTML = `<span class="tag bad">${esc(msg || "failed")}</span>`; }
+      res();
+    };
+    x.onerror = () => { li.querySelector(".sz").innerHTML = `<span class="tag bad">network error</span>`; res(); };
+    x.send(file);
+  });
+}
+async function handleFiles(list) {
+  const files = [...list].filter(f => /\.(csv|dxf|zip)$/i.test(f.name));
+  if (files.length < list.length) toast("Only .csv, .dxf and .zip files are accepted");
+  for (const f of files) await upload(f);
+  refreshState();
+}
+const drop = $("#drop");
+$("#file").onchange = e => { handleFiles(e.target.files); e.target.value = ""; };
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => handleFiles(e.dataTransfer.files));
+
+$("#go").onclick = async () => {
+  const body = { data: runData, params: runCfg, skip: skipList(), mc: nMC(), workers: nWorkers() };
+  if (runData === "own" && !ST.datasets.own.inbox.length && !ST.datasets.own.registered) { toast("Upload your own FMS and survey files first"); return; }
+  if (setKey(runData, runCfg) === "default" && !confirm("This run replaces the default results for the example data in " + ST.result_sets.default.root + "/ (the previous version stays in history/). Continue?")) return;
+  try { const j = await api("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); lastJobRunning = true; renderJob(j); schedule(true); }
+  catch (e) { toast(e.message); }
+};
+$("#stop").onclick = async () => { if (!confirm("Cancel the running analysis?")) return; await api("/api/cancel", { method: "POST" }).catch(e => toast(e.message)); refreshState(); };
+$("#jobdone").addEventListener("click", e => { const s = e.target.dataset.set; if (s) { resData = s.startsWith("own") ? "own" : "example"; resParams = s.endsWith("custom") ? "custom" : "default"; resultsLoaded = false; } });
+
+/* ---------- parameters ---------- */
+let PS = null, pmode = "form", edits = {};
+const show_v = v => v == null ? "(blank)" : Array.isArray(v) ? v.join(", ") : String(v);
+const eqv = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function inputFor(it, v) {
+  const k = esc(it.keys[0]);
+  if (it.kind === "bool") return `<select data-k="${k}"><option value="true"${v ? " selected" : ""}>on</option><option value="false"${!v ? " selected" : ""}>off</option></select>`;
+  if (it.kind === "choice") return `<select data-k="${k}">${it.choices.map(c => `<option${c === v ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>`;
+  if (it.kind === "multichoice") return `<span data-k="${k}" data-multi="1">${it.choices.map(c => `<label class="small" style="margin-right:10px"><input type="checkbox" value="${esc(c)}"${(v || []).includes(c) ? " checked" : ""}> ${esc(c)}</label>`).join("")}</span>`;
+  const val = v == null ? "" : Array.isArray(v) ? v.join(", ") : v;
+  const ph = it.kind === "auto_number" ? 'placeholder="auto"' : it.kind === "null_number" ? 'placeholder="blank = from FMS"' : "";
+  const type = (it.kind === "number" || it.kind === "int") ? "number" : "text";
+  const step = it.kind === "int" ? 'step="1"' : 'step="any"';
+  return `<input type="${type}" ${type === "number" ? step : ""} data-k="${k}" value="${esc(val)}" ${ph}>`;
+}
+function readInput(it) {
+  const el = $(`[data-k="${CSS.escape(it.keys[0])}"]`);
+  if (it.kind === "bool") return el.value === "true";
+  if (it.kind === "multichoice") return $$("input:checked", el).map(c => c.value);
+  if (it.kind === "number" || it.kind === "int") return el.value === "" ? "" : Number(el.value);
+  if (it.kind === "numlist") return el.value.split(/[,;]/).map(s => s.trim()).filter(Boolean).map(Number);
+  if (it.kind === "auto_number") return el.value.trim() === "" || /^auto$/i.test(el.value.trim()) ? "auto" : Number(el.value);
+  if (it.kind === "null_number") return el.value.trim() === "" ? null : Number(el.value);
+  return el.value;
+}
+function current(it) { return it.custom !== null && PS.custom_exists ? it.custom : it.default; }
+function renderParams() {
+  const st = PS.custom_exists
+    ? `Custom parameters saved: <b>${PS.changes.length}</b> value${PS.changes.length === 1 ? "" : "s"} differ from the default settings.` + (PS.changes.length ? `<ul class="chg">${PS.changes.map(c => `<li><code>${esc(c.key)}</code>: ${esc(show_v(c.default))} → <b>${esc(show_v(c.custom))}</b></li>`).join("")}</ul>` : "")
+    : "No custom parameters yet. The form shows the default values; edit any of them and save.";
+  $("#pstatus").innerHTML = st + `<div style="margin-top:6px">There are no economic or price parameters in this model; it reports tonnes, grades and contained metal.</div>`;
+  $("#pform").innerHTML = PS.groups.map(g => `<div class="pgroup"><h3>${esc(g.title)}</h3>` + g.items.map(it => {
+    const cur = current(it), changed = !eqv(cur, it.default);
+    return `<div class="prm${changed ? " changed" : ""}" data-row="${esc(it.keys[0])}">
+      <div><span class="lab">${esc(it.label)}</span> ${it.a ? `<span class="tag">${esc(it.a)}</span>` : ""}</div>
+      <div class="hlp">${esc(it.help)} <span class="mono" style="font-size:11.5px;opacity:.75">${it.keys.map(esc).join(" + ")}</span></div>
+      <div class="ctl"><div class="in">${inputFor(it, cur)}${it.unit ? `<span class="unit">${esc(it.unit)}</span>` : ""}</div>
+        <div class="off">default: ${esc(show_v(it.default))}${changed ? `<button data-revert="${esc(it.keys[0])}">use default</button>` : ""}</div>
+        <div class="bad" data-bad="${esc(it.keys[0])}"></div></div></div>`;
+  }).join("") + `</div>`).join("");
+  $("#yamltxt").value = PS.yaml;
+  edits = {}; markDirty();
+}
+const ITEMS = () => PS.groups.flatMap(g => g.items);
+function markDirty() {
+  const n = Object.keys(edits).length + ($("#yamltxt").dataset.dirty ? 1 : 0);
+  $("#pdirty").textContent = pmode === "yaml" ? ($("#yamltxt").dataset.dirty ? "YAML edited, not saved." : "No unsaved changes.") : n ? `${n} unsaved change${n === 1 ? "" : "s"}.` : "No unsaved changes.";
+}
+$("#pform").addEventListener("input", onEdit);
+$("#pform").addEventListener("change", onEdit);
+function onEdit(e) {
+  const holder = e.target.closest("[data-k]") || e.target; const k = holder.dataset.k; if (!k) return;
+  const it = ITEMS().find(i => i.keys[0] === k), v = readInput(it);
+  if (eqv(v, current(it))) delete edits[k]; else edits[k] = v;
+  $(`[data-row="${CSS.escape(k)}"]`).classList.toggle("changed", !eqv(v, it.default));
+  $(`[data-bad="${CSS.escape(k)}"]`).textContent = "";
+  markDirty();
+}
+$("#pform").addEventListener("click", e => {
+  const b = e.target.closest("[data-revert]"); if (!b) return;
+  const it = ITEMS().find(i => i.keys[0] === b.dataset.revert);
+  const row = $(`[data-row="${CSS.escape(it.keys[0])}"] .in`); row.firstElementChild.outerHTML = inputFor(it, it.default);
+  if (eqv(it.default, current(it))) delete edits[it.keys[0]]; else edits[it.keys[0]] = it.default;
+  b.closest(".prm").classList.remove("changed"); b.remove(); markDirty();
+});
+$("#yamltxt").addEventListener("input", () => { $("#yamltxt").dataset.dirty = "1"; markDirty(); });
+$("#pmode").addEventListener("click", e => {
+  const b = e.target.closest("[data-pm]"); if (!b) return;
+  if (b.dataset.pm === pmode) return;
+  if ((pmode === "form" && Object.keys(edits).length) || (pmode === "yaml" && $("#yamltxt").dataset.dirty)) { if (!confirm("Discard unsaved edits and switch?")) return; loadParams(true); }
+  pmode = b.dataset.pm;
+  $$("#pmode button").forEach(x => x.setAttribute("aria-pressed", x.dataset.pm === pmode));
+  $("#pform").hidden = pmode !== "form"; $("#pyaml").hidden = pmode !== "yaml"; markDirty();
+});
+$("#psave").onclick = async () => {
+  const body = pmode === "yaml" ? { yaml: $("#yamltxt").value } : { values: edits };
+  if (pmode === "form" && !Object.keys(edits).length && PS.custom_exists) { toast("Nothing to save"); return; }
+  try {
+    const r = await api("/api/params", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    toast(`Saved: ${r.changes.length} value${r.changes.length === 1 ? "" : "s"} differ from default. Run with Custom settings to see the effect.`);
+    delete $("#yamltxt").dataset.dirty; await loadParams(true); if (ST) { ST.custom_config = true; refreshState(); }
+  } catch (e) {
+    const m = e.message, it = ITEMS().find(i => m.startsWith(i.label + ":"));
+    if (it && pmode === "form") $(`[data-bad="${CSS.escape(it.keys[0])}"]`).textContent = m.slice(it.label.length + 1).trim();
+    toast(m);
+  }
+};
+$("#pdiscard").onclick = () => { delete $("#yamltxt").dataset.dirty; renderParams(); };
+$("#preset").onclick = async () => {
+  if (!confirm("Delete the custom parameters? Results already produced are kept.")) return;
+  await api("/api/params/reset", { method: "POST" }).catch(e => toast(e.message));
+  delete $("#yamltxt").dataset.dirty; loadParams(true); refreshState();
+};
+async function loadParams(force) {
+  if (PS && !force) return;
+  try { PS = await api("/api/params"); renderParams(); } catch (e) { toast("Could not load parameters: " + e.message); }
+}
+
+/* ---------- results ---------- */
+const FIG = {
+  "fig_bm_3d_cu_pct": "3-D view of block Cu grade", "fig_bm_plans_cu_pct": "Plan slices: Cu grade", "fig_bm_plans_au_gpt": "Plan slices: Au grade",
+  "fig_bm_plans_tonnes": "Plan slices: tonnes", "fig_bm_plans_frac_fms": "Plan slices: FMS-tracked share", "fig_bm_sections_cu_pct": "Cross-sections: Cu grade",
+  "fig_bm_sections_frac_fms": "Cross-sections: FMS-tracked share", "fig_bm_confidence": "Confidence classes", "fig_bm_information_class": "Information classes",
+  "fig_bm_grade_tonnage": "Grade-tonnage curve", "fig_growth_cumulative": "Cumulative FMS vs surveyed volume", "fig_growth_face_advance": "Face advance between surveys",
+  "fig_growth_period_maps": "Fill per survey interval", "fig_growth_period_reconciliation": "Interval reconciliation", "fig_growth_push_distance": "Push distance of loads",
+  "fig_temporal_alignment": "Survey cut-off scan", "fig_volume_factor": "Volume factor calibration", "fig_qaqc_daily_grades": "Daily grades",
+  "fig_qaqc_daily_tonnage_volume": "Daily tonnage and volume", "fig_qaqc_dump_density": "Dump density", "fig_qaqc_dump_map": "Dump locations",
+  "fig_qaqc_dumpz_timeofday": "Dump Z and time of day", "fig_qaqc_floor_plane": "Floor plane fit", "fig_qaqc_payload_grades": "Payloads and grades",
+  "fig_qaqc_repose": "Face slopes (angle of repose)", "fig_qaqc_survey_solids": "Survey change solids", "fig_bm_plans_cu_cv": "Block Cu uncertainty (CV)",
+  "fig_scenarios": "Volume-gap scenarios", "fig_sens_tornado": "Sensitivity tornado", "fig_unc_block_maps": "Block uncertainty maps",
+  "fig_unc_global_histograms": "Monte Carlo totals", "fig_unc_param_scatter": "Monte Carlo inputs vs totals", "fig_val_forward_test": "Forward-model test on unseen intervals",
+  "fig_val_geometry": "Model surface vs survey", "fig_val_twin_scatter": "Synthetic twin: model vs truth",
+};
+const GROUP = { blockmodel: "Block model", growth: "Growth & timing", qaqc: "Data quality", uncertainty: "Uncertainty", validation: "Validation" };
+const figName = p => FIG[p.split("/").pop().replace(".png", "")] || p.split("/").pop();
+let resultsLoaded = false, R = null, figGroup = "all", resData = "example", resParams = "default";
+const OUT = p => `/out/${R.set}/${p}`;
+
+function renderFigs() {
+  const groups = Object.keys(R.figures);
+  $("#figchips").innerHTML = ["all", ...groups].map(g => `<button aria-pressed="${g === figGroup}" data-g="${g}">${g === "all" ? "All" : GROUP[g] || g}</button>`).join("");
+  const list = groups.filter(g => figGroup === "all" || g === figGroup).flatMap(g => R.figures[g]);
+  const v = "?v=" + encodeURIComponent(R.manifest.run_id || "");
+  $("#figs").innerHTML = list.map(f => `<figure class="fig" data-src="${esc(f.path)}"><img loading="lazy" src="${esc(OUT(f.path))}${v}" alt="${esc(figName(f.path))}"><figcaption>${esc(figName(f.path))}${f.stale ? ' <span class="tag warn">earlier run</span>' : ""}</figcaption></figure>`).join("");
+}
+$("#figchips").addEventListener("click", e => { const b = e.target.closest("[data-g]"); if (b) { figGroup = b.dataset.g; renderFigs(); } });
+$("#figs").addEventListener("click", e => {
+  const f = e.target.closest(".fig"); if (!f) return;
+  const p = f.dataset.src;
+  $("#lbimg").src = OUT(p); $("#lbcap").textContent = figName(p); $("#lbdl").href = OUT(p) + "?download=1";
+  $("#lb").showModal();
+});
+$("#lbx").onclick = () => $("#lb").close();
+$("#lb").addEventListener("click", e => { if (e.target.id === "lb") $("#lb").close(); });
+
+function renderTable() {
+  const k = $("#tblsel").value, t = R.tables[k];
+  $("#tblpath").innerHTML = `<code>${esc(R.root)}/${esc(t.path)}</code>` + (t.data ? ` · <a href="${esc(OUT(t.path))}?download=1">download CSV</a>` : "") + (t.stale ? ' · <span class="tag warn">from an earlier run (step skipped this time)</span>' : "");
+  $("#tbl").innerHTML = table(t.data, { fast: true });
+}
+$("#tblsel").onchange = renderTable;
+
+function renderResults() {
+  const s = R.summary, k = s.key_results, m = R.manifest;
+  $("#gradenote").hidden = R.data !== "example";   // the warning is about the example data's grades
+  $("#runid").textContent = "run " + (m.run_id || "?");
+  $("#runmeta").textContent = `${R.root}/ · finished ${m.finished || "?"} · code ${m.git_commit || "?"} · config ${m.config_hash || "?"} · ${R.inputs ? R.inputs.length + " input files" : ""}`;
+  $("#chgnote").hidden = R.set !== "custom";
+  if (R.set === "custom") $("#chgnote").innerHTML = R.changes.length
+    ? `Run with custom parameters. Currently saved changes from default (if you edited after this run, they may differ from what it used; see <code>audit/config_used.json</code>):<ul class="chg">${R.changes.map(c => `<li><code>${esc(c.key)}</code>: ${esc(show_v(c.default))} → <b>${esc(show_v(c.custom))}</b></li>`).join("")}</ul>`
+    : "Run with custom settings (currently identical to default).";
+  const nStale = Object.values(R.tables).filter(x => x.stale).length + Object.values(R.figures).flat().filter(f => f.stale).length;
+  $("#stalenote").hidden = !nStale;
+  $("#stalenote").textContent = `${nStale} table(s) or figure(s) in this folder are from an earlier run, because their step was skipped this time. They are marked “earlier run”.`;
+  $("#kpis").innerHTML = kpis(k);
+
+  const parts = [["FMS-tracked", k.tonnes_fms_in_model, "var(--c-fms)"], ["Unattributed", k.tonnes_unattributed, "var(--c-unat)"], ["Pre-record core", k.tonnes_legacy, "var(--c-leg)"]];
+  const tot = parts.reduce((a, p) => a + p[1], 0);
+  $("#stack").innerHTML = parts.map(p => `<span style="width:${100 * p[1] / tot}%;background:${p[2]}" title="${p[0]}: ${fmt(p[1])} t"></span>`).join("");
+  $("#stackleg").innerHTML = parts.map(p => `<span><i style="background:${p[2]}"></i>${p[0]} ${fmt(p[1])} t (${fmt(100 * p[1] / tot, 1)}%)</span>`).join("");
+
+  const mc = k.mc_record_period_tonnes_p10_p50_p90;
+  if (mc) {
+    const base = k.tonnes_record_period, lo = Math.min(mc[0], base) * 0.97, hi = Math.max(mc[2], base) * 1.03, pos = v => 100 * (v - lo) / (hi - lo);
+    $("#mcrange").innerHTML = `<div class="range"><div class="track"></div><div class="band" style="left:${pos(mc[0])}%;width:${pos(mc[2]) - pos(mc[0])}%"></div>
+      <div class="tick" style="left:${pos(mc[1])}%"></div><div class="base" style="left:${pos(base)}%" title="base case"></div></div>
+      <div class="range-lbl"><span>P10 ${kt(mc[0])}</span><span>P50 ${kt(mc[1])}</span><span>P90 ${kt(mc[2])}</span></div>
+      <div class="legend" style="margin-top:8px"><span><i style="background:var(--c-unat);transform:rotate(45deg)"></i>base case ${kt(base)}</span><span><i style="background:var(--accent)"></i>P50</span></div>`;
+    $("#mcnote").textContent = "The base case sits near P10: the only alternative sampled for recorded payloads is under-recording, which can only add tonnes.";
+  } else {
+    $("#mcrange").innerHTML = `<p class="muted">Monte Carlo not run (fast run). Start a full analysis for ranges.</p>`;
+    $("#mcnote").textContent = "";
+  }
+
+  const sc = R.tables.scenarios.data;
+  if (sc) {
+    const ci = n => sc.columns.indexOf(n);
+    const rows = sc.rows.map(r => `<tr><td><b>${esc(r[ci("scenario")])}</b></td><td><span class="tag ${/base/.test(r[ci("status")]) ? "info" : /inside/.test(r[ci("status")]) ? "ok" : /excluded/i.test(r[ci("status")]) ? "bad" : "warn"}">${esc(r[ci("status")])}</span></td>
+      <td class="small">${esc(r[ci("description")])}</td><td class="n">${fmt(r[ci("record_period_tonnes")])}</td><td class="n">${fmt(r[ci("largest_load_t")])}</td><td class="n">${fmt(r[ci("total_tonnes")])}</td></tr>`).join("");
+    $("#scen").innerHTML = (R.tables.scenarios.stale ? '<p class="small"><span class="tag warn">earlier run</span> scenarios were skipped this time.</p>' : "") + `<div class="tablewrap"><table><thead><tr><th>Scenario</th><th>Status</th><th>Reading</th><th>Record-period t</th><th>Largest load t</th><th>Whole pile t</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  } else $("#scen").innerHTML = `<p class="muted small">Not produced by this run.</p>`;
+
+  const ppm = x => Math.abs(x) < 1e-3 ? "< 0.001 ppm" : fmt(x, 3) + " ppm";
+  const chk = (name, val, good, note) => `<div class="card"><div class="row"><b>${esc(name)}</b><span class="tag ${good ? "ok" : "warn"}" style="margin-left:auto">${good ? "pass" : "check"}</span></div><div class="kpi"><div class="value" style="font-size:20px">${val}</div></div><div class="small muted">${note}</div></div>`;
+  $("#checks").innerHTML = [
+    chk("FMS tonnes conserved", ppm(k.mass_balance_rel_err_ppm), Math.abs(k.mass_balance_rel_err_ppm) < 1, "relative difference, blocks vs FMS input"),
+    chk("Cu and Au conserved", ppm(k.cu_balance_rel_err_ppm).replace(" ppm", "") + " / " + ppm(k.au_balance_rel_err_ppm), Math.abs(k.cu_balance_rel_err_ppm) < 1 && Math.abs(k.au_balance_rel_err_ppm) < 1, "relative difference, blocks vs FMS input"),
+    chk("Surface matches survey", fmt(k.geometry_rmse_m, 3) + " m RMSE", k.geometry_rmse_m < 0.15, "model top vs latest surveyed top"),
+    chk("Volume factor predicts", fmt(100 * k.volume_factor_holdout_mae, 1) + "% error", k.volume_factor_holdout_mae < 0.1, "calibrated on the first half, tested on the second"),
+    k.twin_cu_rmse_base != null ? chk("Synthetic twin", fmt(k.twin_cu_rmse_base, 2) + "% Cu RMSE", k.twin_cu_corr_base > 0.8, `block Cu vs known truth, r = ${fmt(k.twin_cu_corr_base, 2)}`) : "",
+    chk("Unattributed fill", fmt(k.unattributed_volume_m3) + " m³", k.unattributed_volume_m3 / k.survey_volume_m3 < 0.15, `${fmt(100 * k.unattributed_volume_m3 / k.survey_volume_m3, 1)}% of surveyed fill has no FMS record`),
+  ].join("");
+
+  renderFigs();
+  $("#tblsel").innerHTML = Object.entries(R.tables).map(([key, t]) => `<option value="${key}">${esc(t.title)}${t.data ? "" : " (not in this run)"}</option>`).join("");
+  renderTable();
+  $("#dl").innerHTML = R.downloads.map(d => `<a class="btn" href="${esc(OUT(d.path))}?download=1">${esc(d.path.split("/").pop())}${d.stale ? ' <span class="tag warn">earlier run</span>' : ""}</a>`).join("");
+  $("#hist").innerHTML = table(R.history);
+}
+
+async function loadResults(force) {
+  if (resultsLoaded && !force) return;
+  try {
+    R = await api("/api/results?set=" + setKey(resData, resParams));
+    document.querySelectorAll("#resdata button").forEach(b => b.setAttribute("aria-pressed", b.dataset.rd === resData));
+    document.querySelectorAll("#resparams button").forEach(b => b.setAttribute("aria-pressed", b.dataset.rp === resParams));
+    $("#runid").textContent = ""; $("#runmeta").textContent = ""; $("#chgnote").hidden = true; $("#stalenote").hidden = true;
+    const has = R.available;
+    $("#res-empty").hidden = has; $("#res").hidden = !has;
+    if (has) renderResults();
+    resultsLoaded = true;
+  } catch (e) { toast("Could not load results: " + e.message); }
+}
+$("#reload").onclick = () => loadResults(true);
+$("#resdata").addEventListener("click", e => { const b = e.target.closest("[data-rd]"); if (b && b.dataset.rd !== resData) { resData = b.dataset.rd; loadResults(true); } });
+$("#resparams").addEventListener("click", e => { const b = e.target.closest("[data-rp]"); if (b && b.dataset.rp !== resParams) { resParams = b.dataset.rp; loadResults(true); } });
+
+/* ---------- start ---------- */
+if (location.protocol === "file:") {
+  // Opened as a file: the explanation tabs work, but uploads, runs and results need the program running.
+  const n = document.createElement("div");
+  n.className = "note wrap"; n.style.margin = "16px auto";
+  n.innerHTML = "SPBM is not running, so only <b>Overview</b> and <b>How it works</b> are available. Start it with the launcher in the project folder: <code>Start SPBM (Windows).bat</code>, <code>Start SPBM (Mac).command</code> or <code>./start_spbm.sh</code>. The page then opens by itself with everything working.";
+  document.querySelector("main").before(n);
+  $("#ov-empty").textContent = "Results appear here once SPBM is running.";
+  const offline = el => !["overview", "how"].includes(el.dataset.tab || el.dataset.go);
+  document.querySelectorAll("nav [data-tab], [data-go]").forEach(el => { if (offline(el)) el.hidden = true; });
+} else {
+  loadOverview();
+  refreshState();
+  setInterval(() => fetch("/api/ping").catch(() => {}), 60000);   // tells the program a page is still open
+}
+const start = location.hash.slice(1);
+const allowed = location.protocol === "file:" ? ["overview", "how"] : ["overview", "how", "params", "run", "results"];
+if (allowed.includes(start)) show(start);
+</script>
+</body>
+</html>

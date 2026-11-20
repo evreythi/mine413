@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open SPBM</title>
+<style>
+:root { --bg: #f6f5f1; --card: #fff; --text: #22211d; --muted: #6a675e; --accent: #1f5fae; --border: #dcd9d0; --code: #efede7; }
+@media (prefers-color-scheme: dark) { :root { --bg: #161614; --card: #201f1c; --text: #ecebe6; --muted: #a29f95; --accent: #79aef0; --border: #3a3833; --code: #2a2925; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 640px; margin: 8vh auto; padding: 0 16px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+h1 { font-size: 24px; margin: 0 0 6px; }
+p { margin: 0 0 12px; }
+.muted { color: var(--muted); }
+ol { padding-left: 20px; margin: 8px 0 14px; }
+li { margin-bottom: 8px; }
+code { background: var(--code); padding: 1px 6px; border-radius: 4px; font-size: 14px; }
+a.btn { display: inline-block; background: var(--accent); color: #fff; padding: 9px 16px; border-radius: 9px; text-decoration: none; font-weight: 600; }
+#checking { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>SPBM: stockpile model</h1>
+    <p id="checking">Looking for SPBM on this computer…</p>
+    <div id="start" hidden>
+      <p>SPBM is not running yet. A web page cannot start a program by itself (browsers do not allow it), so start it once with the launcher in this folder:</p>
+      <ol>
+        <li><b>Windows:</b> double-click <code>Start SPBM (Windows).bat</code></li>
+        <li><b>Mac:</b> double-click <code>Start SPBM (Mac).command</code> (the first time, right-click it and choose <i>Open</i>)</li>
+        <li><b>Linux:</b> run <code>./start_spbm.sh</code></li>
+      </ol>
+      <p class="muted">The first start sets everything up (a few minutes, needs Python 3.10 or later). After that the page opens by itself in a few seconds, and SPBM stops on its own about 15 minutes after you close the page. This page will also open SPBM automatically as soon as it is running.</p>
+      <p><a class="btn" href="http://127.0.0.1:8413/">Try again</a></p>
+    </div>
+  </div>
+</main>
+<script>
+// A file:// page cannot read the local server's answers, but a no-cors request
+// still succeeds only if something is listening, which is enough to redirect.
+const URL_ = "http://127.0.0.1:8413/";
+let shown = false;
+async function check() {
+  try {
+    await fetch(URL_ + "api/ping", { mode: "no-cors", cache: "no-store" });
+    location.replace(URL_);
+  } catch (e) {
+    if (!shown) { document.getElementById("checking").hidden = true; document.getElementById("start").hidden = false; shown = true; }
+    setTimeout(check, 3000);
+  }
+}
+check();
+</script>
+</body>
+</html>

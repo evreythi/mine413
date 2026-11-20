@@ -1,4 +1,4 @@
-"""Task 8 - audit trail: data registry, run manifest, model-version history and
+"""Audit trail: data registry, run manifest, model-version history and
 change report between consecutive model versions."""
 from __future__ import annotations
 
@@ -27,9 +27,9 @@ def sha256_file(p: Path) -> str:
 
 def git_commit() -> str:
     """Code identity for the manifest. In a Git checkout: the commit hash
-    (with '+modified' if tracked files differ). In a packaged copy (e.g. the
-    submission zip, no .git): the commit recorded in BUILD_INFO.json when the
-    package was made. Never fails, never writes to stderr."""
+    (with '+modified' if tracked files differ). In a packaged copy without .git:
+    the commit recorded in BUILD_INFO.json, if one was written when the copy
+    was made. Never fails, never writes to stderr."""
     try:
         h = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], text=True,
                                     stderr=subprocess.DEVNULL).strip()
@@ -118,7 +118,7 @@ def write_manifest(cfg, files, outputs_root: Path, summary: dict, started: datet
 
 
 def change_report(outputs_root: Path) -> str | None:
-    """Compare the two most recent model versions (Task 8 item 11)."""
+    """Compare the two most recent model versions (written to audit/change_report.md)."""
     hist = sorted((outputs_root / "history").glob("*/run_manifest.json"))
     if len(hist) < 2:
         return None

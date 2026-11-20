@@ -1,4 +1,4 @@
-"""End-to-end workflow (Task 8). Each step writes to outputs/<step>/."""
+"""End-to-end workflow. Each step writes to outputs/<step>/."""
 from __future__ import annotations
 
 import json
@@ -8,7 +8,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-from . import audit, blockmodel as bm, bmviz, growth, qaqc, uncertainty, validation, volume
+from . import audit, blockmodel as bm, bmviz, growth, parallel, qaqc, uncertainty, validation, volume
 from .config import resolve
 from .dataset import load_dataset
 from .movement import reconstruct
@@ -26,8 +26,21 @@ def _md(df: pd.DataFrame, floatfmt="{:,.2f}") -> str:
     return "\n".join(lines)
 
 
+class Loader:
+    """Loads the dataset for a (modified) configuration; a class rather than a
+    lambda so it can be handed to worker processes."""
+
+    def __init__(self, until=None):
+        self.until = until
+
+    def __call__(self, cfg):
+        return load_dataset(cfg, until=self.until, verbose=False)
+
+
 def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do_sens=True, do_align=True, do_temporal=True,
-        do_scen=True, verbose=True):
+        do_scen=True, do_figs=True, verbose=True):
+    """Run the whole chain. The do_* switches turn off optional steps; the
+    reconstruction, block model, balances and audit trail always run."""
     started = datetime.now()
     t0 = time.time()
     cfg_loaded = cfg      # configuration as supplied (hashed in the manifest); cfg gains resolved values below
@@ -41,7 +54,7 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
         if verbose:
             print(f"[{time.time() - t0:6.1f}s] {msg}", flush=True)
 
-    loader = lambda c: load_dataset(c, until=until, verbose=False)  # noqa: E731
+    loader = Loader(until)
     # 1-2 import -----------------------------------------------------------
     log("1-2 import FMS records and survey surfaces")
     ds = load_dataset(cfg, until=until, verbose=verbose)
@@ -81,7 +94,8 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
     for name, z in [("floor_plane", rec.B), ("pre_record_surface", rec.legacy_top), ("final_model_surface", rec.diagnostics["final_surface"]),
                     ("latest_surveyed_surface", rec.observed_top)]:
         bm.export_grid_asc(np.where(rec.domain | np.isfinite(z), z, np.nan), g, dirs["movement"] / f"{name}.asc")
-    growth.growth_figures(rec, ds, ptab, dirs["growth"])
+    if do_figs:
+        growth.growth_figures(rec, ds, ptab, dirs["growth"])
     # 6-7 block model --------------------------------------------------------
     log("6-7 block model and inventories")
     bg = bm.make_block_grid(rec, cfg)
@@ -89,14 +103,36 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
     df = bm.block_table(rec, bg, agg, cfg)
     prov = bm.provenance(rec, bg)
     df = bm.provenance_fields(df, prov, bg, rec.loads)
-    # 8 uncertainty ----------------------------------------------------------
-    mc = None
+    # 8-9 slow steps -----------------------------------------------------------
+    # Independent of each other given the base model, so with several workers
+    # they run side by side (spbm.parallel.run_steps); results are the same.
+    df0 = df.copy()                           # base block model (before Monte Carlo ranges)
+    n_real = n_mc or cfg["uncertainty"]["n_realizations"]
+    steps = []
     if do_mc:
-        log(f"8   Monte Carlo uncertainty ({n_mc or cfg['uncertainty']['n_realizations']} realisations)")
-        mc = uncertainty.monte_carlo(loader, cfg, bg, df, dirs["uncertainty"], n=n_mc, verbose=verbose)
+        steps.append(("mc", f"8   Monte Carlo uncertainty ({n_real} realisations)",
+                      lambda: uncertainty.monte_carlo(loader, cfg, bg, df0, dirs["uncertainty"], n=n_mc, verbose=verbose)))
+    if do_temporal:
+        steps.append(("tv", "    forward-model temporal validation", lambda: validation.temporal_validation(rec, cfg, dirs["validation"])))
+    if do_twin:
+        steps.append(("tw", "    synthetic twin experiment", lambda: validation.twin_experiment(rec, ds, cfg, dirs["validation"])))
+    if do_robust:
+        steps.append(("rb", "    numerical robustness", lambda: validation.robustness(loader, cfg, dirs["validation"], df0)))
+    if do_scen:
+        steps.append(("scen", "    volume-gap scenarios (A-06)", lambda: uncertainty.scenarios(ds, cfg, bg, dirs["uncertainty"], verbose=verbose)))
+    if do_sens:
+        steps.append(("sens", "    one-at-a-time sensitivity",
+                      lambda: uncertainty.sensitivity_oat(loader, cfg, df0, rec, dirs["uncertainty"], verbose=verbose)))
+    res = parallel.run_steps(steps, {"loader": loader, "bg": bg, "base_df": df0, "rec": rec, "cfg": cfg, "ds": {}}, log,
+                             start_first=("tw", "sens", "rb", "scen", "tv", "mc"))
+    mc, tv, tw, scen = res.get("mc"), res.get("tv"), res.get("tw"), res.get("scen")
+
+    # block model with Monte Carlo ranges, exports, figures ------------------------
+    if mc is not None:
         df = uncertainty.attach_block_stats(df, mc["stats"])
         df = uncertainty.apply_prior_ranges(df, rec.loads)
-        uncertainty.mc_figures(mc, df, dirs["uncertainty"])
+        if do_figs:
+            uncertainty.mc_figures(mc, df, dirs["uncertainty"])
     df["confidence"] = bm.classify_confidence(df, cfg)
     df.to_csv(dirs["blockmodel"] / "stockpile_block_model.csv", index=False, float_format="%.5g")
     vtk_fields = [c for c in ["tonnes", "cu_pct", "au_gpt", "ag_gpt", "fill_frac", "frac_fms", "frac_legacy", "cu_cv", "cu_p10", "cu_p90",
@@ -109,20 +145,22 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
         json.dump({"origin": [bg.x0, bg.y0, bg.z0], "block_size": [bg.dx, bg.dy, bg.dz], "n_blocks": [bg.nx, bg.ny, bg.nz],
                    "crs": cfg["project"]["crs_note"], "units": {"cu_pct": "% Cu", "au_gpt": "g/t Au", "ag_gpt": "g/t Ag", "tonnes": "dry t (as FMS)",
                    "cu_t": "t Cu", "au_kg": "kg Au", "ag_kg": "kg Ag"}}, fh, indent=2)
-    log("    figures")
-    bmviz.bench_plans(df, bg, rec, "cu_pct", "Cu (%)", bmviz.pl.SEQ, dirs["blockmodel"])
-    bmviz.bench_plans(df, bg, rec, "au_gpt", "Au (g/t)", bmviz.pl.SEQ_OR, dirs["blockmodel"])
-    bmviz.bench_plans(df, bg, rec, "frac_fms", "fraction FMS-tracked", bmviz.pl.SEQ, dirs["blockmodel"], 0, 1)
-    bmviz.bench_plans(df, bg, rec, "tonnes", "tonnes per block", bmviz.pl.SEQ, dirs["blockmodel"])
-    bmviz.sections(df, bg, rec, dirs["blockmodel"])
-    bmviz.sections(df, bg, rec, dirs["blockmodel"], "frac_fms", "fraction FMS-tracked")
-    bmviz.view3d(df, bg, dirs["blockmodel"])
-    bmviz.grade_tonnage(st["grade_tonnage"], dirs["blockmodel"])
-    bmviz.class_maps(df, bg, rec, dirs["blockmodel"])
-    if mc is not None:
-        bmviz.uncertainty_maps(df, bg, dirs["uncertainty"])
-        bmviz.bench_plans(df, bg, rec, "cu_cv", "Cu grade CV (Monte Carlo)", bmviz.pl.SEQ_OR, dirs["uncertainty"], 0, 0.3)
-    # 9 validation -----------------------------------------------------------
+    if do_figs:
+        log("    figures")
+        bmviz.bench_plans(df, bg, rec, "cu_pct", "Cu (%)", bmviz.pl.SEQ, dirs["blockmodel"])
+        bmviz.bench_plans(df, bg, rec, "au_gpt", "Au (g/t)", bmviz.pl.SEQ_OR, dirs["blockmodel"])
+        bmviz.bench_plans(df, bg, rec, "frac_fms", "fraction FMS-tracked", bmviz.pl.SEQ, dirs["blockmodel"], 0, 1)
+        bmviz.bench_plans(df, bg, rec, "tonnes", "tonnes per block", bmviz.pl.SEQ, dirs["blockmodel"])
+        bmviz.sections(df, bg, rec, dirs["blockmodel"])
+        bmviz.sections(df, bg, rec, dirs["blockmodel"], "frac_fms", "fraction FMS-tracked")
+        bmviz.view3d(df, bg, dirs["blockmodel"])
+        bmviz.grade_tonnage(st["grade_tonnage"], dirs["blockmodel"])
+        bmviz.class_maps(df, bg, rec, dirs["blockmodel"])
+        if mc is not None:
+            bmviz.uncertainty_maps(df, bg, dirs["uncertainty"])
+            bmviz.bench_plans(df, bg, rec, "cu_cv", "Cu grade CV (Monte Carlo)", bmviz.pl.SEQ_OR, dirs["uncertainty"], 0, 0.3)
+
+    # balances and geometry --------------------------------------------------------
     log("9   validation and reconciliation")
     vb = validation.mass_metal_balance(rec, agg, df)
     vb.to_csv(dirs["validation"] / "mass_metal_balance.csv", index=False)
@@ -132,24 +170,6 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
     vr.to_csv(dirs["validation"] / "volume_reconciliation.csv", index=False)
     geo = validation.geometry_check(rec, ds, dirs["validation"])
     pd.Series(geo).to_csv(dirs["validation"] / "geometry_check.csv")
-    tv = None
-    if do_temporal:
-        log("    forward-model temporal validation")
-        tv = validation.temporal_validation(rec, cfg, dirs["validation"])
-    tw = None
-    if do_twin:
-        log("    synthetic twin experiment")
-        tw = validation.twin_experiment(rec, ds, cfg, dirs["validation"])
-    if do_robust:
-        log("    numerical robustness")
-        validation.robustness(loader, cfg, dirs["validation"], df)
-    scen = None
-    if do_scen:
-        log("    volume-gap scenarios (A-06)")
-        scen = uncertainty.scenarios(ds, cfg, bg, dirs["uncertainty"], verbose=verbose)
-    if do_sens:
-        log("    one-at-a-time sensitivity")
-        uncertainty.sensitivity_oat(loader, cfg, df, rec, dirs["uncertainty"], verbose=verbose)
     # 10 summary -------------------------------------------------------------
     summary = {
         "last_survey": str(ds.surveys[-1].datetime), "n_surveys": len(ds.surveys), "n_fms_records": int(len(ds.fms)),
@@ -221,4 +241,4 @@ def _tables_md(root, q, ptab, st, vb, inv, vr, geo, tv, tw, mc, cal=None, scen=N
         parts += ["## Synthetic twin experiment", _md(tw["table"]), ""]
     if mc is not None:
         parts += ["## Monte Carlo global summary", _md(mc["global"].reset_index()), ""]
-    (root / "report_tables.md").write_text("\n".join(parts))
+    (root / "summary_tables.md").write_text("\n".join(parts))

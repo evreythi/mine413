@@ -80,13 +80,9 @@ def test_infer_surface_platform_and_front():
 
 
 def test_markdown_tables_escape_pipes():
-    import importlib.util
     import pandas as pd
-    from pathlib import Path
-    spec = importlib.util.spec_from_file_location("fill_report", Path(__file__).resolve().parents[1] / "tools" / "fill_report.py")
-    fr = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fr)
-    txt = fr.md(pd.DataFrame({"a": ["|x| > 3"], "b": [1]}), "t")
+    from spbm.pipeline import _md
+    txt = _md(pd.DataFrame({"a": ["|x| > 3"], "b": [1]}))
     row = [l for l in txt.splitlines() if "x" in l][0]
     assert row.count(" | ") == 1 and "\\|x\\|" in row
 
@@ -155,9 +151,9 @@ def test_every_config_assumption_is_in_the_register():
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     ids = set(re.findall(r"\bA-\d+\b", (root / "config" / "project.yaml").read_text()))
-    reg = (root / "tools" / "templates" / "D2_Data_and_Assumption_Register.template.md").read_text()
+    reg = (root / "METHOD.md").read_text()
     missing = sorted(i for i in ids if not re.search(rf"\b{i}\b", reg))
-    assert not missing, f"config cites assumptions not in D2: {missing}"
+    assert not missing, f"config cites assumptions not in METHOD.md: {missing}"
 
 
 # ------------------------------------------------------------ QA rules
@@ -349,3 +345,28 @@ def test_density_factors_identity_and_overrides():
     auto = apply_overrides(load_config(), {"density.volume_factor": "auto"})
     with pytest.raises(ValueError, match="not resolved"):
         density_factors(auto)
+
+
+def test_ingest_reads_zip_inside_a_folder(tmp_path):
+    """An uploaded .zip lands in the inbox folder; its members must be used."""
+    import zipfile
+    from spbm import io as sio
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    with zipfile.ZipFile(inbox / "upload.zip", "w") as z:
+        z.writestr("data/fms.csv", "Cycle ID\n1\n")
+        z.writestr("data/Topo_260401.dxf", "0\nEOF\n")
+    cfg = {"inputs": {"sources": [str(inbox)], "raw_store": str(tmp_path / "store"),
+                      "fms_pattern": "*.csv", "survey_pattern": "*.dxf"}}
+    names = sorted(f.name for f in sio.scan_sources(cfg))
+    assert names == ["Topo_260401.dxf", "fms.csv"]
+    with pytest.raises(RuntimeError, match="No FMS"):
+        sio.scan_sources({"inputs": dict(cfg["inputs"], sources=[str(tmp_path / "empty")], raw_store=str(tmp_path / "s2"))})
+
+
+def test_speed_modes_never_exceed_the_machine():
+    from spbm.parallel import machine, resolve_workers
+    m = machine()
+    assert 1 <= m["max_workers"] <= m["cores"]
+    assert resolve_workers("low") == 1 and resolve_workers("high") == m["max_workers"]
+    assert resolve_workers(10_000) == m["max_workers"] and resolve_workers("nonsense") == m["max_workers"]

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Demonstrates the Task 8 update workflow: build a model with the data available
+# Demonstrates the update workflow: build a model with the data available
 # on 22 March, then update it with everything received afterwards and compare.
 set -euo pipefail
 cd "$(dirname "$0")/.."

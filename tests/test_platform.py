@@ -1,5 +1,5 @@
-"""Platform tests (Task 8): command line, managed raw store, manual
-interventions in the engine, audit trail and incremental updating."""
+"""Platform tests: command line, managed raw store, manual interventions
+in the engine, audit trail, incremental updating and the web page."""
 import dataclasses
 import json
 
@@ -124,3 +124,87 @@ def test_pipeline_fast_run_and_update(tmp_path):
     assert out["summary"]["n_surveys"] == 10
     rep = (root / "audit" / "change_report.md").read_text()
     assert "| n_surveys | 7.00 | 10.00 | +3.00 |" in rep
+
+
+# ------------------------------------------------------------ web front end
+def test_web_parameter_validation_and_custom_config(tmp_path, monkeypatch):
+    import yaml
+    from spbm import web
+    monkeypatch.setattr(web, "CUSTOM_CONFIG", str(tmp_path / "custom.yaml"))
+    items = {it["keys"][0]: it for _, its in web.PARAMS for it in its}
+    assert web.coerce(items["infill.repose_deg"], "35") == 35.0
+    assert web.coerce(items["density.volume_factor"], "") == "auto"
+    assert web.coerce(items["density.legacy_density"], "") is None
+    assert web.coerce(items["blockmodel.block"], "10, 10, 4") == [10.0, 10.0, 4.0]
+    for key, bad in [("infill.repose_deg", 80), ("blockmodel.block", "5,5"), ("movement.cost", "straight"),
+                     ("uncertainty.epsilon_range", "15, 2"), ("uncertainty.seed", 1.5), ("uncertainty.cost_modes", [])]:
+        with pytest.raises(ValueError):
+            web.coerce(items[key], bad)
+    cfg = web.default_config()
+    for k in items["infill.repose_deg"]["keys"]:
+        web._set(cfg, k, 35.0)
+    cfg["inputs"]["raw_store"] = "/elsewhere"                 # locked sections are restored
+    diff = web.write_custom(cfg)
+    assert sorted(d["key"] for d in diff) == ["forward.repose_deg", "infill.repose_deg"]
+    saved = yaml.safe_load((tmp_path / "custom.yaml").read_text())
+    assert saved["outputs"]["root"] == web.CUSTOM_OUTPUTS and saved["inputs"]["raw_store"] == "data/raw_store"
+    cfg["movement"]["retain_cost"] = cfg["movement"]["unattributed_cost"] = 10.0
+    with pytest.raises(ValueError, match="maximum push"):
+        web.write_custom(cfg)
+
+
+def test_web_upload_names_and_progress():
+    from spbm import web
+    assert web.safe_name("Topo_260402.dxf") == "Topo_260402.dxf"
+    assert web.safe_name("../../x.csv") == "x.csv"              # directories are dropped
+    assert web.safe_name("run.sh") is None and web.safe_name(".hidden.csv") is None
+    lines = ["[ 0.0s] 1-2 import FMS records", "[ 1.0s] 3   data-quality checks", "[ 3.0s] 4b  volume factor calibration",
+             "[ 6.0s] 5   material-movement reconstruction", "[19.0s] 6-7 block model", "[19.5s] 8   Monte Carlo", "    MC 30/60  (300 s)"]
+    f_half, st, _ = web.progress(lines, [], 60)
+    f_fast, st_fast, _ = web.progress(lines[:4], ["mc", "temporal", "twin", "robust", "sensitivity"], 60)
+    # time left follows the run's own pace: 30 of 60 realisations in 300 s -> about 300 s more for the rest
+    _, _, left = web.progress(lines, ["temporal", "twin", "robust", "scenarios", "sensitivity", "figures"], 60, 1, elapsed=319.5)
+    assert 280 < left < 340
+    assert 0 < f_half < 0.5 and 0 < f_fast < 1
+    assert all("Monte Carlo" not in s["label"] for s in st_fast) and any("Monte Carlo" in s["label"] for s in st)
+
+
+def test_cli_rejects_unknown_skip_step():
+    from spbm.__main__ import main
+    with pytest.raises(SystemExit):
+        main(["run", "--skip", "blockmodel"])
+
+
+def test_web_ping_and_already_running_check():
+    import socket
+    import threading
+    from http.server import ThreadingHTTPServer
+    from spbm import web
+    from spbm.config import load_config
+    with socket.socket() as s:                      # a free port
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    assert not web._already_running("127.0.0.1", port)
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), web.make_handler(load_config(), web.Job()))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        assert web._already_running("127.0.0.1", port)   # the launcher reuses a running copy
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_web_own_data_config_reads_only_uploaded_files(tmp_path, monkeypatch):
+    import yaml
+    from spbm import web
+    monkeypatch.setattr(web, "OWN_DIR", str(tmp_path / "own"))
+    monkeypatch.setattr(web, "CUSTOM_CONFIG", str(tmp_path / "custom.yaml"))
+    p = web.own_config_path("default")
+    c = yaml.safe_load(p.read_text())
+    assert c["inputs"]["sources"] == [str(tmp_path / "own") + "/inbox"]          # no example data
+    assert c["inputs"]["raw_store"].startswith(str(tmp_path / "own"))
+    assert c["outputs"]["root"] == "outputs_own"
+    assert (tmp_path / "own" / "manual_interventions.csv").read_text().startswith("id,type,target")
+    with pytest.raises(ValueError, match="no custom"):
+        web.own_config_path("custom")
+    assert web.result_set("own", "custom") == "own_custom" and web.result_set("example", "default") == "default"
