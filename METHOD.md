@@ -118,7 +118,11 @@ On the real data, the two forms change block grades by about 0.2% Cu on average 
 
 $$\mathbf P^\star = \arg\min_{\mathbf P \ge 0} \;\sum_{k,c} P_{kc} C_{kc} \;-\; \varepsilon H(\mathbf P)\quad \text{s.t.}\;\; \mathbf P\mathbf 1 = \mathbf a,\;\; \mathbf P^\top\mathbf 1 = \mathbf b,\qquad H(\mathbf P) = -\sum P_{kc}(\log P_{kc} - 1)$$
 
-The solution is $P_{kc} = \exp\big((f_k + g_c - C_{kc})/\varepsilon\big)$. It is computed by **log-domain Sinkhorn** iterations (numerically stable with infinite costs):
+The solution is $P_{kc} = u_k\,K_{kc}\,v_c$ with $K_{kc} = \exp(-C_{kc}/\varepsilon)$ ($K = 0$ for infinite costs). It is computed by **Sinkhorn** iterations, alternately scaling the rows and the columns to their marginals:
+
+$$u_k \leftarrow \frac{a_k}{\sum_c K_{kc} v_c},\qquad v_c \leftarrow \frac{b_c}{\sum_k K_{kc} u_k}$$
+
+These are matrix-vector products, which is fast. If $K$ would come too close to the smallest number the computer can hold ($C/\varepsilon > 200$, only with very short mixing lengths), the same updates run in the log domain ($f = \varepsilon \log u$, $g = \varepsilon \log v$, LSE = log-sum-exp):
 
 $$f_k \leftarrow \varepsilon\log a_k - \varepsilon\,\text{LSE}_c\!\left(\tfrac{g_c - C_{kc}}{\varepsilon}\right),\qquad g_c \leftarrow \varepsilon\log b_c - \varepsilon\,\text{LSE}_k\!\left(\tfrac{f_k - C_{kc}}{\varepsilon}\right)$$
 
@@ -156,11 +160,11 @@ After deposit, $z_m$ = column tops, the volume in column R becomes carried parce
 | Grid cell | 1 m (0.5 and 2.5 m tested) | `validation/robustness_numerical.csv` |
 | Detection limit τ | 0.14 m (k = 1-4 tested) | Volume not moved: 137 m³ (0.4%) |
 | Sinkhorn tolerance | 10⁻⁶ (10⁻⁴, 10⁻⁸ tested) | Column residual < 10⁻⁶ |
-| Log-domain Sinkhorn | always | No underflow with costs ≫ ε |
+| Sinkhorn form | scaling updates; log domain if $C/\varepsilon > 200$ | No underflow; same iterates either way |
 | Time step | one survey interval (cut-off D+1 07:00, data-driven) | Gap periods flagged |
 | Block size | 5 × 5 × 2 m (2 × 2 × 1 and 10 × 10 × 4 tested) | Tornado |
 
-Typical convergence takes 30-660 Sinkhorn iterations per interval. A full reconstruction takes about 15 s.
+Typical convergence takes 30-660 Sinkhorn iterations per interval. A full reconstruction takes about 2-3 s on one core.
 
 ## 3.11 Pseudocode
 
@@ -180,7 +184,7 @@ for s in 0..S-1:
     sources <- carried + loads(period s) + cut_sources
     a <- [v_k ..., V_fill],  b <- [b_c ..., V_sources]
     C <- geodesic_cost(surface, alpha, L_max) ; add dummy costs c_R, c_U, 0
-    P <- sinkhorn_log(a, b, C, eps) ; P <- rescale_rows(P, a)
+    P <- sinkhorn(a, b, C, eps) ; P <- rescale_rows(P, a)
     for c in fill: append layer sum_k P[k,c]*pi_k + P[U,c]*pi_U to columns[c]
     carried <- {k : P[k,R] > 0}            # dozer lag
     observed[F] <- True
@@ -291,6 +295,8 @@ Blocks are accumulated on the base block grid. For each block we report P10/P50/
 | Uncertainty / sensitivity / scenarios | `spbm/uncertainty.py` |
 | Audit trail | `spbm/audit.py` |
 | Orchestration / CLI | `spbm/pipeline.py`, `spbm/__main__.py` |
+| Several CPU cores: cases and steps run side by side (results identical to one core) | `spbm/parallel.py` |
+| Web page: data choice, parameters, uploads, runs with progress, results | `spbm/web.py`, `spbm/webui/index.html` |
 
 # 10. Assumptions
 
