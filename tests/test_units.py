@@ -345,3 +345,20 @@ def test_density_factors_identity_and_overrides():
     auto = apply_overrides(load_config(), {"density.volume_factor": "auto"})
     with pytest.raises(ValueError, match="not resolved"):
         density_factors(auto)
+
+
+def test_ingest_reads_zip_inside_a_folder(tmp_path):
+    """An uploaded .zip lands in the inbox folder; its members must be used."""
+    import zipfile
+    from spbm import io as sio
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    with zipfile.ZipFile(inbox / "upload.zip", "w") as z:
+        z.writestr("data/fms.csv", "Cycle ID\n1\n")
+        z.writestr("data/Topo_260401.dxf", "0\nEOF\n")
+    cfg = {"inputs": {"sources": [str(inbox)], "raw_store": str(tmp_path / "store"),
+                      "fms_pattern": "*.csv", "survey_pattern": "*.dxf"}}
+    names = sorted(f.name for f in sio.scan_sources(cfg))
+    assert names == ["Topo_260401.dxf", "fms.csv"]
+    with pytest.raises(RuntimeError, match="No FMS"):
+        sio.scan_sources({"inputs": dict(cfg["inputs"], sources=[str(tmp_path / "empty")], raw_store=str(tmp_path / "s2"))})

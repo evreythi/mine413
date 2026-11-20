@@ -53,18 +53,23 @@ def _kind(name: str, cfg: dict) -> str | None:
 def _iter_entries(cfg: dict, extra=()):
     """(name, origin, bytes) for every candidate input in the configured
     sources plus `extra` paths (zip archives, directories or files)."""
+    def zip_members(p, label):
+        with zipfile.ZipFile(p) as zf:
+            for m in zf.namelist():
+                if not m.endswith("/") and not Path(m).name.startswith("._"):
+                    yield Path(m).name, f"{label}::{m}", zf.read(m)
+
     for src in list(cfg["inputs"]["sources"]) + [str(e) for e in extra]:
         p = resolve(src)
         if not p.exists():
             continue
         if p.is_file() and p.suffix.lower() == ".zip":
-            with zipfile.ZipFile(p) as zf:
-                for m in zf.namelist():
-                    if not m.endswith("/") and not Path(m).name.startswith("._"):
-                        yield Path(m).name, f"{src}::{m}", zf.read(m)
+            yield from zip_members(p, src)
         elif p.is_dir():
             for f in sorted(p.rglob("*")):
-                if f.is_file():
+                if f.is_file() and f.suffix.lower() == ".zip":     # e.g. a zip uploaded to the inbox
+                    yield from zip_members(f, str(f))
+                elif f.is_file():
                     yield f.name, str(f), f.read_bytes()
         elif p.is_file():
             yield p.name, str(p), p.read_bytes()
@@ -118,6 +123,8 @@ def scan_sources(cfg: dict, interventions: pd.DataFrame | None = None) -> list[S
     every stored input (a superseded file is replaced by its successor)."""
     ingest(cfg, interventions=interventions)
     store = resolve(cfg["inputs"]["raw_store"])
+    if not (store / "ingest_log.csv").exists():
+        raise RuntimeError("No FMS (.csv) or survey (.dxf) files found in " + ", ".join(map(str, cfg["inputs"]["sources"])))
     log = pd.read_csv(store / "ingest_log.csv", dtype=str)
     log = log[log["status"] != "duplicate"]
     current = log.groupby("name").tail(1)          # latest accepted version per name

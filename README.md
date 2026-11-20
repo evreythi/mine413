@@ -30,8 +30,12 @@ You can also open **`SPBM.html`**: it jumps straight to SPBM if it is running, a
 ### What the page does
 
 * **Overview** and **How it works**: what the model is and how it gets its answer, in plain language.
-* **Parameters**: change any value or assumption (angle of repose, swell/volume factor, density, survey timing, dozer push, block size, uncertainty ranges…), on a form or as raw text. Your changes are saved separately (`config/project_custom.yaml`) and their results go to `outputs_custom/`. The official settings and results are never changed. The model has no prices or economic values; it reports tonnes, grades and contained metal.
-* **Upload & run**: drag in new truck data (`.csv`) or surveys (`.dxf`), tick which steps to run, and watch the progress bar. The core always runs, takes about 20 s, and produces the full block model. The slow extras can each be turned off:
+* **Parameters**: change any value or assumption (angle of repose, swell/volume factor, density, survey timing, dozer push, block size, uncertainty ranges…), on a form or as raw text. Your changes are saved separately (`config/project_custom.yaml`) as the **Custom** settings; the **Default** settings and results are never changed. The model has no prices or economic values; it reports tonnes, grades and contained metal.
+* **Upload & run**: first choose the data:
+  * **Example data**: the supplied stockpile (`Data_Topo 2026.zip`), plus any files you add;
+  * **My own data**: only the files you upload, for example a client's own truck records and surveys. These are kept apart in `data/own/`, with their own corrections file (`data/own/manual_interventions.csv`). "Clear my data" starts over for a new client.
+
+  Then drag in truck data (`.csv`), surveys (`.dxf`, the file name containing the date as `YYMMDD`) or a `.zip`, pick Default or Custom settings, tick which steps to run, and watch the progress bar. Each combination of data and settings has its own results folder (`outputs/`, `outputs_custom/`, `outputs_own/`, `outputs_own_custom/`), so no run overwrites another. For a new site, check the settings that were tuned to the example stockpile (survey cut-off time, bucket size, angle of repose); the volume factor is worked out from the data. The block grid and the forward-model test adjust to the new data automatically. The core always runs, takes about 20 s, and produces the full block model. The slow extras can each be turned off:
 
   | Step | Time |
   |---|---|
@@ -43,7 +47,7 @@ You can also open **`SPBM.html`**: it jumps straight to SPBM if it is running, a
   | Scenarios | ~40 s |
   | Figures | ~5 s |
 
-* **Results**: key numbers, checks, scenarios, every figure and table, and downloads (block model as CSV and VTK). You can switch between the official results and your custom ones.
+* **Results**: key numbers, checks, scenarios, every figure and table, and downloads (block model as CSV and VTK). Two switches choose which results to show: example data or your own data, and Default or Custom settings.
 
 ## Running from a terminal (optional)
 
@@ -55,7 +59,7 @@ python -m spbm serve --open        # the web page (same as the launcher)
 python -m spbm run --fast          # core + scenarios, about 1 min
 python -m spbm run                 # everything, about 35 min
 python -m spbm run --skip mc,sensitivity   # leave out chosen steps
-python -m pytest -q                # 71 automated checks, about 2-3 min
+python -m pytest -q                # 73 automated checks, about 2-3 min
 ```
 
 Steps that `--skip` accepts:

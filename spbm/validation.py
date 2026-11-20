@@ -146,7 +146,17 @@ def _forward_metrics(rec, s, fcfg, mode="push"):
 
 def temporal_validation(rec, cfg, out: Path) -> dict:
     fc = cfg["forward"]
-    calib, test = fc["calib_periods"], fc["test_periods"]
+    calib, test = list(fc["calib_periods"]), list(fc["test_periods"])
+    n = len(rec.periods)
+    if not set(calib + test) <= set(range(n)):
+        # The configured split does not fit these data (another site or fewer
+        # surveys): calibrate on the earlier ~55% of the intervals after the
+        # first, test on the rest.
+        avail = list(range(1, n))
+        k = max(1, int(round(0.55 * len(avail))))
+        calib, test = avail[:k], avail[k:]
+    if not calib or not test:
+        return None                       # too few survey intervals for a hold-out test
     grid = list(itertools.product([35.0, 37.0, 39.0], [2.0, 3.0, 5.0], [0.0, 2.0, 4.0]))
     rows = []
     for rep, rad, off in grid:

@@ -105,4 +105,8 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except (RuntimeError, ValueError) as e:      # data or settings problems: say what is wrong, plainly
+        print(f"error: {e}", file=sys.stderr)
+        sys.exit(1)

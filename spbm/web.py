@@ -6,16 +6,19 @@ index.html) and a JSON API around the normal command line:
     GET  /api/ping              {"app": "spbm"} (used by SPBM.html and the launchers)
     GET  /api/state             inbox files, registered inputs, current/last job
     PUT  /api/upload?name=F     store the request body as data/inbox/F (.csv/.dxf/.zip)
-    GET  /api/params            editable parameters: official and custom values
+    GET  /api/params            editable parameters: default and custom values
     POST /api/params            {"values": {key: value}} or {"yaml": text} -> config/project_custom.yaml
     POST /api/params/reset      delete the custom configuration
-    POST /api/run               {"mode": "fast"|"full", "mc": n, "config": "official"|"custom"}
+    POST /api/run               {"data": "example"|"own", "params": "default"|"custom", "skip": [...], "mc": n}
     POST /api/cancel            stop the running job
-    GET  /api/results?set=S     summary, manifest, tables and figures (S = official | custom)
+    GET  /api/results?set=S     summary, manifest, tables and figures of one result set (see RESULT_SETS)
     GET  /out/<S>/<path>        a file from that output folder (figures, CSV, VTK)
 
-Changed parameters never touch config/project.yaml or outputs/: they are
-saved as config/project_custom.yaml, whose runs write to outputs_custom/.
+Two data sets: "example" (the supplied Data_Topo 2026.zip plus data/inbox/)
+and "own" (only files uploaded for it, kept apart under data/own/, for a
+client's own data). Two parameter sets: "default" (config/project.yaml) and
+"custom" (config/project_custom.yaml, edited on the page). Each of the four
+combinations writes to its own output folder, so nothing overwrites another.
 
 The analysis always runs as a separate `python -m spbm update` process, so
 the web page uses exactly the same code path and audit trail as the command
@@ -124,6 +127,44 @@ DOWNLOADS = ["blockmodel/stockpile_block_model.csv", "blockmodel/stockpile_block
 CUSTOM_CONFIG = "config/project_custom.yaml"
 CUSTOM_OUTPUTS = "outputs_custom"
 LOCKED = ("inputs", "outputs")     # data sources and output folder cannot be changed from the page
+
+OWN_DIR = "data/own"                # a client's own data, kept apart from the example data
+DATASETS = {
+    "example": {"label": "Example data", "inbox": "data/inbox"},
+    "own": {"label": "My own data", "inbox": OWN_DIR + "/inbox"},
+}
+RESULT_SETS = {                     # (data set, parameters) -> output folder
+    "default": ("example", "default", "outputs"),
+    "custom": ("example", "custom", CUSTOM_OUTPUTS),
+    "own_default": ("own", "default", "outputs_own"),
+    "own_custom": ("own", "custom", "outputs_own_custom"),
+}
+
+
+def result_set(data, params):
+    return next(k for k, (d, pr, _) in RESULT_SETS.items() if d == data and pr == params)
+
+
+def own_config_path(params: str) -> Path:
+    """Write the configuration for a run on the client's own data: the default
+    or custom parameters, but reading only data/own/inbox, with its own raw
+    store, corrections file and output folder."""
+    base = default_config() if params == "default" else custom_config()
+    if base is None:
+        raise ValueError("no custom parameters saved yet")
+    c = _clean(base)
+    own = resolve(OWN_DIR)
+    (own / "inbox").mkdir(parents=True, exist_ok=True)
+    mi = own / "manual_interventions.csv"
+    if not mi.exists():
+        mi.write_text(",".join(["id", "type", "target", "value", "reason", "author", "date", "approved_by"]) + "\n")
+    c["inputs"] = dict(c["inputs"], sources=[OWN_DIR + "/inbox"], raw_store=OWN_DIR + "/raw_store",
+                       manual_interventions=OWN_DIR + "/manual_interventions.csv")
+    c["outputs"] = dict(c["outputs"], root=RESULT_SETS[result_set("own", params)][2])
+    p = own / f"config_{params}.yaml"
+    p.write_text("# Written by the SPBM web page for a run on your own data; do not edit (edit the parameters on the page).\n"
+                 + yaml.safe_dump(c, sort_keys=False, allow_unicode=True))
+    return p
 
 # Editable parameters shown as a form: (group, [items]).  Item fields:
 #   keys  - dotted config keys written with this value (several = kept equal)
@@ -289,7 +330,7 @@ def _cross_checks(cfg):
         raise ValueError("confidence classes: High ≥ Medium ≥ Low FMS-tracked share")
 
 
-def official_config():
+def default_config():
     return load_config("config/project.yaml")
 
 
@@ -298,7 +339,7 @@ def custom_config():
     return load_config(CUSTOM_CONFIG) if p.exists() else None
 
 
-def changes(official, custom):
+def changes(default, custom):
     """Leaf values that differ between two configurations (dotted keys)."""
     out = []
 
@@ -311,14 +352,14 @@ def changes(official, custom):
             if isinstance(ka, dict) or isinstance(kb, dict):
                 walk(ka or {}, kb or {}, pre + k + ".")
             elif ka != kb:
-                out.append({"key": pre + k, "official": ka, "custom": kb})
-    walk(_clean(official), _clean(custom), "")
+                out.append({"key": pre + k, "default": ka, "custom": kb})
+    walk(_clean(default), _clean(custom), "")
     return [c for c in out if c["key"] != "outputs.root"]
 
 
 def write_custom(cfg_new):
     """Validate a full configuration and save it as the custom configuration."""
-    off = official_config()
+    off = default_config()
     if not isinstance(cfg_new, dict):
         raise ValueError("the configuration must be a YAML mapping")
     cfg_new = copy.deepcopy(_clean(cfg_new))
@@ -339,16 +380,16 @@ def write_custom(cfg_new):
     head = ["# Custom configuration written by the SPBM web page (python -m spbm serve).",
             "# Runs with it write to outputs_custom/; config/project.yaml is unchanged.",
             "# Changes from config/project.yaml:"]
-    head += [f"#   {d['key']}: {d['official']!r} -> {d['custom']!r}" for d in diff] or ["#   (none)"]
+    head += [f"#   {d['key']}: {d['default']!r} -> {d['custom']!r}" for d in diff] or ["#   (none)"]
     resolve(CUSTOM_CONFIG).write_text("\n".join(head) + "\n\n" + yaml.safe_dump(cfg_new, sort_keys=False, allow_unicode=True))
     return diff
 
 
 def params_state():
-    off, cus = official_config(), custom_config()
+    off, cus = default_config(), custom_config()
     groups = []
     for title, items in PARAMS:
-        groups.append({"title": title, "items": [dict(it, official=_get(off, it["keys"][0]),
+        groups.append({"title": title, "items": [dict(it, default=_get(off, it["keys"][0]),
                                                       custom=None if cus is None else _get(cus, it["keys"][0]))
                                                  for it in items]})
     p = resolve(CUSTOM_CONFIG)
@@ -440,13 +481,34 @@ def safe_name(name: str) -> str | None:
 
 
 def make_handler(cfg: dict, job: Job):
-    inbox = resolve("data/inbox")
-    official_path = cfg.get("_path", str(resolve("config/project.yaml")))
-    roots = {"official": resolve(cfg["outputs"]["root"]).resolve(), "custom": resolve(CUSTOM_OUTPUTS).resolve()}
+    default_path = cfg.get("_path", str(resolve("config/project.yaml")))
+    roots = {k: resolve(folder).resolve() for k, (_, _, folder) in RESULT_SETS.items()}
+    roots["default"] = resolve(cfg["outputs"]["root"]).resolve()
+    inboxes = {k: resolve(v["inbox"]) for k, v in DATASETS.items()}
+    stores = {"example": resolve(cfg["inputs"]["raw_store"]), "own": resolve(OWN_DIR + "/raw_store")}
     from .__main__ import STEPS
 
     def rel(p: Path) -> str:
         return p.relative_to(ROOT).as_posix() if p.is_relative_to(ROOT) else str(p)
+
+    def files_in(folder: Path):
+        folder.mkdir(parents=True, exist_ok=True)
+        return [{"name": p.name, "bytes": p.stat().st_size} for p in sorted(folder.iterdir())
+                if p.is_file() and not p.name.startswith(".")]
+
+    def registered(data):
+        """Files already in that data set's raw store (from its ingest log)."""
+        log = stores[data] / "ingest_log.csv"
+        d = read_csv(log)
+        if not d:
+            return None
+        keep = [i for i, c in enumerate(d["columns"]) if c in ("name", "kind", "bytes", "ingested", "status")]
+        return {"columns": [d["columns"][i] for i in keep], "rows": [[r[i] for i in keep] for r in d["rows"]],
+                "truncated": d["truncated"]}
+
+    def busy():
+        st = job.status()
+        return st is not None and st["running"]
 
     class H(BaseHTTPRequestHandler):
         server_version = "spbm"
@@ -483,6 +545,12 @@ def make_handler(cfg: dict, job: Job):
                 raise ValueError("request too large")
             return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
+        @staticmethod
+        def _data(value):
+            if value not in DATASETS:
+                raise ValueError("data must be example or own")
+            return value
+
         # ---------------------------------------------------------- GET
         def do_GET(self):
             u = urlparse(self.path)
@@ -496,22 +564,18 @@ def make_handler(cfg: dict, job: Job):
             if u.path == "/api/params":
                 return self._json(params_state())
             if u.path == "/api/results":
-                return self._json(self._results(q.get("set", ["official"])[0]))
+                return self._json(self._results(q.get("set", ["default"])[0]))
             if u.path.startswith("/out/"):
                 which, _, path = unquote(u.path[len("/out/"):]).partition("/")
                 return self._file(which, path, q.get("download"))
             self._err(404, "not found")
 
         def _state(self):
-            inbox.mkdir(parents=True, exist_ok=True)
-            files = [{"name": p.name, "bytes": p.stat().st_size} for p in sorted(inbox.iterdir())
-                     if p.is_file() and not p.name.startswith(".")]
-            have = {k: (r / "summary.json").exists() for k, r in roots.items()}
-            reg = next((roots[k] / "audit" / "data_registry.csv" for k in ("custom", "official")
-                        if (roots[k] / "audit" / "data_registry.csv").exists()), None)
-            return {"inbox": files, "registered": read_csv(reg) if reg else None, "job": job.status(),
-                    "results": have, "custom_config": resolve(CUSTOM_CONFIG).exists(),
-                    "roots": {k: rel(r) for k, r in roots.items()},
+            return {"datasets": {k: {"label": v["label"], "inbox_path": v["inbox"], "inbox": files_in(inboxes[k]),
+                                     "registered": registered(k)} for k, v in DATASETS.items()},
+                    "job": job.status(), "results": {k: (r / "summary.json").exists() for k, r in roots.items()},
+                    "result_sets": {k: {"data": d, "params": pr, "root": rel(roots[k])} for k, (d, pr, _) in RESULT_SETS.items()},
+                    "custom_config": resolve(CUSTOM_CONFIG).exists(),
                     "steps": [{"id": k, "label": v} for k, v in STEPS.items()],
                     "default_mc": cfg["uncertainty"]["n_realizations"]}
 
@@ -536,12 +600,13 @@ def make_handler(cfg: dict, job: Job):
             for k, title, path in TABLES:
                 f = root / path
                 tables[k] = {"title": title, "path": path, "data": read_csv(f), "stale": f.exists() and stale(f)}
-            off, cus = official_config(), custom_config()
-            return {"available": True, "set": which, "root": rel(root),
+            dflt, cus = default_config(), custom_config()
+            data, params, _ = RESULT_SETS[which]
+            return {"available": True, "set": which, "data": data, "params": params, "root": rel(root),
                     "summary": json.loads((root / "summary.json").read_text()),
                     "manifest": {k: m.get(k) for k in ("run_id", "started", "finished", "git_commit", "config_hash", "notes")},
                     "inputs": m.get("inputs"), "tables": tables, "figures": figs,
-                    "changes": changes(off, cus) if which == "custom" and cus else [],
+                    "changes": changes(dflt, cus) if params == "custom" and cus else [],
                     "downloads": [{"path": d, "stale": stale(root / d)} for d in DOWNLOADS if (root / d).exists()],
                     "history": read_csv(root / "audit" / "run_log.csv")}
 
@@ -563,16 +628,21 @@ def make_handler(cfg: dict, job: Job):
             u = urlparse(self.path)
             if u.path != "/api/upload":
                 return self._err(404, "not found")
-            name = safe_name(parse_qs(u.query).get("name", [""])[0])
+            q = parse_qs(u.query)
+            data = q.get("data", ["example"])[0]
+            if data not in DATASETS:
+                return self._err(400, "data must be example or own")
+            name = safe_name(q.get("name", [""])[0])
             if name is None:
                 return self._err(400, "file name must end in .csv, .dxf or .zip and contain only letters, digits, spaces and . _ - ( ) +")
             n = int(self.headers.get("Content-Length") or 0)
             if n <= 0 or n > MAX_UPLOAD:
                 return self._err(400, "empty or too large (limit 1 GB)")
+            inbox = inboxes[data]
             inbox.mkdir(parents=True, exist_ok=True)
             dest = inbox / name
             if dest.exists():
-                return self._err(409, f"{name} is already in data/inbox; remove it first or rename the new file")
+                return self._err(409, f"{name} is already waiting to be used; remove it first or rename the new file")
             tmp = inbox / f".{name}.part"
             left = n
             with open(tmp, "wb") as fh:
@@ -586,30 +656,37 @@ def make_handler(cfg: dict, job: Job):
                 tmp.unlink(missing_ok=True)
                 return self._err(400, "upload interrupted")
             tmp.rename(dest)
-            self._json({"stored": f"data/inbox/{name}", "bytes": n})
+            self._json({"stored": rel(dest), "bytes": n})
 
         def do_POST(self):
             u = urlparse(self.path)
             try:
                 if u.path == "/api/run":
                     b = self._body_json()
-                    which = b.get("config", "official")
-                    if which not in ("official", "custom"):
-                        return self._err(400, "config must be official or custom")
-                    if which == "custom" and not resolve(CUSTOM_CONFIG).exists():
+                    data = self._data(b.get("data", "example"))
+                    params = b.get("params", "default")
+                    if params not in ("default", "custom"):
+                        return self._err(400, "params must be default or custom")
+                    if params == "custom" and not resolve(CUSTOM_CONFIG).exists():
                         return self._err(400, "no custom parameters saved yet")
+                    if data == "own" and not (files_in(inboxes["own"]) or registered("own")):
+                        return self._err(400, "upload your own FMS and survey files first")
                     skip = [s for s in b.get("skip", []) if s in STEPS]
                     if len(skip) != len(b.get("skip", [])):
                         return self._err(400, "unknown step")
                     n_mc = int(b.get("mc") or cfg["uncertainty"]["n_realizations"])
                     if not 1 <= n_mc <= 1000:
                         return self._err(400, "Monte Carlo realisations must be 1-1000")
-                    job.start(official_path if which == "official" else str(resolve(CUSTOM_CONFIG)), which, skip, n_mc)
+                    if data == "own":
+                        path = str(own_config_path(params))
+                    else:
+                        path = default_path if params == "default" else str(resolve(CUSTOM_CONFIG))
+                    job.start(path, result_set(data, params), skip, n_mc)
                     return self._json(job.status())
                 if u.path == "/api/cancel":
                     return self._json({"cancelled": job.cancel()})
                 if u.path == "/api/params":
-                    if job.status() and job.status()["running"] and job.info["set"] == "custom":
+                    if busy() and job.info["set"].endswith("custom"):
                         return self._err(409, "a custom run is in progress; wait for it or cancel it first")
                     b = self._body_json()
                     if "yaml" in b:
@@ -618,7 +695,7 @@ def make_handler(cfg: dict, job: Job):
                         except yaml.YAMLError as e:
                             return self._err(400, f"YAML error: {e}")
                     else:
-                        base = custom_config() or official_config()
+                        base = custom_config() or default_config()
                         new = _clean(base)
                         items = {it["keys"][0]: it for _, its in PARAMS for it in its}
                         for key, raw in (b.get("values") or {}).items():
@@ -632,12 +709,25 @@ def make_handler(cfg: dict, job: Job):
                     resolve(CUSTOM_CONFIG).unlink(missing_ok=True)
                     return self._json({"reset": True})
                 if u.path == "/api/inbox/remove":
-                    name = safe_name(self._body_json().get("name", ""))
-                    p = inbox / name if name else None
+                    b = self._body_json()
+                    data = self._data(b.get("data", "example"))
+                    name = safe_name(b.get("name", ""))
+                    p = inboxes[data] / name if name else None
                     if p is None or not p.is_file():
-                        return self._err(404, "no such file in data/inbox")
+                        return self._err(404, "no such file waiting to be used")
                     p.unlink()
                     return self._json({"removed": name})
+                if u.path == "/api/own/clear":
+                    # Start over with a new client: forget the uploaded files and their
+                    # registered copies. Results already produced are kept.
+                    if busy():
+                        return self._err(409, "a run is in progress; wait for it or cancel it first")
+                    import shutil
+                    for sub in ("inbox", "raw_store"):
+                        d = resolve(OWN_DIR) / sub
+                        if d.is_dir() and d.resolve().is_relative_to(resolve(OWN_DIR).resolve()):
+                            shutil.rmtree(d)
+                    return self._json({"cleared": True})
             except RuntimeError as e:
                 return self._err(409, str(e))
             except (ValueError, TypeError, KeyError, json.JSONDecodeError) as e:

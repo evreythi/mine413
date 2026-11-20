@@ -363,31 +363,46 @@ footer { color: var(--muted); font-size: 13px; padding: 24px 0 40px; border-top:
 <!-- ======================================================== RUN -->
 <section id="tab-run" hidden>
   <h2>Upload &amp; run</h2>
-  <p class="lead">The supplied data (<code>Data_Topo 2026.zip</code>) is always included. Add new FMS exports (<code>.csv</code>) or survey solids (<code>.dxf</code>), or a <code>.zip</code> of them, then start a run.</p>
+  <p class="lead">Choose which data to model, add files if needed, pick the settings and the steps, then start the run.</p>
+
+  <div class="card block">
+    <h3>1. Which data?</h3>
+    <div class="seg" id="dataseg">
+      <button data-ds="example" aria-pressed="true">Example data (Data_Topo 2026.zip)</button>
+      <button data-ds="own">My own data</button>
+    </div>
+    <p class="small" id="datanote" style="margin:10px 0 0"></p>
+    <div class="note small" id="ownhelp" hidden>
+      <b>What to upload:</b> the truck (FMS) records as <code>.csv</code> with the columns <code>Cycle ID, Truck PayLoad, Au, Ag, Cu, Dens, X (Dump Event), Y (Dump Event), Z (Dump Event), Dump_tstamp</code>, and one survey change solid per survey as <code>.dxf</code> whose file name contains the survey date as YYMMDD (for example <code>PadB_260402.dxf</code>). A <code>.zip</code> of them also works. Coordinates must be metres, with the truck records and the surveys on the same grid.
+      <br><b>Check the settings for your site</b> on the Parameters tab. A few defaults were set for the example stockpile, such as the survey time of day (cut-off), the bucket size used for the payload check and the angle of repose. The volume factor is worked out from your own data.
+      <br>Your files are kept apart from the example data (in <code>data/own/</code>), and data corrections go in <code>data/own/manual_interventions.csv</code>.
+    </div>
+  </div>
 
   <div class="grid g2 block">
     <div>
-      <h3>1. Add new data <span class="muted small">(optional)</span></h3>
+      <h3>2. Add files <span class="muted small" id="addopt">(optional)</span></h3>
       <label class="drop" id="drop">
         <input type="file" id="file" multiple accept=".csv,.dxf,.zip" hidden>
         <strong>Drop files here or click to choose</strong>
         <span class="muted small">FMS <code>.csv</code> · survey <code>.dxf</code> (name contains the date as YYMMDD) · <code>.zip</code></span>
       </label>
       <ul class="filelist" id="uploads"></ul>
-      <h3 class="block" style="margin-top:20px">Waiting in <code>data/inbox/</code></h3>
+      <h3 class="block" style="margin-top:20px">Waiting to be used</h3>
       <ul class="filelist" id="inbox"></ul>
-      <p class="muted small" style="margin-top:8px">Files are registered in the managed raw store when the next run starts. After that they stay part of the model even if removed from the inbox; a corrected file with the same name needs a <code>supersede</code> intervention.</p>
+      <p class="muted small" style="margin-top:8px">Files are registered when the next run starts. After that they stay part of this data set even if removed from the waiting list; a corrected file with the same name needs a <code>supersede</code> correction.</p>
+      <button class="btn danger" id="clearown" hidden style="margin-top:6px">Clear my data and start over</button>
     </div>
 
     <div>
-      <h3>2. Parameters</h3>
+      <h3>3. Settings</h3>
       <div class="seg" id="cfgseg">
-        <button data-cfg="official" aria-pressed="true">Official (config/project.yaml)</button>
+        <button data-cfg="default" aria-pressed="true">Default (config/project.yaml)</button>
         <button data-cfg="custom" id="cfgcustom">Custom</button>
       </div>
       <p class="muted small" id="cfgnote" style="margin-top:8px"></p>
 
-      <h3 style="margin-top:20px">3. Choose what to run</h3>
+      <h3 style="margin-top:20px">4. Choose what to run</h3>
       <div class="row" style="margin-bottom:10px">
         <span class="small muted">Presets:</span>
         <button class="btn" data-preset="fast" style="padding:5px 12px">Fast</button>
@@ -418,7 +433,7 @@ footer { color: var(--muted); font-size: 13px; padding: 24px 0 40px; border-top:
   </div>
 
   <div class="block">
-    <h3>Registered inputs <span class="muted small">(from the latest run)</span></h3>
+    <h3>Files already registered <span class="muted small" id="reglabel"></span></h3>
     <div id="registered"></div>
   </div>
 </section>
@@ -426,11 +441,11 @@ footer { color: var(--muted); font-size: 13px; padding: 24px 0 40px; border-top:
 <!-- ======================================================== PARAMETERS -->
 <section id="tab-params" hidden>
   <h2>Parameters</h2>
-  <p class="lead">Change any model value or assumption, then run with <b>Custom</b> parameters. Changes are saved to <code>config/project_custom.yaml</code> and its runs write to <code>outputs_custom/</code>, so the official configuration and results are never touched.</p>
+  <p class="lead">Change any model value or assumption, then run with <b>Custom</b> parameters. Changes are saved to <code>config/project_custom.yaml</code> and runs with them write to their own folders (<code>outputs_custom/</code>, or <code>outputs_own_custom/</code> for your own data), so the default settings and results are never touched.</p>
   <div class="note info small" id="pstatus"></div>
   <div class="row block" style="margin-top:14px">
     <div class="seg" id="pmode"><button data-pm="form" aria-pressed="true">Form</button><button data-pm="yaml">Edit all (YAML)</button></div>
-    <button class="btn" id="preset" style="margin-left:auto">Reset everything to official</button>
+    <button class="btn" id="preset" style="margin-left:auto">Reset everything to default</button>
   </div>
 
   <div id="pform"></div>
@@ -450,7 +465,8 @@ footer { color: var(--muted); font-size: 13px; padding: 24px 0 40px; border-top:
 <!-- ======================================================== RESULTS -->
 <section id="tab-results" hidden>
   <div class="row"><h2 style="margin:0">Results</h2><span class="tag" id="runid"></span>
-    <div class="seg" id="setseg" style="margin-left:auto"><button data-set="official" aria-pressed="true">Official</button><button data-set="custom">Custom</button></div>
+    <div class="seg" id="resdata" style="margin-left:auto"><button data-rd="example" aria-pressed="true">Example data</button><button data-rd="own">My own data</button></div>
+    <div class="seg" id="resparams"><button data-rp="default" aria-pressed="true">Default</button><button data-rp="custom">Custom</button></div>
     <button class="btn" id="reload">Refresh</button></div>
   <p class="muted small" id="runmeta" style="margin-top:6px"></p>
   <div class="note small" id="chgnote" hidden></div>
@@ -611,7 +627,10 @@ const STEP_INFO = {
 const ORDER = ["align", "mc", "figures", "temporal", "twin", "robust", "scenarios", "sensitivity"];
 const PRESETS = { fast: ["mc", "temporal", "twin", "robust", "sensitivity"], full: [], core: ORDER.slice() };
 const CORE_S = 22;
-let polling = null, lastJobRunning = false, runCfg = "official", ST = null;
+let polling = null, lastJobRunning = false, runCfg = "default", runData = "example", ST = null;
+const SET_LABEL = { default: "example data · default settings", custom: "example data · custom settings",
+                    own_default: "my data · default settings", own_custom: "my data · custom settings" };
+const setKey = (data, params) => (data === "own" ? "own_" : "") + params;
 
 function renderSteps() {
   $("#steplist").innerHTML =
@@ -640,12 +659,42 @@ $("#steplist").addEventListener("input", estimate);
 document.addEventListener("click", e => { const b = e.target.closest("[data-preset]"); if (b) setPreset(b.dataset.preset); });
 
 function setRunCfg(c) {
-  if (c === "custom" && !(ST && ST.custom_config)) { toast("Save custom parameters on the Parameters tab first"); return; }
+  if (c === "custom" && !(ST && ST.custom_config)) { toast("Save custom settings on the Parameters tab first"); return; }
   runCfg = c;
-  $$("#cfgseg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.cfg === c));
-  $("#outnote").innerHTML = `Results go to <code>${esc(ST ? ST.roots[c] : c)}/</code>` + (c === "official"
-    ? " and replace the official results. Every run is archived in <code>history/</code> and compared with the previous one in the change report."
-    : ". The official results are not touched.");
+  document.querySelectorAll("#cfgseg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.cfg === c));
+  updateOutNote();
+}
+function updateOutNote() {
+  const k = setKey(runData, runCfg), root = ST ? ST.result_sets[k].root : k;
+  const replaces = k === "default"
+    ? " and replace the default results for the example data. Every run is archived in <code>history/</code> and compared with the previous one in the change report."
+    : ". Other results are not touched.";
+  $("#outnote").innerHTML = `Results go to <code>${esc(root)}/</code>` + replaces;
+}
+function setRunData(d) {
+  runData = d;
+  document.querySelectorAll("#dataseg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.ds === d));
+  const own = d === "own";
+  $("#ownhelp").hidden = !own;
+  $("#clearown").hidden = !own;
+  $("#addopt").textContent = own ? "(needed)" : "(optional)";
+  $("#datanote").innerHTML = own
+    ? "Only the files you upload here are used. The example data is left out."
+    : "The supplied example stockpile (<code>Data_Topo 2026.zip</code>) is always included. Files you add here are modelled together with it.";
+  if (ST) renderData();
+  updateOutNote();
+}
+$("#dataseg").addEventListener("click", e => { const b = e.target.closest("[data-ds]"); if (b) setRunData(b.dataset.ds); });
+$("#clearown").onclick = async () => {
+  if (!confirm("Remove all files uploaded as your own data (waiting and registered)? Results already produced are kept.")) return;
+  try { await api("/api/own/clear", { method: "POST" }); toast("Your data was cleared"); refreshState(); } catch (e) { toast(e.message); }
+};
+function renderData() {
+  const ds = ST.datasets[runData];
+  renderInbox(ds.inbox);
+  $("#reglabel").textContent = "(" + ds.label.toLowerCase() + ")";
+  const reg = ds.registered;
+  $("#registered").innerHTML = reg ? table(reg) : `<p class="muted small">None yet. Files are registered when a run starts.</p>`;
 }
 $("#cfgseg").addEventListener("click", e => { const b = e.target.closest("[data-cfg]"); if (b) setRunCfg(b.dataset.cfg); });
 
@@ -655,7 +704,7 @@ function renderJob(j) {
   card.hidden = false;
   const ok = !j.running && j.returncode === 0, fail = !j.running && j.returncode !== 0;
   $("#jobtag").className = "tag " + (j.running ? "info" : ok ? "ok" : "bad");
-  $("#jobtag").textContent = (j.set === "custom" ? "custom · " : "official · ") + (j.running ? "running" : ok ? "finished" : "stopped (exit " + j.returncode + ")");
+  $("#jobtag").textContent = (SET_LABEL[j.set] || j.set) + " · " + (j.running ? "running" : ok ? "finished" : "stopped (exit " + j.returncode + ")");
   $("#prog").className = "prog " + (j.running ? "run" : ok ? "done" : "fail");
   $("#prog span").style.width = Math.max(2, 100 * j.progress) + "%";
   $("#jobpct").textContent = j.running ? Math.round(100 * j.progress) + "% (estimated)" : "";
@@ -674,18 +723,18 @@ function renderJob(j) {
   $("#stop").hidden = !j.running;
   $("#jobdone").hidden = !ok;
   $("#jobdone button").dataset.set = j.set;
-  if (lastJobRunning && !j.running) { toast(ok ? "Run finished" : "Run stopped"); loadOverview(); resultsLoaded = false; if (ok) resSet = j.set; }
+  if (lastJobRunning && !j.running) { toast(ok ? "Run finished" : "Run stopped"); loadOverview(); resultsLoaded = false; if (ok) { resData = j.set.startsWith("own") ? "own" : "example"; resParams = j.set.endsWith("custom") ? "custom" : "default"; } }
   lastJobRunning = j.running;
 }
 
 function renderInbox(files) {
   $("#inbox").innerHTML = files.length ? files.map(f =>
     `<li><span class="nm">${esc(f.name)}</span><span class="sz">${bytes(f.bytes)}</span><button class="btn link" data-rm="${esc(f.name)}" title="Remove from inbox">Remove</button></li>`).join("")
-    : `<li class="muted small">Empty. Runs use the supplied data and anything already registered.</li>`;
+    : `<li class="muted small">${runData === "own" ? "Nothing waiting. Upload your FMS and survey files above." : "Nothing waiting. Runs use the example data and anything already registered."}</li>`;
 }
 $("#inbox").addEventListener("click", async e => {
   const b = e.target.closest("[data-rm]"); if (!b) return;
-  try { await api("/api/inbox/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: b.dataset.rm }) }); refreshState(); }
+  try { await api("/api/inbox/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: b.dataset.rm, data: runData }) }); refreshState(); }
   catch (err) { toast(err.message); }
 });
 
@@ -694,15 +743,12 @@ async function refreshState() {
     const s = await api("/api/state");
     const first = !ST; ST = s;
     if (first) renderSteps();
-    renderInbox(s.inbox);
+    renderData();
     $("#cfgcustom").disabled = !s.custom_config;
-    $("#cfgnote").innerHTML = s.custom_config ? `Custom parameters are saved. <a href="#params" data-go="params">Review them</a>.`
+    $("#cfgnote").innerHTML = s.custom_config ? `Custom settings are saved. <a href="#params" data-go="params">Review them</a>.`
       : `To change values or assumptions, use the <a href="#params" data-go="params">Parameters</a> tab.`;
-    if (runCfg === "custom" && !s.custom_config) runCfg = "official";
+    if (runCfg === "custom" && !s.custom_config) runCfg = "default";
     setRunCfg(runCfg);
-    const reg = s.registered;
-    $("#registered").innerHTML = reg ? table({ columns: reg.columns.filter(c => !/sha256|path|origin|member/i.test(c)),
-      rows: reg.rows.map(r => r.filter((_, i) => !/sha256|path|origin|member/i.test(reg.columns[i]))) }) : `<p class="muted small">None yet.</p>`;
     renderJob(s.job);
     schedule(s.job && s.job.running);
   } catch (e) { toast("Could not reach the platform: " + e.message); }
@@ -715,7 +761,7 @@ function upload(file) {
   $("#uploads").append(li);
   return new Promise(res => {
     const x = new XMLHttpRequest();
-    x.open("PUT", "/api/upload?name=" + encodeURIComponent(file.name));
+    x.open("PUT", "/api/upload?data=" + runData + "&name=" + encodeURIComponent(file.name));
     x.upload.onprogress = e => { if (e.lengthComputable) $(".mini span", li).style.width = (100 * e.loaded / e.total) + "%"; };
     x.onload = () => {
       let msg = ""; try { msg = JSON.parse(x.responseText).error || ""; } catch (e) {}
@@ -740,13 +786,14 @@ $("#file").onchange = e => { handleFiles(e.target.files); e.target.value = ""; }
 drop.addEventListener("drop", e => handleFiles(e.dataTransfer.files));
 
 $("#go").onclick = async () => {
-  const body = { config: runCfg, skip: skipList(), mc: nMC() };
-  if (runCfg === "official" && !confirm("This run replaces the official results in " + ST.roots.official + "/ (the previous version stays in history/). Continue?")) return;
+  const body = { data: runData, params: runCfg, skip: skipList(), mc: nMC() };
+  if (runData === "own" && !ST.datasets.own.inbox.length && !ST.datasets.own.registered) { toast("Upload your own FMS and survey files first"); return; }
+  if (setKey(runData, runCfg) === "default" && !confirm("This run replaces the default results for the example data in " + ST.result_sets.default.root + "/ (the previous version stays in history/). Continue?")) return;
   try { const j = await api("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); lastJobRunning = true; renderJob(j); schedule(true); }
   catch (e) { toast(e.message); }
 };
 $("#stop").onclick = async () => { if (!confirm("Cancel the running analysis?")) return; await api("/api/cancel", { method: "POST" }).catch(e => toast(e.message)); refreshState(); };
-$("#jobdone").addEventListener("click", e => { if (e.target.dataset.set) { resSet = e.target.dataset.set; resultsLoaded = false; } });
+$("#jobdone").addEventListener("click", e => { const s = e.target.dataset.set; if (s) { resData = s.startsWith("own") ? "own" : "example"; resParams = s.endsWith("custom") ? "custom" : "default"; resultsLoaded = false; } });
 
 /* ---------- parameters ---------- */
 let PS = null, pmode = "form", edits = {};
@@ -773,19 +820,19 @@ function readInput(it) {
   if (it.kind === "null_number") return el.value.trim() === "" ? null : Number(el.value);
   return el.value;
 }
-function current(it) { return it.custom !== null && PS.custom_exists ? it.custom : it.official; }
+function current(it) { return it.custom !== null && PS.custom_exists ? it.custom : it.default; }
 function renderParams() {
   const st = PS.custom_exists
-    ? `Custom parameters saved: <b>${PS.changes.length}</b> value${PS.changes.length === 1 ? "" : "s"} differ from the official configuration.` + (PS.changes.length ? `<ul class="chg">${PS.changes.map(c => `<li><code>${esc(c.key)}</code>: ${esc(show_v(c.official))} → <b>${esc(show_v(c.custom))}</b></li>`).join("")}</ul>` : "")
-    : "No custom parameters yet. The form shows the official values; edit any of them and save.";
+    ? `Custom parameters saved: <b>${PS.changes.length}</b> value${PS.changes.length === 1 ? "" : "s"} differ from the default settings.` + (PS.changes.length ? `<ul class="chg">${PS.changes.map(c => `<li><code>${esc(c.key)}</code>: ${esc(show_v(c.default))} → <b>${esc(show_v(c.custom))}</b></li>`).join("")}</ul>` : "")
+    : "No custom parameters yet. The form shows the default values; edit any of them and save.";
   $("#pstatus").innerHTML = st + `<div style="margin-top:6px">There are no economic or price parameters in this model; it reports tonnes, grades and contained metal.</div>`;
   $("#pform").innerHTML = PS.groups.map(g => `<div class="pgroup"><h3>${esc(g.title)}</h3>` + g.items.map(it => {
-    const cur = current(it), changed = !eqv(cur, it.official);
+    const cur = current(it), changed = !eqv(cur, it.default);
     return `<div class="prm${changed ? " changed" : ""}" data-row="${esc(it.keys[0])}">
       <div><span class="lab">${esc(it.label)}</span> ${it.a ? `<span class="tag">${esc(it.a)}</span>` : ""}</div>
       <div class="hlp">${esc(it.help)} <span class="mono" style="font-size:11.5px;opacity:.75">${it.keys.map(esc).join(" + ")}</span></div>
       <div class="ctl"><div class="in">${inputFor(it, cur)}${it.unit ? `<span class="unit">${esc(it.unit)}</span>` : ""}</div>
-        <div class="off">official: ${esc(show_v(it.official))}${changed ? `<button data-revert="${esc(it.keys[0])}">use official</button>` : ""}</div>
+        <div class="off">default: ${esc(show_v(it.default))}${changed ? `<button data-revert="${esc(it.keys[0])}">use default</button>` : ""}</div>
         <div class="bad" data-bad="${esc(it.keys[0])}"></div></div></div>`;
   }).join("") + `</div>`).join("");
   $("#yamltxt").value = PS.yaml;
@@ -802,15 +849,15 @@ function onEdit(e) {
   const holder = e.target.closest("[data-k]") || e.target; const k = holder.dataset.k; if (!k) return;
   const it = ITEMS().find(i => i.keys[0] === k), v = readInput(it);
   if (eqv(v, current(it))) delete edits[k]; else edits[k] = v;
-  $(`[data-row="${CSS.escape(k)}"]`).classList.toggle("changed", !eqv(v, it.official));
+  $(`[data-row="${CSS.escape(k)}"]`).classList.toggle("changed", !eqv(v, it.default));
   $(`[data-bad="${CSS.escape(k)}"]`).textContent = "";
   markDirty();
 }
 $("#pform").addEventListener("click", e => {
   const b = e.target.closest("[data-revert]"); if (!b) return;
   const it = ITEMS().find(i => i.keys[0] === b.dataset.revert);
-  const row = $(`[data-row="${CSS.escape(it.keys[0])}"] .in`); row.firstElementChild.outerHTML = inputFor(it, it.official);
-  if (eqv(it.official, current(it))) delete edits[it.keys[0]]; else edits[it.keys[0]] = it.official;
+  const row = $(`[data-row="${CSS.escape(it.keys[0])}"] .in`); row.firstElementChild.outerHTML = inputFor(it, it.default);
+  if (eqv(it.default, current(it))) delete edits[it.keys[0]]; else edits[it.keys[0]] = it.default;
   b.closest(".prm").classList.remove("changed"); b.remove(); markDirty();
 });
 $("#yamltxt").addEventListener("input", () => { $("#yamltxt").dataset.dirty = "1"; markDirty(); });
@@ -827,7 +874,7 @@ $("#psave").onclick = async () => {
   if (pmode === "form" && !Object.keys(edits).length && PS.custom_exists) { toast("Nothing to save"); return; }
   try {
     const r = await api("/api/params", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    toast(`Saved: ${r.changes.length} value${r.changes.length === 1 ? "" : "s"} differ from official. Run with Custom parameters to see the effect.`);
+    toast(`Saved: ${r.changes.length} value${r.changes.length === 1 ? "" : "s"} differ from default. Run with Custom settings to see the effect.`);
     delete $("#yamltxt").dataset.dirty; await loadParams(true); if (ST) { ST.custom_config = true; refreshState(); }
   } catch (e) {
     const m = e.message, it = ITEMS().find(i => m.startsWith(i.label + ":"));
@@ -837,7 +884,7 @@ $("#psave").onclick = async () => {
 };
 $("#pdiscard").onclick = () => { delete $("#yamltxt").dataset.dirty; renderParams(); };
 $("#preset").onclick = async () => {
-  if (!confirm("Delete the custom parameters? Results already in outputs_custom/ are kept.")) return;
+  if (!confirm("Delete the custom parameters? Results already produced are kept.")) return;
   await api("/api/params/reset", { method: "POST" }).catch(e => toast(e.message));
   delete $("#yamltxt").dataset.dirty; loadParams(true); refreshState();
 };
@@ -863,7 +910,7 @@ const FIG = {
 };
 const GROUP = { blockmodel: "Block model", growth: "Growth & timing", qaqc: "Data quality", uncertainty: "Uncertainty", validation: "Validation" };
 const figName = p => FIG[p.split("/").pop().replace(".png", "")] || p.split("/").pop();
-let resultsLoaded = false, R = null, figGroup = "all", resSet = "official";
+let resultsLoaded = false, R = null, figGroup = "all", resData = "example", resParams = "default";
 const OUT = p => `/out/${R.set}/${p}`;
 
 function renderFigs() {
@@ -892,12 +939,13 @@ $("#tblsel").onchange = renderTable;
 
 function renderResults() {
   const s = R.summary, k = s.key_results, m = R.manifest;
+  $("#gradenote").hidden = R.data !== "example";   // the warning is about the example data's grades
   $("#runid").textContent = "run " + (m.run_id || "?");
   $("#runmeta").textContent = `${R.root}/ · finished ${m.finished || "?"} · code ${m.git_commit || "?"} · config ${m.config_hash || "?"} · ${R.inputs ? R.inputs.length + " input files" : ""}`;
   $("#chgnote").hidden = R.set !== "custom";
   if (R.set === "custom") $("#chgnote").innerHTML = R.changes.length
-    ? `Run with custom parameters. Currently saved changes from official (if you edited after this run, they may differ from what it used; see <code>audit/config_used.json</code>):<ul class="chg">${R.changes.map(c => `<li><code>${esc(c.key)}</code>: ${esc(show_v(c.official))} → <b>${esc(show_v(c.custom))}</b></li>`).join("")}</ul>`
-    : "Run with custom parameters (currently identical to official).";
+    ? `Run with custom parameters. Currently saved changes from default (if you edited after this run, they may differ from what it used; see <code>audit/config_used.json</code>):<ul class="chg">${R.changes.map(c => `<li><code>${esc(c.key)}</code>: ${esc(show_v(c.default))} → <b>${esc(show_v(c.custom))}</b></li>`).join("")}</ul>`
+    : "Run with custom settings (currently identical to default).";
   const nStale = Object.values(R.tables).filter(x => x.stale).length + Object.values(R.figures).flat().filter(f => f.stale).length;
   $("#stalenote").hidden = !nStale;
   $("#stalenote").textContent = `${nStale} table(s) or figure(s) in this folder are from an earlier run, because their step was skipped this time. They are marked “earlier run”.`;
@@ -950,8 +998,9 @@ function renderResults() {
 async function loadResults(force) {
   if (resultsLoaded && !force) return;
   try {
-    R = await api("/api/results?set=" + resSet);
-    $$("#setseg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.set === resSet));
+    R = await api("/api/results?set=" + setKey(resData, resParams));
+    document.querySelectorAll("#resdata button").forEach(b => b.setAttribute("aria-pressed", b.dataset.rd === resData));
+    document.querySelectorAll("#resparams button").forEach(b => b.setAttribute("aria-pressed", b.dataset.rp === resParams));
     $("#runid").textContent = ""; $("#runmeta").textContent = ""; $("#chgnote").hidden = true; $("#stalenote").hidden = true;
     const has = R.available;
     $("#res-empty").hidden = has; $("#res").hidden = !has;
@@ -960,7 +1009,8 @@ async function loadResults(force) {
   } catch (e) { toast("Could not load results: " + e.message); }
 }
 $("#reload").onclick = () => loadResults(true);
-$("#setseg").addEventListener("click", e => { const b = e.target.closest("[data-set]"); if (b && b.dataset.set !== resSet) { resSet = b.dataset.set; loadResults(true); } });
+$("#resdata").addEventListener("click", e => { const b = e.target.closest("[data-rd]"); if (b && b.dataset.rd !== resData) { resData = b.dataset.rd; loadResults(true); } });
+$("#resparams").addEventListener("click", e => { const b = e.target.closest("[data-rp]"); if (b && b.dataset.rp !== resParams) { resParams = b.dataset.rp; loadResults(true); } });
 
 /* ---------- start ---------- */
 if (location.protocol === "file:") {

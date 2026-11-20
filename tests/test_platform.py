@@ -140,7 +140,7 @@ def test_web_parameter_validation_and_custom_config(tmp_path, monkeypatch):
                      ("uncertainty.epsilon_range", "15, 2"), ("uncertainty.seed", 1.5), ("uncertainty.cost_modes", [])]:
         with pytest.raises(ValueError):
             web.coerce(items[key], bad)
-    cfg = web.official_config()
+    cfg = web.default_config()
     for k in items["infill.repose_deg"]["keys"]:
         web._set(cfg, k, 35.0)
     cfg["inputs"]["raw_store"] = "/elsewhere"                 # locked sections are restored
@@ -189,3 +189,19 @@ def test_web_ping_and_already_running_check():
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+def test_web_own_data_config_reads_only_uploaded_files(tmp_path, monkeypatch):
+    import yaml
+    from spbm import web
+    monkeypatch.setattr(web, "OWN_DIR", str(tmp_path / "own"))
+    monkeypatch.setattr(web, "CUSTOM_CONFIG", str(tmp_path / "custom.yaml"))
+    p = web.own_config_path("default")
+    c = yaml.safe_load(p.read_text())
+    assert c["inputs"]["sources"] == [str(tmp_path / "own") + "/inbox"]          # no example data
+    assert c["inputs"]["raw_store"].startswith(str(tmp_path / "own"))
+    assert c["outputs"]["root"] == "outputs_own"
+    assert (tmp_path / "own" / "manual_interventions.csv").read_text().startswith("id,type,target")
+    with pytest.raises(ValueError, match="no custom"):
+        web.own_config_path("custom")
+    assert web.result_set("own", "custom") == "own_custom" and web.result_set("example", "default") == "default"

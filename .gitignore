@@ -12,3 +12,6 @@ config/project_custom.yaml
 outputs_custom/
 .spbm_server.log
 .venv/
+data/own/
+outputs_own/
+outputs_own_custom/
