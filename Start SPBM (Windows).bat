@@ -4,9 +4,14 @@ rem (a few minutes, needs Python 3.10 or later from python.org). After that it
 rem starts in seconds, opens the page in your browser, and stops by itself
 rem about 15 minutes after the page is closed (never during a run).
 cd /d "%~dp0"
-if not exist ".venv\Scripts\python.exe" (
-  echo First start: setting up SPBM. This takes a few minutes, once.
-  py -3 -m venv .venv 2>nul || python -m venv .venv
+rem PyYAML has no ready-made build for the newest Python versions; this makes
+rem it install as plain Python instead of needing a C++ compiler.
+set PYYAML_FORCE_LIBYAML=0
+if not exist ".venv\spbm_ready.txt" (
+  echo Setting up SPBM. This takes a few minutes, once.
+  if not exist ".venv\Scripts\python.exe" (
+    py -3 -m venv .venv 2>nul || python -m venv .venv
+  )
   if not exist ".venv\Scripts\python.exe" (
     echo Python 3.10 or later is needed. Install it from https://www.python.org/downloads/ and try again.
     pause
@@ -18,5 +23,6 @@ if not exist ".venv\Scripts\python.exe" (
     pause
     exit /b 1
   )
+  echo ready> ".venv\spbm_ready.txt"
 )
 start "SPBM (close this window to stop)" /min ".venv\Scripts\python.exe" -m spbm serve --open --idle-exit 15
