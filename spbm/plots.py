@@ -10,7 +10,12 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+import threading  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap  # noqa: E402
+
+# pyplot keeps global figure state: steps running side by side (spbm.parallel)
+# draw their figures one at a time under this lock.
+LOCK = threading.RLock()
 
 CAT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
 BLUE = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5", "#2a78d6",

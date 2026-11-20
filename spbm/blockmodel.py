@@ -37,15 +37,13 @@ def make_block_grid(rec, cfg, block=None) -> BlockGrid:
     fx, fy = int(round(dx / g.cell)), int(round(dy / g.cell))
     if abs(fx * g.cell - dx) > 1e-6 or abs(fy * g.cell - dy) > 1e-6:
         raise ValueError("block size must be a multiple of the grid cell")
-    # Bottom of the block grid: the configured origin, moved down whole blocks
-    # if the floor is lower, or up whole blocks if the floor is far higher (a
-    # different site), so the grid starts just below the floor either way.
-    z0 = cfg["blockmodel"]["origin_z"]
-    zmin = np.nanmin(rec.B)
-    if zmin < z0:
-        z0 = np.floor(zmin / dz) * dz
-    else:
-        z0 = z0 + np.floor((zmin - z0) / dz) * dz
+    # Bottom of the block grid: the configured origin, or lower if the floor is
+    # lower. If the floor is far higher (another site), move up whole blocks so
+    # the grid does not start with tens of metres of empty blocks.
+    z0 = min(cfg["blockmodel"]["origin_z"], np.floor(np.nanmin(rec.B) / dz) * dz)
+    gap = np.nanmin(rec.B) - z0
+    if gap > 10.0:
+        z0 += np.floor(gap / dz) * dz
     ztop = np.nanmax(rec.cols.top)
     nz = int(np.ceil((ztop - z0) / dz)) + 1
     return BlockGrid(g.x0, g.y0, z0, dx, dy, dz, int(np.ceil(g.nx / fx)), int(np.ceil(g.ny / fy)), nz, fx, fy)

@@ -166,7 +166,7 @@ def test_web_upload_names_and_progress():
     _, _, left = web.progress(lines, ["temporal", "twin", "robust", "scenarios", "sensitivity", "figures"], 60, 1, elapsed=319.5)
     assert 280 < left < 340
     assert 0 < f_half < 0.5 and 0 < f_fast < 1
-    assert all("Monte Carlo" not in s[1] for s in st_fast) and any("Monte Carlo" in s[1] for s in st)
+    assert all("Monte Carlo" not in s["label"] for s in st_fast) and any("Monte Carlo" in s["label"] for s in st)
 
 
 def test_cli_rejects_unknown_skip_step():

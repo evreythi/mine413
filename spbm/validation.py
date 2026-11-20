@@ -198,27 +198,28 @@ def temporal_validation(rec, cfg, out: Path) -> dict:
     tab.to_csv(out / "forward_temporal_validation.csv", index=False)
     summ = tab.groupby(["set", "mode"])[["w1_m", "capture", "centroid_err_m"]].mean().round(3)
     summ.to_csv(out / "forward_temporal_summary.csv")
-    # figure: test periods predicted vs observed
-    import matplotlib.pyplot as plt
-    g = rec.grid
-    ts = [s for s in test if (s, "push (calibrated)") in keep]
-    fig, axs = plt.subplots(1, len(ts), figsize=(4.4 * len(ts), 4.4), squeeze=False)
-    for ax, s in zip(axs[0], ts):
-        ob = rec.diagnostics["snapshots"][s]["fill"]
-        pl.raster(ax, np.where(ob > 0, ob, np.nan), g, vmin=0, vmax=5)
-        ax.contour(g.xc, g.yc, keep[(s, "push (calibrated)")], [0.3], colors=[pl.CAT[1]], linewidths=1.2)
-        ax.contour(g.xc, g.yc, keep[(s, "no-push baseline")], [0.3], colors=[pl.INK], linewidths=0.8, linestyles=":")
-        L = rec.loads[rec.loads.period == s]
-        ax.scatter(L.x, L.y, s=6, color=pl.CAT[1])
-        r = tab[(tab.period == s) & (tab["mode"] == "push (calibrated)")].iloc[0]
-        lab = re.search(r"(\d{2})(\d{2})(\d{2})", str(rec.periods.loc[s, "survey"]))
-        pl.plan_axes(ax, g, (f"survey {lab.group(2)}-{lab.group(3)}" if lab else f"interval {s}") + f"  W1 {r.w1_m:.1f} m", ticks=False)
-        ax.set_xticks([]); ax.set_yticks([])
-    axs[0][0].plot([], [], color=pl.CAT[1], label="predicted deposit (push + avalanche)")
-    axs[0][0].plot([], [], color=pl.INK, ls=":", label="no-push baseline")
-    axs[0][0].legend(loc="lower left", fontsize=7)
-    fig.suptitle("Unseen test periods: observed fill (blue) vs forward-model prediction made without that survey", x=0.01, ha="left", fontsize=10)
-    pl.save(fig, out / "fig_val_forward_test.png")
+    with pl.LOCK:   # one figure at a time (steps may run side by side)
+        # figure: test periods predicted vs observed
+        import matplotlib.pyplot as plt
+        g = rec.grid
+        ts = [s for s in test if (s, "push (calibrated)") in keep]
+        fig, axs = plt.subplots(1, len(ts), figsize=(4.4 * len(ts), 4.4), squeeze=False)
+        for ax, s in zip(axs[0], ts):
+            ob = rec.diagnostics["snapshots"][s]["fill"]
+            pl.raster(ax, np.where(ob > 0, ob, np.nan), g, vmin=0, vmax=5)
+            ax.contour(g.xc, g.yc, keep[(s, "push (calibrated)")], [0.3], colors=[pl.CAT[1]], linewidths=1.2)
+            ax.contour(g.xc, g.yc, keep[(s, "no-push baseline")], [0.3], colors=[pl.INK], linewidths=0.8, linestyles=":")
+            L = rec.loads[rec.loads.period == s]
+            ax.scatter(L.x, L.y, s=6, color=pl.CAT[1])
+            r = tab[(tab.period == s) & (tab["mode"] == "push (calibrated)")].iloc[0]
+            lab = re.search(r"(\d{2})(\d{2})(\d{2})", str(rec.periods.loc[s, "survey"]))
+            pl.plan_axes(ax, g, (f"survey {lab.group(2)}-{lab.group(3)}" if lab else f"interval {s}") + f"  W1 {r.w1_m:.1f} m", ticks=False)
+            ax.set_xticks([]); ax.set_yticks([])
+        axs[0][0].plot([], [], color=pl.CAT[1], label="predicted deposit (push + avalanche)")
+        axs[0][0].plot([], [], color=pl.INK, ls=":", label="no-push baseline")
+        axs[0][0].legend(loc="lower left", fontsize=7)
+        fig.suptitle("Unseen test periods: observed fill (blue) vs forward-model prediction made without that survey", x=0.01, ha="left", fontsize=10)
+        pl.save(fig, out / "fig_val_forward_test.png")
     return {"calibration": cal, "best": best.to_dict(), "results": tab, "summary": summ}
 
 
@@ -311,6 +312,25 @@ def _global_mean_row(truth_name, agg_t, sel):
             "cu_corr": np.nan, "au_rmse": np.nan, "au_corr": np.nan, "tonnes_corr": np.nan, "recovered_fms_tonnes_frac": np.nan}
 
 
+def _twin_truth_case(task):
+    """Build one known-truth stockpile and observe it like the real one (runs in a worker)."""
+    from .parallel import state
+    seed, crest_rule, cfg, bg, drop_frac, gps_sigma, push_jitter = task
+    st = state()
+    ds = st["loader"](cfg)
+    rng = np.random.default_rng(seed)
+    truths, surveys, loads = _twin_truth(st["rec"], ds, cfg, rng, push_jitter, crest_rule=crest_rule)
+    syn = _twin_observe(ds, loads, surveys, rng, drop_frac, gps_sigma)
+    agg = {k: bm.aggregate(SimpleNamespace(grid=ds.grid, cols=t), bg).reshape(-1, NP) for k, t in truths.items()}
+    return agg, syn
+
+
+def _twin_recon_case(task):
+    """Blind reconstruction of a synthetic twin (runs in a worker)."""
+    syn, c2, bg = task
+    return bm.aggregate(reconstruct(syn, c2), bg).reshape(-1, NP)
+
+
 def twin_experiment(rec, ds, cfg, out: Path, seed=7, drop_frac=0.15, gps_sigma=3.0, push_jitter=6.0) -> dict:
     """Synthetic twins with known truth, observed like the real stockpile
     (survey change solids, noisy GPS, payload error, 15% missing FMS records)
@@ -324,21 +344,26 @@ def twin_experiment(rec, ds, cfg, out: Path, seed=7, drop_frac=0.15, gps_sigma=3
       * period-uniform: each period's fill is perfectly mixed (the best case
         for the period-average baseline, the worst for CPST's localisation).
     """
+    from .parallel import run_cases
+    from .uncertainty import ds_loader_for
     bg = bm.make_block_grid(rec, cfg)
-    rng = np.random.default_rng(seed)
-    truths, surveys, loads = _twin_truth(rec, ds, cfg, rng, push_jitter)
-    syn = _twin_observe(ds, loads, surveys, rng, drop_frac, gps_sigma)
-    agg = {k: bm.aggregate(SimpleNamespace(grid=ds.grid, cols=t), bg).reshape(-1, NP) for k, t in truths.items()}
+    shared = {"rec": rec, "loader": ds_loader_for(ds)}
+    # the two truths (each with its own seeded random stream) are built side by side
+    (agg, syn), (agg2, syn2) = run_cases(_twin_truth_case, [(seed, "nearest", cfg, bg, drop_frac, gps_sigma, push_jitter),
+                                                            (seed + 1, "random", cfg, bg, drop_frac, gps_sigma, push_jitter)], shared)
     variants = [("CPST eps=2 m", {"movement.epsilon": 2.0}), ("CPST eps=6 m (base)", {}),
                 ("CPST eps=15 m", {"movement.epsilon": 15.0}), ("CPST eps=6, no uphill penalty", {"movement.alpha_up": 0.0}),
                 ("CPST eps=6, flat cost (no push term)", {"movement.cost": "flat"}),
                 ("Baseline: period-average (eps=1e4)", {"movement.epsilon": 1e4})]
+    key = ["CPST eps=6 m (base)", "CPST eps=6, flat cost (no push term)", "Baseline: period-average (eps=1e4)"]
+    # all blind reconstructions of both twins, side by side
+    out_a = run_cases(_twin_recon_case, [(syn, apply_overrides(cfg, ov), bg) for _, ov in variants]
+                      + [(syn2, apply_overrides(cfg, dict(variants)[name]), bg) for name in key], shared)
+    recon = {name: a for (name, _), a in zip(variants, out_a[:len(variants)])}
+    recon2 = dict(zip(key, out_a[len(variants):]))
     rows, alt = [], []
     sel = agg["loads"][:, P["T_F"]] > 25
-    recon = {}
     for name, ov in variants:
-        r2 = reconstruct(syn, apply_overrides(cfg, ov))
-        recon[name] = bm.aggregate(r2, bg).reshape(-1, NP)
         row, sc = _twin_score(name, "physics", agg["loads"], recon[name], sel)
         rows.append({k: v for k, v in row.items() if k != "truth"})
         if name.endswith("(base)"):
@@ -349,34 +374,30 @@ def twin_experiment(rec, ds, cfg, out: Path, seed=7, drop_frac=0.15, gps_sigma=3
     tab.to_csv(out / "twin_experiment.csv", index=False)
 
     # ---- stress tests: truth placement rules CPST does not assume
-    key = ["CPST eps=6 m (base)", "CPST eps=6, flat cost (no push term)", "Baseline: period-average (eps=1e4)"]
     for name in key:
         alt.append(_twin_score(name, "physics (nearest crest + 6 m jitter)", agg["loads"], recon[name], sel)[0])
         alt.append(_twin_score(name, "period-uniform mixing", agg["uniform"], recon[name], sel)[0])
     alt.append(_global_mean_row("physics (nearest crest + 6 m jitter)", agg["loads"], sel))
     alt.append(_global_mean_row("period-uniform mixing", agg["uniform"], sel))
-    rng2 = np.random.default_rng(seed + 1)
-    truths2, surveys2, loads2 = _twin_truth(rec, ds, cfg, rng2, push_jitter, crest_rule="random")
-    syn2 = _twin_observe(ds, loads2, surveys2, rng2, drop_frac, gps_sigma)
-    agg2 = bm.aggregate(SimpleNamespace(grid=ds.grid, cols=truths2["loads"]), bg).reshape(-1, NP)
+    agg2 = agg2["loads"]
     sel2 = agg2[:, P["T_F"]] > 25
     for name in key:
-        a2 = bm.aggregate(reconstruct(syn2, apply_overrides(cfg, dict(variants)[name])), bg).reshape(-1, NP)
-        alt.append(_twin_score(name, "random-crest (dump position uninformative)", agg2, a2, sel2)[0])
+        alt.append(_twin_score(name, "random-crest (dump position uninformative)", agg2, recon2[name], sel2)[0])
     alt.append(_global_mean_row("random-crest (dump position uninformative)", agg2, sel2))
     alt_tab = pd.DataFrame(alt)
     alt_tab.to_csv(out / "twin_alternative_truths.csv", index=False)
 
     import matplotlib.pyplot as plt
-    cu_r, cu_tt, m = base_cu
-    fig, ax = plt.subplots(figsize=(5.5, 5))
-    ax.scatter(cu_tt[m], cu_r[m], s=10, color=pl.CAT[0], alpha=0.6, edgecolor="none")
-    lo, hi = np.nanmin(cu_tt[m]), np.nanmax(cu_tt[m])
-    ax.plot([lo, hi], [lo, hi], color=pl.INK, lw=1)
-    ax.set_xlabel("true block Cu (%)"); ax.set_ylabel("reconstructed block Cu (%)")
-    r = tab.iloc[1]
-    ax.set_title(f"Synthetic twin: r = {r.cu_corr:.2f}, RMSE {r.cu_rmse:.2f} % Cu", loc="left")
-    pl.save(fig, out / "fig_val_twin_scatter.png")
+    with pl.LOCK:   # one figure at a time (steps may run side by side)
+        cu_r, cu_tt, m = base_cu
+        fig, ax = plt.subplots(figsize=(5.5, 5))
+        ax.scatter(cu_tt[m], cu_r[m], s=10, color=pl.CAT[0], alpha=0.6, edgecolor="none")
+        lo, hi = np.nanmin(cu_tt[m]), np.nanmax(cu_tt[m])
+        ax.plot([lo, hi], [lo, hi], color=pl.INK, lw=1)
+        ax.set_xlabel("true block Cu (%)"); ax.set_ylabel("reconstructed block Cu (%)")
+        r = tab.iloc[1]
+        ax.set_title(f"Synthetic twin: r = {r.cu_corr:.2f}, RMSE {r.cu_rmse:.2f} % Cu", loc="left")
+        pl.save(fig, out / "fig_val_twin_scatter.png")
     return {"table": tab, "alternative": alt_tab}
 
 

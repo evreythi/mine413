@@ -233,34 +233,35 @@ def sensitivity_oat(ds_loader, cfg, base_df, base_rec, out: Path, verbose=True) 
 
 def _tornado(tab, out):
     import matplotlib.pyplot as plt
-    base = tab[tab.parameter == "base"].iloc[0]
-    metrics = [("record_period_tonnes", "Record-period tonnes (FMS-tracked + unattributed)"),
-               ("total_tonnes", "Whole-pile tonnes (incl. pre-record core)"),
-               ("top_bench_cu_pct", "Cu grade of top bench (>4484 m), %"),
-               ("mean_abs_block_cu_change", "Mean |block Cu change| vs base, % Cu")]
-    fig, axs = plt.subplots(2, 2, figsize=(13, 9))
-    fig.subplots_adjust(hspace=0.42, wspace=0.45)
-    for ax, (m, lab) in zip(axs.flat, metrics):
-        d = tab[tab.parameter != "base"].pivot(index="parameter", columns="level", values=m)
-        if m == "mean_abs_block_cu_change":
-            b = 0.0
-        else:
-            b = base[m]
-        lo = d["low"] - b
-        hi = d["high"] - b
-        rng_ = (np.abs(lo).fillna(0) + np.abs(hi).fillna(0))
-        order = rng_.sort_values().index
-        y = np.arange(len(order))
-        ax.barh(y - 0.18, lo[order], height=0.34, color=pl.CAT[0], label="low value")
-        ax.barh(y + 0.18, hi[order], height=0.34, color=pl.CAT[1], label="high value")
-        ax.set_yticks(y)
-        ax.set_yticklabels(order)
-        ax.axvline(0, color=pl.INK, lw=0.8)
-        ax.set_title(lab + (f" (base {b:,.2f})" if m != "mean_abs_block_cu_change" else ""), loc="left", fontsize=9.5)
-        ax.set_xlabel("change from base")
-    axs[0, 0].legend(loc="lower right")
-    fig.suptitle("One-at-a-time sensitivity (tornado)", x=0.01, ha="left", fontsize=11, fontweight="bold")
-    pl.save(fig, out / "fig_sens_tornado.png")
+    with pl.LOCK:   # one figure at a time (steps may run side by side)
+        base = tab[tab.parameter == "base"].iloc[0]
+        metrics = [("record_period_tonnes", "Record-period tonnes (FMS-tracked + unattributed)"),
+                   ("total_tonnes", "Whole-pile tonnes (incl. pre-record core)"),
+                   ("top_bench_cu_pct", "Cu grade of top bench (>4484 m), %"),
+                   ("mean_abs_block_cu_change", "Mean |block Cu change| vs base, % Cu")]
+        fig, axs = plt.subplots(2, 2, figsize=(13, 9))
+        fig.subplots_adjust(hspace=0.42, wspace=0.45)
+        for ax, (m, lab) in zip(axs.flat, metrics):
+            d = tab[tab.parameter != "base"].pivot(index="parameter", columns="level", values=m)
+            if m == "mean_abs_block_cu_change":
+                b = 0.0
+            else:
+                b = base[m]
+            lo = d["low"] - b
+            hi = d["high"] - b
+            rng_ = (np.abs(lo).fillna(0) + np.abs(hi).fillna(0))
+            order = rng_.sort_values().index
+            y = np.arange(len(order))
+            ax.barh(y - 0.18, lo[order], height=0.34, color=pl.CAT[0], label="low value")
+            ax.barh(y + 0.18, hi[order], height=0.34, color=pl.CAT[1], label="high value")
+            ax.set_yticks(y)
+            ax.set_yticklabels(order)
+            ax.axvline(0, color=pl.INK, lw=0.8)
+            ax.set_title(lab + (f" (base {b:,.2f})" if m != "mean_abs_block_cu_change" else ""), loc="left", fontsize=9.5)
+            ax.set_xlabel("change from base")
+        axs[0, 0].legend(loc="lower right")
+        fig.suptitle("One-at-a-time sensitivity (tornado)", x=0.01, ha="left", fontsize=11, fontweight="bold")
+        pl.save(fig, out / "fig_sens_tornado.png")
 
 
 def mc_figures(mc, base_df, out: Path):
@@ -286,6 +287,35 @@ def mc_figures(mc, base_df, out: Path):
     pl.save(fig, out / "fig_unc_param_scatter.png")
 
 
+def _scenario_case(task):
+    """One volume-gap scenario: a full reconstruction and its inventory (runs in a worker)."""
+    from .validation import class_inventory
+    sid, c2, pmax = task
+    st = state()
+    rec = reconstruct(st["loader"](c2), c2)
+    inv = class_inventory(rec, bm.aggregate(rec, st["bg"])).set_index("class")
+    f_, u_, l_ = inv.iloc[0], inv.iloc[1], inv.iloc[2]
+    L = rec.loads
+    fpay = float(c2["density"].get("payload_factor", 1.0))
+    return {"volume_factor": float(L["vol"].sum() / (L["m_recorded"] / L["dens_fms"]).sum()), "payload_factor": fpay,
+            "in_pile_density_t_m3": float(np.average(L["rho"], weights=L["m"])), "largest_load_t": pmax * fpay,
+            "fms_tonnes": f_.tonnes, "unattributed_tonnes": u_.tonnes,
+            "record_period_tonnes": f_.tonnes + u_.tonnes, "record_period_cu_t": f_.cu_t + u_.cu_t,
+            "record_period_au_kg": f_.au_kg + u_.au_kg, "unattributed_volume_m3": float(rec.periods["unattributed_volume"].sum()),
+            "pre_record_tonnes": l_.tonnes, "total_tonnes": inv.loc["TOTAL", "tonnes"], "total_cu_t": inv.loc["TOTAL", "cu_t"]}
+
+
+class ds_loader_for:
+    """Loader that returns an already loaded dataset (no file access); used
+    when a step is given the dataset itself rather than a loader."""
+
+    def __init__(self, ds):
+        self.ds = ds
+
+    def __call__(self, cfg):
+        return self.ds
+
+
 def scenarios(ds, cfg, bg, out: Path, verbose=True) -> pd.DataFrame:
     """A-06 interpretations of the volume gap. The calibrated volume factor f_v
     fixes the in-pile VOLUME of every load (T * f_v / Dens) in all of them;
@@ -293,7 +323,6 @@ def scenarios(ds, cfg, bg, out: Path, verbose=True) -> pd.DataFrame:
     identify. S0/S1 bound the Monte Carlo range; X1 is excluded on physical
     grounds; X2 cannot be excluded from these data and is reported separately
     ("not included in those ranges")."""
-    from .validation import class_inventory
     fv = float(cfg["density"]["volume_factor_resolved"])
     fpay_hi = float(cfg["uncertainty"]["payload_factor_range"][1])
     pmax = float(pd.to_numeric(ds.fms["payload_t"], errors="coerce").max())
@@ -311,37 +340,27 @@ def scenarios(ds, cfg, bg, out: Path, verbose=True) -> pd.DataFrame:
          f"Dens is the in-pile density and the excess volume is loads missing from the FMS: about {1 - 1 / fv:.0%} of the volume on days with otherwise complete records.",
          {"density.volume_factor": 1.0, "density.volume_factor_resolved": None}),
     ]
+    cases = [(sid, apply_overrides(cfg, ov) if ov else cfg, pmax) for sid, _, _, ov in defs]
     rows = []
-    for sid, status, desc, ov in defs:
-        c2 = apply_overrides(cfg, ov) if ov else cfg
-        rec = reconstruct(ds, c2)
-        inv = class_inventory(rec, bm.aggregate(rec, bg)).set_index("class")
-        f_, u_, l_ = inv.iloc[0], inv.iloc[1], inv.iloc[2]
-        L = rec.loads
-        fpay = float(c2["density"].get("payload_factor", 1.0))
-        rows.append({"scenario": sid, "status": status, "description": desc,
-                     "volume_factor": float(L["vol"].sum() / (L["m_recorded"] / L["dens_fms"]).sum()), "payload_factor": fpay,
-                     "in_pile_density_t_m3": float(np.average(L["rho"], weights=L["m"])), "largest_load_t": pmax * fpay,
-                     "fms_tonnes": f_.tonnes, "unattributed_tonnes": u_.tonnes,
-                     "record_period_tonnes": f_.tonnes + u_.tonnes, "record_period_cu_t": f_.cu_t + u_.cu_t,
-                     "record_period_au_kg": f_.au_kg + u_.au_kg, "unattributed_volume_m3": float(rec.periods["unattributed_volume"].sum()),
-                     "pre_record_tonnes": l_.tonnes, "total_tonnes": inv.loc["TOTAL", "tonnes"], "total_cu_t": inv.loc["TOTAL", "cu_t"]})
+    for (sid, status, desc, _), r in zip(defs, run_cases(_scenario_case, cases, {"loader": ds_loader_for(ds), "bg": bg})):
+        rows.append({"scenario": sid, "status": status, "description": desc, **r})
         if verbose:
-            print(f"    scenario {sid}: record-period {rows[-1]['record_period_tonnes']:,.0f} t, total {rows[-1]['total_tonnes']:,.0f} t")
+            print(f"    scenario {sid}: record-period {r['record_period_tonnes']:,.0f} t, total {r['total_tonnes']:,.0f} t")
     tab = pd.DataFrame(rows)
     tab.to_csv(out / "scenarios.csv", index=False)
     import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(figsize=(10.5, 4.3))
-    y = np.arange(len(tab))[::-1]
-    ax.barh(y, tab["fms_tonnes"] / 1e3, color=pl.CAT[0], label="FMS-tracked")
-    ax.barh(y, tab["unattributed_tonnes"] / 1e3, left=tab["fms_tonnes"] / 1e3, color=pl.CAT[2], label="unattributed (surveyed, no FMS record)")
-    ax.barh(y, tab["pre_record_tonnes"] / 1e3, left=tab["record_period_tonnes"] / 1e3, color=pl.GRID, label="pre-record core (inferred geometry, assumed grade)")
-    for yy, (_, r) in zip(y, tab.iterrows()):
-        ax.text(r["record_period_tonnes"] / 1e3, yy, f" {r['record_period_tonnes'] / 1e3:,.1f} kt", va="center", fontsize=8, color=pl.INK)
-    ax.set_yticks(y)
-    ax.set_yticklabels([f"{r.scenario}  {r.status.split(' (')[0]}" for r in tab.itertuples()])
-    ax.set_xlabel("kt")
-    ax.set_title("Volume-gap interpretations: tonnes held by the same surveyed volume", loc="left")
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.16), ncol=3, fontsize=7.5)   # below the axes: clear of the bars
-    pl.save(fig, out / "fig_scenarios.png")
+    with pl.LOCK:   # one figure at a time (steps may run side by side)
+        fig, ax = plt.subplots(figsize=(10.5, 4.3))
+        y = np.arange(len(tab))[::-1]
+        ax.barh(y, tab["fms_tonnes"] / 1e3, color=pl.CAT[0], label="FMS-tracked")
+        ax.barh(y, tab["unattributed_tonnes"] / 1e3, left=tab["fms_tonnes"] / 1e3, color=pl.CAT[2], label="unattributed (surveyed, no FMS record)")
+        ax.barh(y, tab["pre_record_tonnes"] / 1e3, left=tab["record_period_tonnes"] / 1e3, color=pl.GRID, label="pre-record core (inferred geometry, assumed grade)")
+        for yy, (_, r) in zip(y, tab.iterrows()):
+            ax.text(r["record_period_tonnes"] / 1e3, yy, f" {r['record_period_tonnes'] / 1e3:,.1f} kt", va="center", fontsize=8, color=pl.INK)
+        ax.set_yticks(y)
+        ax.set_yticklabels([f"{r.scenario}  {r.status.split(' (')[0]}" for r in tab.itertuples()])
+        ax.set_xlabel("kt")
+        ax.set_title("Volume-gap interpretations: tonnes held by the same surveyed volume", loc="left")
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.16), ncol=3, fontsize=7.5)   # below the axes: clear of the bars
+        pl.save(fig, out / "fig_scenarios.png")
     return tab

@@ -36,53 +36,72 @@ UI = Path(__file__).resolve().parent / "webui" / "index.html"
 ALLOWED_UPLOAD = {".csv", ".dxf", ".zip"}
 MAX_UPLOAD = 1024 ** 3          # 1 GB per file
 
-# Progress model: the log line that opens each stage, the optional step it
-# belongs to (None = always runs) and its duration in seconds in a timed full
-# run on one core on the supplied data ("mc" is per realisation), and how many
-# independent cases the step has (it runs that many at once, up to the workers).
-_STAGES = [
-    ("1-2 import", None, 1, 1, "Import FMS records and surveys"),
-    ("3   data-quality", None, 2, 1, "Data-quality checks"),
-    ("4   survey cut-off", "align", 1, 1, "Survey cut-off scan"),
-    ("4b  volume factor", None, 3, 1, "Volume factor calibration"),
-    ("5   material-movement", None, 13, 1, "Movement reconstruction (CPST)"),
-    ("6-7 block model", None, 1, 1, "Block model and inventories"),
-    ("8   Monte Carlo", "mc", 12.6, "n_mc", "Monte Carlo uncertainty"),
-    ("    figures", "figures", 5, 1, "Block-model figures"),
-    ("9   validation", None, 1, 1, "Balances and geometry check"),
-    ("forward-model temporal", "temporal", 375, 36, "Forward-model temporal test"),
-    ("synthetic twin", "twin", 87, 1, "Synthetic twin experiment"),
-    ("numerical robustness", "robust", 272, 7, "Numerical robustness"),
-    ("volume-gap scenarios", "scenarios", 41, 1, "Volume-gap scenarios"),
-    ("one-at-a-time sensitivity", "sensitivity", 515, 20, "Sensitivity analysis"),
-    ("done - run", None, 1, 1, "Write summary and audit trail"),
+# Progress model. Each stage: the log line that opens it, the optional step it
+# belongs to (None = always runs), its time in seconds on one core on the
+# supplied data and its label. The slow steps also have the best speed-up their
+# cases allow (limited by their longest single case).
+_BASE = [
+    ("1-2 import", None, 2, "Import FMS records and surveys"),
+    ("3   data-quality", None, 2.5, "Data-quality checks"),
+    ("4   survey cut-off", "align", 0.5, "Survey cut-off scan"),
+    ("4b  volume factor", None, 2.5, "Volume factor calibration"),
+    ("5   material-movement", None, 4, "Movement reconstruction (CPST)"),
+    ("6-7 block model", None, 1, "Block model and inventories"),
 ]
+_SLOW = [   # (log key, step, seconds per unit on one core, max speed-up, label)
+    ("8   Monte Carlo", "mc", 2.5, None, "Monte Carlo uncertainty"),
+    ("forward-model temporal", "temporal", 55, 30, "Forward-model temporal test"),
+    ("synthetic twin", "twin", 75, 2.5, "Synthetic twin experiment"),
+    ("numerical robustness", "robust", 75, 1.5, "Numerical robustness"),
+    ("volume-gap scenarios", "scenarios", 12, 5, "Volume-gap scenarios"),
+    ("one-at-a-time sensitivity", "sensitivity", 170, 3.4, "Sensitivity analysis"),
+]
+_TAIL = [
+    ("    figures", "figures", 7, "Block-model figures"),
+    ("9   validation", None, 1, "Balances and geometry check"),
+    ("done - run", None, 1, "Write summary and audit trail"),
+]
+_GROUP_KEY = "8-9 running side by side"
 
 
-def _speedup(cases, workers):
-    """Rough speed-up of a step with `cases` independent cases on `workers` cores."""
-    w = max(1, min(cases, workers))
-    rounds = -(-cases // w)                       # cases are run in rounds of w
-    return cases / rounds * 0.85 if w > 1 else 1.0
-
-
-def plan(skip, n_mc, workers=1):
-    """Stages that will run and their expected durations (s)."""
+def _slow_steps(skip, n_mc, workers):
+    """(key, label, one-core seconds, seconds on `workers`) of the slow steps that run."""
     out = []
-    for key, step, dur, cases, label in _STAGES:
-        if step is not None and step in skip:
+    for key, step, dur, cap, label in _SLOW:
+        if step in skip:
             continue
-        n = n_mc if cases == "n_mc" else cases
-        d = dur * (n_mc if step == "mc" else 1)
-        out.append((key, label, d / _speedup(n, workers)))
+        one = dur * (n_mc if step == "mc" else 1)
+        cap = n_mc if cap is None else cap
+        out.append((key, label, one, one / max(1.0, min(cap, workers * 0.85))))
     return out
 
 
+def plan(skip, n_mc, workers=1):
+    """Stages that will run, as (log key, label, expected seconds)."""
+    base = [(k, lab, d) for k, s, d, lab in _BASE if s is None or s not in skip]
+    tail = [(k, lab, d) for k, s, d, lab in _TAIL if s is None or s not in skip]
+    slow = _slow_steps(skip, n_mc, workers)
+    if workers > 1 and slow:
+        # side by side: limited by the total work spread over the cores, or by
+        # the step whose own cases cannot be spread further
+        group = max(sum(s[2] for s in slow) / (0.85 * workers), max(s[3] for s in slow))
+        mid = [(_GROUP_KEY, "Slow steps, side by side", group)]
+    else:
+        mid = [(k, lab, d) for k, lab, _, d in slow]
+    return base + mid + tail
+
+
+def _counter(text, key):
+    pat = r"MC (\d+)/(\d+)" if key.startswith("8") else r"OAT (\d+)/(\d+)" if "sensitivity" in key else None
+    m = re.findall(pat, text) if pat else []
+    return (int(m[-1][0]), int(m[-1][1])) if m else None
+
+
 def progress(lines, skip, n_mc, workers=1, elapsed=None):
-    """Estimated fraction done and seconds left, from the stages reached in
-    the log. The time left learns from this run: a step with a counter (Monte
-    Carlo, sensitivity) uses its own rate so far, and the steps still to come
-    are scaled by how fast the finished steps went compared with the plan."""
+    """(fraction done, stage list for the page, seconds left or None).
+    The time left learns from this run: a running step with a counter uses its
+    own rate, the side-by-side group uses the share of its work finished, and
+    stages still to come are scaled by how fast the finished ones went."""
     st = plan(skip, n_mc, workers)
     total = sum(d for _, _, d in st)
     text = "\n".join(lines)
@@ -91,38 +110,52 @@ def progress(lines, skip, n_mc, workers=1, elapsed=None):
         for line in lines:
             if key in line:
                 reached = i
-                m = re.match(r"\[\s*([\d.]+)s\]", line)   # pipeline time stamp of the stage start
-                if m and i not in t_start:
+                m = re.match(r"\[\s*([\d.]+)s\]", line)        # pipeline time stamp of the stage start
+                if m:
                     t_start[i] = float(m.group(1))
                 break
+    stages = [{"label": lab, "state": "done" if k < reached else "now" if k == reached else "todo"} for k, (_, lab, _) in enumerate(st)]
     if reached < 0:
-        return 0.0, st, None
+        return 0.0, stages, None
     done = sum(d for _, _, d in st[:reached])
     key, _, dur = st[reached]
-    part, counter = 0.0, None
-    if key.startswith("8"):
-        counter = re.findall(r"MC (\d+)/(\d+)", text)
-    elif "sensitivity" in key:
-        counter = re.findall(r"OAT (\d+)/(\d+)", text)
-    if counter:
-        k, n = int(counter[-1][0]), int(counter[-1][1])
-        part = k / n if key.startswith("8") else k / (n + 1)
-    elif key == "done - run":
-        part = 1.0
+    t_cur = t_start.get(reached, elapsed or 0.0)
+    in_stage = max((elapsed or t_cur) - t_cur, 0.0)
+    part, rate_left = 0.0, None
+    if key == _GROUP_KEY:
+        slow = _slow_steps(skip, n_mc, workers)
+        work = sum(s[2] for s in slow)
+        got = 0.0
+        subs = []
+        for k2, lab2, one, _ in slow:
+            fin = ("finished: " + k2.strip()) in text
+            c = _counter(text, k2)
+            f = 1.0 if fin else (c[0] / (c[1] + (0 if k2.startswith("8") else 1)) if c else 0.0)
+            got += one * f
+            subs.append({"label": "· " + lab2 + (f" ({c[0]} / {c[1]})" if c and not fin else ""),
+                         "state": "done" if fin else "now"})
+        part = got / work if work else 0.0
+        if part > 0.05:
+            rate_left = in_stage * (1 - part) / part
+        stages[reached + 1:reached + 1] = subs
+    else:
+        c = _counter(text, key)
+        if c and c[0]:
+            part = c[0] / c[1] if key.startswith("8") else c[0] / (c[1] + 1)
+            rate_left = in_stage * (1 - part) / part
+        elif key == "done - run":
+            part = 1.0
     frac = min((done + part * dur) / total, 1.0)
     if elapsed is None:
-        return frac, st, None
-    # speed of this machine relative to the plan, from the steps already finished
-    t_cur = t_start.get(reached, elapsed)
-    factor = t_cur / done if done > 5 else 1.0
-    factor = min(max(factor, 0.2), 8.0)
-    in_stage = max(elapsed - t_cur, 0.0)
-    if counter and part > 0:
-        stage_left = in_stage * (1 - part) / part        # this step's own rate
-    else:
-        stage_left = max(dur * factor - in_stage, 0.1 * dur * factor)
+        return frac, stages, None
+    factor = min(max(t_cur / done, 0.2), 8.0) if done > 5 else 1.0     # this machine vs the plan
+    plan_left = max(dur * factor - in_stage, 0.1 * dur * factor)
+    # early on the rate is noisy (long cases are started first), so lean on the
+    # plan and move to the observed rate as more of the stage is done
+    wr = min(1.0, part / 0.5)
+    stage_left = plan_left if rate_left is None else (1 - wr) * plan_left + wr * rate_left
     later = sum(d for _, _, d in st[reached + 1:]) * factor
-    return frac, st, stage_left + later
+    return frac, stages, stage_left + later
 
 
 # Tables shown on the results page: (key, title, path in the output folder).
@@ -471,10 +504,13 @@ class Job:
         running = i["finished"] is None
         end = time.time() if running else i["finished"]
         elapsed = end - i["started"]
-        frac, st, left = progress(i["lines"], i["skip"], i["mc"], i["workers"], elapsed)
+        frac, stages, left = progress(i["lines"], i["skip"], i["mc"], i["workers"], elapsed)
         ok = not running and i["returncode"] == 0
         if ok:
             frac = 1.0
+            stages = [dict(s, state="done") for s in stages]
+        elif not running:
+            stages = [dict(s, state="failed" if s["state"] == "now" else s["state"]) for s in stages]
         eta = None
         if running and left is not None:
             # smooth: blend the new estimate with the previous one counted down
@@ -483,11 +519,7 @@ class Job:
                 left = 0.7 * max(prev - (time.time() - t_prev), 0.0) + 0.3 * left
             i["eta"], i["eta_t"] = left, time.time()
             eta = left
-        text = "\n".join(i["lines"])
-        reached = max([k for k, (key, _, _) in enumerate(st) if key in text], default=-1)
-        mc = re.findall(r"MC (\d+)/(\d+)", text)
-        stages = [{"label": label, "state": "done" if k < reached or ok else "now" if k == reached and running else
-                   "failed" if k == reached else "todo"} for k, (_, label, _) in enumerate(st)]
+        mc = re.findall(r"MC (\d+)/(\d+)", "\n".join(i["lines"]))
         return {"set": i["set"], "skip": i["skip"], "mc": i["mc"], "workers": i["workers"], "cmd": i["cmd"], "running": running,
                 "started": i["started"], "now": time.time(),
                 "returncode": i["returncode"], "elapsed_s": round(elapsed, 1), "eta_s": None if eta is None else round(eta),

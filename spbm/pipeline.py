@@ -8,7 +8,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-from . import audit, blockmodel as bm, bmviz, growth, qaqc, uncertainty, validation, volume
+from . import audit, blockmodel as bm, bmviz, growth, parallel, qaqc, uncertainty, validation, volume
 from .config import resolve
 from .dataset import load_dataset
 from .movement import reconstruct
@@ -103,11 +103,32 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
     df = bm.block_table(rec, bg, agg, cfg)
     prov = bm.provenance(rec, bg)
     df = bm.provenance_fields(df, prov, bg, rec.loads)
-    # 8 uncertainty ----------------------------------------------------------
-    mc = None
+    # 8-9 slow steps -----------------------------------------------------------
+    # Independent of each other given the base model, so with several workers
+    # they run side by side (spbm.parallel.run_steps); results are the same.
+    df0 = df.copy()                           # base block model (before Monte Carlo ranges)
+    n_real = n_mc or cfg["uncertainty"]["n_realizations"]
+    steps = []
     if do_mc:
-        log(f"8   Monte Carlo uncertainty ({n_mc or cfg['uncertainty']['n_realizations']} realisations)")
-        mc = uncertainty.monte_carlo(loader, cfg, bg, df, dirs["uncertainty"], n=n_mc, verbose=verbose)
+        steps.append(("mc", f"8   Monte Carlo uncertainty ({n_real} realisations)",
+                      lambda: uncertainty.monte_carlo(loader, cfg, bg, df0, dirs["uncertainty"], n=n_mc, verbose=verbose)))
+    if do_temporal:
+        steps.append(("tv", "    forward-model temporal validation", lambda: validation.temporal_validation(rec, cfg, dirs["validation"])))
+    if do_twin:
+        steps.append(("tw", "    synthetic twin experiment", lambda: validation.twin_experiment(rec, ds, cfg, dirs["validation"])))
+    if do_robust:
+        steps.append(("rb", "    numerical robustness", lambda: validation.robustness(loader, cfg, dirs["validation"], df0)))
+    if do_scen:
+        steps.append(("scen", "    volume-gap scenarios (A-06)", lambda: uncertainty.scenarios(ds, cfg, bg, dirs["uncertainty"], verbose=verbose)))
+    if do_sens:
+        steps.append(("sens", "    one-at-a-time sensitivity",
+                      lambda: uncertainty.sensitivity_oat(loader, cfg, df0, rec, dirs["uncertainty"], verbose=verbose)))
+    res = parallel.run_steps(steps, {"loader": loader, "bg": bg, "base_df": df0, "rec": rec, "cfg": cfg, "ds": {}}, log,
+                             start_first=("tw", "sens", "rb", "scen", "tv", "mc"))
+    mc, tv, tw, scen = res.get("mc"), res.get("tv"), res.get("tw"), res.get("scen")
+
+    # block model with Monte Carlo ranges, exports, figures ------------------------
+    if mc is not None:
         df = uncertainty.attach_block_stats(df, mc["stats"])
         df = uncertainty.apply_prior_ranges(df, rec.loads)
         if do_figs:
@@ -139,7 +160,7 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
             bmviz.uncertainty_maps(df, bg, dirs["uncertainty"])
             bmviz.bench_plans(df, bg, rec, "cu_cv", "Cu grade CV (Monte Carlo)", bmviz.pl.SEQ_OR, dirs["uncertainty"], 0, 0.3)
 
-    # 9 validation -----------------------------------------------------------
+    # balances and geometry --------------------------------------------------------
     log("9   validation and reconciliation")
     vb = validation.mass_metal_balance(rec, agg, df)
     vb.to_csv(dirs["validation"] / "mass_metal_balance.csv", index=False)
@@ -149,24 +170,6 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
     vr.to_csv(dirs["validation"] / "volume_reconciliation.csv", index=False)
     geo = validation.geometry_check(rec, ds, dirs["validation"])
     pd.Series(geo).to_csv(dirs["validation"] / "geometry_check.csv")
-    tv = None
-    if do_temporal:
-        log("    forward-model temporal validation")
-        tv = validation.temporal_validation(rec, cfg, dirs["validation"])
-    tw = None
-    if do_twin:
-        log("    synthetic twin experiment")
-        tw = validation.twin_experiment(rec, ds, cfg, dirs["validation"])
-    if do_robust:
-        log("    numerical robustness")
-        validation.robustness(loader, cfg, dirs["validation"], df)
-    scen = None
-    if do_scen:
-        log("    volume-gap scenarios (A-06)")
-        scen = uncertainty.scenarios(ds, cfg, bg, dirs["uncertainty"], verbose=verbose)
-    if do_sens:
-        log("    one-at-a-time sensitivity")
-        uncertainty.sensitivity_oat(loader, cfg, df, rec, dirs["uncertainty"], verbose=verbose)
     # 10 summary -------------------------------------------------------------
     summary = {
         "last_survey": str(ds.surveys[-1].datetime), "n_surveys": len(ds.surveys), "n_fms_records": int(len(ds.fms)),

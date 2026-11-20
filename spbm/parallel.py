@@ -77,12 +77,19 @@ def _init(shared: dict):
     _STATE.update(shared)
 
 
+_POOL = None                         # shared pool while run_steps runs steps side by side
+
+
 def run_cases(fn, cases: list, shared: dict | None = None, on_done=None, costs=None) -> list:
     """fn(case) for every case, using the data in `shared` (via state()).
     fn must be a module-level function. on_done(k, n) is called as cases finish.
     `costs` (relative run times) makes the slowest cases start first, so no
-    long case is left running alone at the end; results keep the case order."""
+    long case is left running alone at the end; results keep the case order.
+    Inside run_steps the cases go to the shared pool (whose data replaces `shared`)."""
     shared = shared or {}
+    order = sorted(range(len(cases)), key=lambda k: -costs[k]) if costs else list(range(len(cases)))
+    if _POOL is not None:
+        return _collect(_POOL, fn, cases, order, on_done)
     n = n_workers(len(cases))
     if n == 1:
         _init(shared)
@@ -92,22 +99,86 @@ def run_cases(fn, cases: list, shared: dict | None = None, on_done=None, costs=N
             if on_done:
                 on_done(k + 1, len(cases))
         return out
-    # one maths thread per worker, so the workers do not compete for the same cores
-    saved = {v: os.environ.get(v) for v in _THREAD_VARS}
-    os.environ.update({v: "1" for v in _THREAD_VARS})
-    try:
-        with ProcessPoolExecutor(max_workers=n, initializer=_init, initargs=(shared,)) as ex:
-            order = sorted(range(len(cases)), key=lambda k: -costs[k]) if costs else range(len(cases))
-            futs = {ex.submit(fn, cases[k]): k for k in order}
-            out = [None] * len(cases)
-            for done, f in enumerate(as_completed(futs), 1):
-                out[futs[f]] = f.result()
-                if on_done:
-                    on_done(done, len(cases))
-            return out
-    finally:
-        for v, old in saved.items():
+    with _executor(n, shared) as ex:
+        return _collect(ex, fn, cases, order, on_done)
+
+
+def _collect(ex, fn, cases, order, on_done):
+    futs = {ex.submit(fn, cases[k]): k for k in order}
+    out = [None] * len(cases)
+    for done, f in enumerate(as_completed(futs), 1):
+        out[futs[f]] = f.result()
+        if on_done:
+            on_done(done, len(cases))
+    return out
+
+
+class _executor:
+    """Process pool with one maths thread per worker (the environment is set
+    while the workers start, then restored)."""
+
+    def __init__(self, n, shared):
+        self.n, self.shared = n, shared
+
+    def __enter__(self):
+        self.saved = {v: os.environ.get(v) for v in _THREAD_VARS}
+        os.environ.update({v: "1" for v in _THREAD_VARS})
+        self.ex = ProcessPoolExecutor(max_workers=self.n, initializer=_init, initargs=(self.shared,))
+        return self.ex
+
+    def __exit__(self, *exc):
+        self.ex.shutdown(wait=True, cancel_futures=exc[0] is not None)
+        for v, old in self.saved.items():
             if old is None:
                 os.environ.pop(v, None)
             else:
                 os.environ[v] = old
+
+
+def run_steps(steps: list, shared: dict, log=print, start_first=()) -> dict:
+    """Run independent steps [(key, label, fn)] and return {key: result}.
+    With several workers the steps run side by side (one thread each, all
+    feeding one shared pool of worker processes, so no core waits for a step
+    to end); with one worker they run one after another, in order. `shared`
+    must hold the data every step's cases read through state(). Steps named in
+    `start_first` (those with the longest single cases) submit their work first,
+    so their long cases are not left running alone at the end."""
+    global _POOL
+    if not steps:
+        return {}
+    n = n_workers(10 ** 6)
+    if n == 1:
+        out = {}
+        for key, label, fn in steps:
+            log(label)
+            out[key] = fn()
+        return out
+    import threading
+    import time
+    t0 = time.time()
+    log("8-9 running side by side: " + "; ".join(label.strip() for _, label, _ in steps))
+    out, errors = {}, []
+
+    def work(key, label, fn):
+        try:
+            out[key] = fn()
+            log(f"    finished: {label.strip()} ({time.time() - t0:.0f} s)")
+        except BaseException as e:            # reported after all steps stop
+            errors.append(e)
+
+    with _executor(n, shared) as ex:
+        _POOL = ex
+        try:
+            rank = {k: i for i, k in enumerate(start_first)}
+            ordered = sorted(steps, key=lambda s: rank.get(s[0], len(rank)))
+            threads = [threading.Thread(target=work, args=s, daemon=True) for s in ordered]
+            for th in threads:
+                th.start()
+                time.sleep(0.2)               # let it submit its cases before the next step does
+            for th in threads:
+                th.join()
+        finally:
+            _POOL = None
+    if errors:
+        raise errors[0]
+    return out

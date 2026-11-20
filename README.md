@@ -35,19 +35,19 @@ You can also open **`SPBM.html`**: it jumps straight to SPBM if it is running, a
   * **Example data**: the supplied stockpile (`Data_Topo 2026.zip`), plus any files you add;
   * **My own data**: only the files you upload, for example a client's own truck records and surveys. These are kept apart in `data/own/`, with their own corrections file (`data/own/manual_interventions.csv`). "Clear my data" starts over for a new client.
 
-  Then drag in truck data (`.csv`), surveys (`.dxf`, the file name containing the date as `YYMMDD`) or a `.zip`, pick Default or Custom settings, tick which steps to run, and watch the progress bar. Each combination of data and settings has its own results folder (`outputs/`, `outputs_custom/`, `outputs_own/`, `outputs_own_custom/`), so no run overwrites another. For a new site, check the settings that were tuned to the example stockpile (survey cut-off time, bucket size, angle of repose); the volume factor is worked out from the data. The block grid and the forward-model test adjust to the new data automatically. The core always runs, takes about 20 s, and produces the full block model. The slow extras can each be turned off:
+  Then drag in truck data (`.csv`), surveys (`.dxf`, the file name containing the date as `YYMMDD`) or a `.zip`, pick Default or Custom settings, tick which steps to run, and watch the progress bar. Each combination of data and settings has its own results folder (`outputs/`, `outputs_custom/`, `outputs_own/`, `outputs_own_custom/`), so no run overwrites another. For a new site, check the settings that were tuned to the example stockpile (survey cut-off time, bucket size, angle of repose); the volume factor is worked out from the data. The block grid and the forward-model test adjust to the new data automatically. The core always runs, takes about 15 s, and produces the full block model. The slow extras can each be turned off (times on one core of a typical PC):
 
-  | Step | Time |
+  | Step | Time on one core |
   |---|---|
-  | Monte Carlo (60 runs) | ~13 min |
-  | Sensitivity | ~9 min |
-  | Forward-model test | ~6 min |
-  | Robustness | ~4.5 min |
-  | Synthetic test | ~1.5 min |
-  | Scenarios | ~40 s |
-  | Figures | ~5 s |
+  | Monte Carlo (60 runs) | ~2.5 min |
+  | Sensitivity | ~3 min |
+  | Forward-model test | ~1 min |
+  | Robustness | ~1.3 min |
+  | Synthetic test | ~1.3 min |
+  | Scenarios | ~12 s |
+  | Figures | ~7 s |
 
-* **Speed**: Low (1 core, leaves the computer free), Medium, High (all cores but one, within the memory) or a custom number of cores. The slow steps run their cases side by side, so High on a many-core computer is several times faster. The numbers are identical whatever the speed.
+* **Speed**: Low (1 core, leaves the computer free), Medium, High (all cores but one, within the memory) or a custom number of cores. With more than one core the slow steps run at the same time, sharing the cores, and each step's cases (Monte Carlo runs, sensitivity cases and so on) are spread over them too. A full run takes about 9 minutes on one core and about 2.5 minutes on 3 cores; the numbers are identical whatever the speed.
 * **Results**: key numbers, checks, scenarios, every figure and table, and downloads (block model as CSV and VTK). Two switches choose which results to show: example data or your own data, and Default or Custom settings.
 
 ## Running from a terminal (optional)
@@ -57,8 +57,8 @@ python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\a
 pip install -r requirements.txt
 
 python -m spbm serve --open        # the web page (same as the launcher)
-python -m spbm run --fast          # core + scenarios, about 1 min
-python -m spbm run                 # everything, about 35 min
+python -m spbm run --fast          # core + scenarios, under a minute
+python -m spbm run                 # everything, a few minutes (all cores but one)
 python -m spbm run --skip mc,sensitivity   # leave out chosen steps
 python -m spbm run --workers low         # CPU cores: low (1), medium, high (default) or a number
 python -m pytest -q                # 74 automated checks, about 2-3 min

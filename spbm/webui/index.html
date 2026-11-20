@@ -152,6 +152,7 @@ select { font: inherit; padding: 6px 10px; border: 1px solid var(--border); bord
 @keyframes sh { from { background-position: -200px 0; } to { background-position: 1200px 0; } }
 .stagelist { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 4px; font-size: 14px; }
 .stagelist li { display: flex; gap: 8px; align-items: center; color: var(--muted); }
+.stagelist li.sub { padding-left: 22px; font-size: 13.5px; }
 .stagelist li.done { color: var(--text); }
 .stagelist li.now { color: var(--accent); font-weight: 600; }
 .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid currentColor; flex: none; }
@@ -622,19 +623,21 @@ async function loadOverview() {
 
 /* ---------- run tab ---------- */
 // optional steps: id (as in --skip), label, seconds in a timed full run ("mc" is per realisation), what it gives
+// per step: seconds on one core on the example data ("mc" per realisation),
+// label, description, and the best speed-up its cases allow (null = number of realisations)
 const STEP_INFO = {
-  align: [1, "Survey cut-off scan", "Re-checks the 31 h cut-off against the data (the configured cut-off is used either way)."],
-  mc: [12.6, "Monte Carlo uncertainty", "P10/P50/P90 for every block and total. The slowest step."],
-  figures: [5, "Figures", "Growth, block-model and uncertainty plots."],
-  temporal: [375, "Forward-model temporal test", "Predicts survey intervals the model never saw."],
-  twin: [87, "Synthetic twin experiment", "Tests the reconstruction on data with a known answer."],
-  robust: [272, "Numerical robustness", "Re-runs with other grid sizes, tolerances and detection limits."],
-  scenarios: [41, "Volume-gap scenarios", "Bulking vs under-recording vs missing loads."],
-  sensitivity: [515, "Sensitivity analysis", "One-at-a-time tornado over the main assumptions."],
+  align: [0.5, "Survey cut-off scan", "Re-checks the 31 h cut-off against the data (the configured cut-off is used either way).", 1],
+  mc: [2.5, "Monte Carlo uncertainty", "P10/P50/P90 for every block and total.", null],
+  figures: [7, "Figures", "Growth, block-model and uncertainty plots.", 1],
+  temporal: [55, "Forward-model temporal test", "Predicts survey intervals the model never saw.", 30],
+  twin: [75, "Synthetic twin experiment", "Tests the reconstruction on data with a known answer.", 2.5],
+  robust: [75, "Numerical robustness", "Re-runs with other grid sizes, tolerances and detection limits.", 1.5],
+  scenarios: [12, "Volume-gap scenarios", "Bulking vs under-recording vs missing loads.", 5],
+  sensitivity: [170, "Sensitivity analysis", "One-at-a-time tornado over the main assumptions.", 3.4],
 };
 const ORDER = ["align", "mc", "figures", "temporal", "twin", "robust", "scenarios", "sensitivity"];
 const PRESETS = { fast: ["mc", "temporal", "twin", "robust", "sensitivity"], full: [], core: ORDER.slice() };
-const CORE_S = 22;
+const CORE_S = 13;
 let polling = null, lastJobRunning = false, runCfg = "default", runData = "example", ST = null, CLOCK = null;
 // Elapsed time counts up every second from the run's start; the time left
 // counts down between server updates instead of jumping.
@@ -670,17 +673,17 @@ function setPreset(name) { $$("[data-step]").forEach(c => c.checked = !PRESETS[n
 function skipList() { return $$("[data-step]").filter(c => !c.checked).map(c => c.dataset.step); }
 let speed = "high";
 try { speed = localStorage.getItem("spbm-speed") || "high"; } catch (e) {}
-// independent cases per step (they run side by side, up to the number of cores)
-const CASES = { mc: () => nMC(), temporal: () => 36, robust: () => 7, sensitivity: () => 20 };
+const SLOW = ["mc", "temporal", "twin", "robust", "scenarios", "sensitivity"];
+function oneCore(id) { return STEP_INFO[id][0] * (id === "mc" ? nMC() : 1); }
+function onW(id, w) {               // a step's time on w cores
+  const cap = STEP_INFO[id][3] === null ? nMC() : STEP_INFO[id][3];
+  return oneCore(id) / Math.max(1, Math.min(cap, w * 0.85));
+}
 function maxW() { return ST && ST.machine ? ST.machine.max_workers : 1; }
 function nWorkers() {
   if (!ST || !ST.machine) return 1;
   if (speed === "custom") return Math.max(1, Math.min(maxW(), Number($("#workers").value) || 1));
   return ST.machine.modes[speed];
-}
-function speedup(cases, w) {
-  w = Math.max(1, Math.min(cases, w));
-  return w > 1 ? cases / Math.ceil(cases / w) * 0.85 : 1;
 }
 function renderSpeed() {
   if (!ST || !ST.machine) return;
@@ -707,14 +710,17 @@ document.getElementById("speedseg").addEventListener("click", e => {
 document.getElementById("workers").addEventListener("input", renderSpeed);
 function nMC() { return Math.max(1, Math.min(1000, Number($("#mc") && $("#mc").value) || 60)); }
 function estimate() {
-  let s = CORE_S;
-  const w = nWorkers();
-  ORDER.forEach(id => {
-    const sec = STEP_INFO[id][0] * (id === "mc" ? nMC() : 1) / (CASES[id] ? speedup(CASES[id](), w) : 1);
-    const el = $(`[data-tm="${id}"]`); if (el) el.textContent = "~" + dur(sec);
-    if ($(`[data-step="${id}"]`).checked) s += sec;
-  });
-  $("#est").textContent = "estimated " + dur(s) + " on the supplied data";
+  const w = nWorkers(), on = id => $(`[data-step="${id}"]`).checked;
+  ORDER.forEach(id => { const el = $(`[data-tm="${id}"]`); if (el) el.textContent = "~" + dur(onW(id, w)); });
+  let s = CORE_S + ORDER.filter(id => on(id) && !SLOW.includes(id)).reduce((a, id) => a + oneCore(id), 0);
+  const slow = SLOW.filter(on);
+  if (slow.length) {
+    // with several cores the slow steps run side by side: limited by the total
+    // work over the cores, or by the step whose own cases cannot be spread further
+    s += w > 1 ? Math.max(slow.reduce((a, id) => a + oneCore(id), 0) / (0.85 * w), ...slow.map(id => onW(id, w)))
+               : slow.reduce((a, id) => a + oneCore(id), 0);
+  }
+  $("#est").textContent = "estimated " + dur(s) + " on the example data" + (w > 1 && slow.length > 1 ? " (slow steps side by side)" : "");
 }
 $("#steplist").addEventListener("change", estimate);
 $("#steplist").addEventListener("input", estimate);
@@ -780,8 +786,8 @@ function renderJob(j) {
   if (atEnd) log.scrollTop = log.scrollHeight;
   $("#stages").innerHTML = j.stages.map(s => {
     const cls = s.state === "done" ? "done" : s.state === "now" ? "now" : "";
-    const extra = s.state === "now" && /Monte Carlo/.test(s.label) && j.mc_done ? ` <span class="small">(${j.mc_done[0]} / ${j.mc_done[1]})</span>` : "";
-    return `<li class="${cls}"><span class="dot"${s.state === "failed" ? ' style="background:var(--bad);border-color:var(--bad)"' : ""}></span>${esc(s.label)}${extra}</li>`;
+    const extra = s.state === "now" && /^Monte Carlo/.test(s.label) && j.mc_done ? ` <span class="small">(${j.mc_done[0]} / ${j.mc_done[1]})</span>` : "";
+    return `<li class="${cls}${s.label.startsWith("· ") ? " sub" : ""}"><span class="dot"${s.state === "failed" ? ' style="background:var(--bad);border-color:var(--bad)"' : ""}></span>${esc(s.label)}${extra}</li>`;
   }).join("");
   $("#go").disabled = j.running;
   $("#stop").hidden = !j.running;
