@@ -128,6 +128,5 @@ config/                settings and data corrections
 spbm/                  program code (spbm/web.py and spbm/webui/ are the web page)
 tests/                 automated checks
 outputs/               results of the full run
-current docs/          report, presentation and other course documents
 METHOD.md              maths, steps and assumptions
 ```
