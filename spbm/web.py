@@ -1,29 +1,16 @@
 """Local web front end:  python -m spbm serve  ->  http://127.0.0.1:8413
 
-A small standard-library HTTP server that serves one page (spbm/webui/
-index.html) and a JSON API around the normal command line:
+A standard-library HTTP server for one page (spbm/webui/index.html) and a
+small JSON API (see do_GET / do_POST / do_PUT below for the routes).
 
-    GET  /api/ping              {"app": "spbm"} (used by SPBM.html and the launchers)
-    GET  /api/state             inbox files, registered inputs, current/last job
-    PUT  /api/upload?name=F     store the request body as data/inbox/F (.csv/.dxf/.zip)
-    GET  /api/params            editable parameters: default and custom values
-    POST /api/params            {"values": {key: value}} or {"yaml": text} -> config/project_custom.yaml
-    POST /api/params/reset      delete the custom configuration
-    POST /api/run               {"data": "example"|"own", "params": "default"|"custom", "skip": [...], "mc": n}
-    POST /api/cancel            stop the running job
-    GET  /api/results?set=S     summary, manifest, tables and figures of one result set (see RESULT_SETS)
-    GET  /out/<S>/<path>        a file from that output folder (figures, CSV, VTK)
+Two data sets: "example" (Data_Topo 2026.zip plus data/inbox/) and "own"
+(only files uploaded for it, under data/own/). Two parameter sets: "default"
+(config/project.yaml) and "custom" (config/project_custom.yaml). Each of the
+four combinations has its own output folder (RESULT_SETS).
 
-Two data sets: "example" (the supplied Data_Topo 2026.zip plus data/inbox/)
-and "own" (only files uploaded for it, kept apart under data/own/, for a
-client's own data). Two parameter sets: "default" (config/project.yaml) and
-"custom" (config/project_custom.yaml, edited on the page). Each of the four
-combinations writes to its own output folder, so nothing overwrites another.
-
-The analysis always runs as a separate `python -m spbm update` process, so
-the web page uses exactly the same code path and audit trail as the command
-line. Only one job runs at a time. The server binds to 127.0.0.1 by default;
-it has no authentication, so do not expose it on a shared network.
+Runs are separate `python -m spbm update` processes, so the page uses the same
+code and audit trail as the command line; one run at a time. The server has no
+login and binds to 127.0.0.1 by default.
 """
 from __future__ import annotations
 

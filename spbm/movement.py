@@ -386,12 +386,9 @@ def reconstruct(ds, cfg, loads=None, rng=None, survey_bias=None, keep_plans=Fals
         prior_new = bot[new_cells].copy()
         gap_fill_new = 0.0
         if s > 0 and len(new_cells) and cfg["infill"].get("front_unobserved_fill", True):
-            # A-13b: a first-surveyed cell lying IN FRONT of a previously surveyed
-            # face must have been at most the repose-angle extrapolation of that
-            # face; a solid bottom above it means fill that no change solid
-            # captured (toe-clipped solids, missing surveys). That volume belongs
-            # to this period, not to the legacy pile. Platform cells keep the
-            # surveyed bottom.
+            # A-13b (optional, off by default): a first-surveyed cell in front of
+            # an earlier face starts at that face's repose extrapolation; a solid
+            # bottom above it counts as this period's fill that no solid captured.
             known = observed.reshape(ny, nx)
             zk = np.where(known, cols.top.reshape(ny, nx), np.nan)
             inf_s, side_s = infer_surface(np.nan_to_num(zk), known, B, domain, g.cell, repose)
@@ -602,7 +599,8 @@ def reconstruct(ds, cfg, loads=None, rng=None, survey_bias=None, keep_plans=Fals
         from scipy import ndimage as ndi
         from .surfaces import extend_outside
         zcur = extend_outside(np.where(domain, cols.top.reshape(ny, nx), np.nan), domain)
-        creg = ndi.binary_dilation(observed.reshape(ny, nx), iterations=max(1, int(round(2.0 / g.cell))))   # 2 m
+        # crests are looked for only within 2 m of surveyed ground
+        creg = ndi.binary_dilation(observed.reshape(ny, nx), iterations=max(1, int(round(2.0 / g.cell))))
         _, feet = fw.place_loads(zcur, loads.iloc[post][["x", "y", "vol"]].values, g, cfg["forward"], sequential=True, crest_region=creg)
         for k, ft in zip(post, feet):
             ld = loads.iloc[k]

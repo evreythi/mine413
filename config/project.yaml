@@ -34,14 +34,11 @@ outputs:
   root: "outputs"
 
 time:
-  # A-05: a survey labelled day D closes its interval at D 00:00 + this many
-  # hours. Not supplied: chosen by the cut-off scan (0-36 h, outputs/growth/
-  # temporal_alignment.csv): FMS volume vs surveyed volume peaks at 30-31 h,
-  # i.e. D+1 06:00-07:00, which coincides with the dump-free shift-change
-  # window in the FMS times (06:00-07:30). 31 h = D+1 07:00 (production day).
+  # A-05: a survey dated D covers dumps up to D 00:00 + this many hours.
+  # 31 h = D+1 07:00, found by the cut-off scan (growth/temporal_alignment.csv).
   survey_cutoff_hours: 31.0
   cutoff_scan_hours: [0.0, 36.0, 0.5]   # start, stop, step of the scan
-  first_interval_hours: 24.0            # A-11: length of the first interval (no earlier survey)
+  first_interval_hours: 24.0            # length of the first interval (no earlier survey)
 
 grid:
   cell: 1.0          # A-24 horizontal simulation resolution (m)
@@ -61,17 +58,12 @@ base:
 
 infill:
   # A-13/A-14: geometry of never-surveyed cells at the start of the record.
-  repose_deg: 37.0      # A-03 angle of repose (measured: median face slope 34-36 deg, P75 38 deg)
-  platform_rule: "nearest_crest"  # behind-crest cells take the nearest surveyed crest elevation
-  domain: "hull"        # model domain = convex hull of surveyed cells + dump points
-  # A-13b: first-surveyed cells in FRONT of an earlier surveyed face could have
-  # been at the repose-angle extrapolation of that face, i.e. a solid bottom
-  # above it would be fill that no solid captured (toe-clipped solids, missing
-  # surveys). Base case FALSE (trust the surveyed solid bottoms): with the
-  # calibrated volume factor, recorded loads already explain the measured fill
-  # of complete intervals to ~3%, so the extra ~7,200 m3 would have to be
-  # unrecorded material on days with complete FMS records. TRUE is tested in
-  # the sensitivity analysis (moves that volume from legacy to unattributed).
+  repose_deg: 37.0      # A-03 angle of repose (measured median face slope 36.7 deg)
+  platform_rule: "nearest_crest"  # label only (fixed rule): behind-crest cells take the nearest crest elevation
+  domain: "hull"        # label only (fixed rule): domain = convex hull of surveyed cells + dump points
+  # A-13b: if true, a first-surveyed cell in front of an earlier face starts at
+  # that face's repose extrapolation, and the volume above it counts as fill no
+  # solid captured. Off: recorded loads already explain complete days to ~3%.
   front_unobserved_fill: false
 
 fms:
@@ -83,28 +75,19 @@ fms:
   dump_z_tolerance_m: 5.0               # QA rule LOC_Z_INCONSISTENT (outside interval surface envelope)
 
 density:
-  # A-06: in-pile volume of a load = payload x payload_factor / (Dens / volume_factor ...)
-  # Formally: recorded tonnes T, true tonnes T*f_pay, in-pile density
-  # rho = Dens * f_pay / f_v, so in-pile volume = T * f_v / Dens for ANY split.
-  #  * volume_factor f_v: "auto" = calibrated on internally consistent intervals
-  #    (robust pooled ratio of measured net fill to sum(T/Dens), spbm/volume.py).
-  #  * payload_factor f_pay: share of f_v due to payload under-recording.
-  #    1.0 = recorded tonnes taken as measured, the excess is bulking (base case).
-  #    Upper plausible bound 1.19 (largest recorded load 304 t x 1.19 = 362 t =
-  #    rated payload of the largest haul trucks). f_pay = f_v (Dens is the in-pile
-  #    density, all excess is under-recording) is reported as an EXCLUDED scenario.
+  # A-06: in-pile volume of a load = T * f_v / Dens; true tonnes = T * f_pay.
+  #  * volume_factor f_v: "auto" = calibrated from the surveys (spbm/volume.py).
+  #  * payload_factor f_pay: 1.0 = recorded tonnes are right and the extra
+  #    volume is bulking. 1.19 is the upper bound (304 t -> 362 t, the largest truck).
   volume_factor: auto
   payload_factor: 1.0
   calibration_outlier_k_mad: 3.0
   legacy_density: null  # null -> tonnage-weighted mean in-pile density of FMS loads
 
 movement:
-  # A-15..A-19 - see METHOD.md Section 3 for the equations
-  # A-15: push cost. "geodesic" = slope-aware dozer push distance (base case);
-  # "flat" = no push term: every source may fill any fill cell of its interval
-  # at equal cost (pure survey-constrained allocation). The synthetic twins
-  # cannot show that the push term improves the answer, so both forms are
-  # sampled in the Monte Carlo (uncertainty.cost_modes).
+  # A-15..A-19, equations in METHOD.md Section 3.
+  # A-15: "geodesic" = slope-aware dozer push distance; "flat" = no push term
+  # (any fill cell of the interval at equal cost). Both are sampled in the Monte Carlo.
   cost: geodesic
   epsilon: 6.0          # m  : entropic mixing length (degree of mixing)
   alpha_up: 4.0         # -  : uphill push penalty (m of horizontal push per m of lift)
@@ -117,9 +100,9 @@ movement:
   cut_as_source: true   # observed elevation decreases on previously-observed cells re-handle material
 
 imputation:
-  # A-21: grade imputed to observed fill that FMS cannot explain
-  method: "period_neighbours"   # tonnage-weighted mean of loads in the period +/- 1 period
-  legacy_grade: "fms_mean"      # A-22: assumed grade of pre-record (legacy) material
+  # Labels only (fixed rules, not options):
+  method: "period_neighbours"   # A-21: unattributed fill = tonnage-weighted mean of loads in the period +/- 1
+  legacy_grade: "fms_mean"      # A-22: pre-record (legacy) material = mean FMS grade
 
 forward:
   # Predictive (unconstrained) model: push to crest + avalanche cellular automaton

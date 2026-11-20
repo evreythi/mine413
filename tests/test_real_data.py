@@ -1,6 +1,6 @@
 """Tests on the supplied project data (Data_Topo 2026.zip). They pin the
-key results (counts, cut-off, f_v, conservation, inventory), so a change in code or data that moves them is
-caught. Fixtures in conftest.py; the reconstruction fixture takes ~15 s."""
+key results (counts, cut-off, f_v, conservation, inventory), so a change in
+code or data that moves them is caught. Fixtures in conftest.py; the reconstruction fixture takes ~15 s."""
 import numpy as np
 import pandas as pd
 import pytest

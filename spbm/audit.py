@@ -118,7 +118,7 @@ def write_manifest(cfg, files, outputs_root: Path, summary: dict, started: datet
 
 
 def change_report(outputs_root: Path) -> str | None:
-    """Compare the two most recent model versions ."""
+    """Compare the two most recent model versions (written to audit/change_report.md)."""
     hist = sorted((outputs_root / "history").glob("*/run_manifest.json"))
     if len(hist) < 2:
         return None

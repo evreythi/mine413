@@ -60,12 +60,12 @@ def infer_surface(z_known: np.ndarray, known: np.ndarray, B: np.ndarray, domain:
                   cell: float, repose_deg: float) -> tuple[np.ndarray, np.ndarray]:
     """Fill unknown cells of a partially observed surface (A-13).
 
-    For each unknown cell the nearest known cell (elevation z_n, distance d)
-    decides the side of the face:
-      * behind the crest (z_n in the upper half of the pile height) -> platform,
-        elevation z_n (flat platform behind the crest);
-      * in front of the face -> face continued at the angle of repose down to
-        the floor: max(B, z_n - d tan(phi)).
+    Each unknown cell looks at its nearest known cell (elevation z_n, distance d).
+    Behind the crest it is flat platform at z_n; in front of the face it is the
+    face continued at the angle of repose: max(B, z_n - d tan(phi)).
+    Which side: where the known surface is steeper than 15 deg, the direction
+    to the cell (up- or down-slope) decides; elsewhere a z_n in the upper half
+    of the pile height means platform.
     Returns (surface, side) where side = 0 known, 1 platform, 2 front.
     """
     if not known.any():

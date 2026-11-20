@@ -7,9 +7,8 @@ For every survey interval k:
            FMS density)
     r_k  = N_k / V_k
 
-On intervals whose FMS and survey records are both complete, r_k is a
-consistent 1.4-1.6; intervals with FMS outages are far higher (missing
-records). The volume factor f_v is the pooled ratio over the internally
+On intervals whose FMS and survey records are both complete, r_k is roughly
+constant; intervals with FMS outages are far higher (missing records). The volume factor f_v is the pooled ratio over the internally
 consistent intervals (robust exclusion: |r - median| > k * 1.4826 * MAD),
 with a bootstrap distribution and two hold-out tests (first-half calibration
 predicting the second half; leave-one-out).

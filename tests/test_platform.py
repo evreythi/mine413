@@ -1,5 +1,5 @@
-"""Platform tests: command line, managed raw store, manual
-interventions in the engine, audit trail and incremental updating."""
+"""Platform tests: command line, managed raw store, manual interventions
+in the engine, audit trail, incremental updating and the web page."""
 import dataclasses
 import json
 

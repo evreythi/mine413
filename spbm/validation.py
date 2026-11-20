@@ -124,7 +124,8 @@ def _forward_metrics(rec, s, fcfg, mode="push"):
     L = rec.loads[rec.loads.period == s]
     if len(L) == 0:
         return None
-    creg = ndimage.binary_dilation(snap["observed_before"], iterations=max(1, int(round(2.0 / g.cell))))   # 2 m
+    # crests are looked for only within 2 m of surveyed ground
+    creg = ndimage.binary_dilation(snap["observed_before"], iterations=max(1, int(round(2.0 / g.cell))))
     xyv = L[["x", "y", "vol"]].values
     if mode == "push":
         zp, _ = fw.place_loads(z0, xyv, g, fcfg, crest_region=creg)
