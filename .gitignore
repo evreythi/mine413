@@ -8,3 +8,5 @@ data/raw_store/
 data/inbox/*
 !data/inbox/.gitkeep
 outputs_demo/
+config/project_custom.yaml
+outputs_custom/

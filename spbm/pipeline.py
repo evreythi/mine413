@@ -27,7 +27,9 @@ def _md(df: pd.DataFrame, floatfmt="{:,.2f}") -> str:
 
 
 def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do_sens=True, do_align=True, do_temporal=True,
-        do_scen=True, verbose=True):
+        do_scen=True, do_figs=True, verbose=True):
+    """Run the whole chain. The do_* switches turn off optional steps; the
+    reconstruction, block model, balances and audit trail always run."""
     started = datetime.now()
     t0 = time.time()
     cfg_loaded = cfg      # configuration as supplied (hashed in the manifest); cfg gains resolved values below
@@ -81,7 +83,8 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
     for name, z in [("floor_plane", rec.B), ("pre_record_surface", rec.legacy_top), ("final_model_surface", rec.diagnostics["final_surface"]),
                     ("latest_surveyed_surface", rec.observed_top)]:
         bm.export_grid_asc(np.where(rec.domain | np.isfinite(z), z, np.nan), g, dirs["movement"] / f"{name}.asc")
-    growth.growth_figures(rec, ds, ptab, dirs["growth"])
+    if do_figs:
+        growth.growth_figures(rec, ds, ptab, dirs["growth"])
     # 6-7 block model --------------------------------------------------------
     log("6-7 block model and inventories")
     bg = bm.make_block_grid(rec, cfg)
@@ -96,7 +99,8 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
         mc = uncertainty.monte_carlo(loader, cfg, bg, df, dirs["uncertainty"], n=n_mc, verbose=verbose)
         df = uncertainty.attach_block_stats(df, mc["stats"])
         df = uncertainty.apply_prior_ranges(df, rec.loads)
-        uncertainty.mc_figures(mc, df, dirs["uncertainty"])
+        if do_figs:
+            uncertainty.mc_figures(mc, df, dirs["uncertainty"])
     df["confidence"] = bm.classify_confidence(df, cfg)
     df.to_csv(dirs["blockmodel"] / "stockpile_block_model.csv", index=False, float_format="%.5g")
     vtk_fields = [c for c in ["tonnes", "cu_pct", "au_gpt", "ag_gpt", "fill_frac", "frac_fms", "frac_legacy", "cu_cv", "cu_p10", "cu_p90",
@@ -109,19 +113,21 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
         json.dump({"origin": [bg.x0, bg.y0, bg.z0], "block_size": [bg.dx, bg.dy, bg.dz], "n_blocks": [bg.nx, bg.ny, bg.nz],
                    "crs": cfg["project"]["crs_note"], "units": {"cu_pct": "% Cu", "au_gpt": "g/t Au", "ag_gpt": "g/t Ag", "tonnes": "dry t (as FMS)",
                    "cu_t": "t Cu", "au_kg": "kg Au", "ag_kg": "kg Ag"}}, fh, indent=2)
-    log("    figures")
-    bmviz.bench_plans(df, bg, rec, "cu_pct", "Cu (%)", bmviz.pl.SEQ, dirs["blockmodel"])
-    bmviz.bench_plans(df, bg, rec, "au_gpt", "Au (g/t)", bmviz.pl.SEQ_OR, dirs["blockmodel"])
-    bmviz.bench_plans(df, bg, rec, "frac_fms", "fraction FMS-tracked", bmviz.pl.SEQ, dirs["blockmodel"], 0, 1)
-    bmviz.bench_plans(df, bg, rec, "tonnes", "tonnes per block", bmviz.pl.SEQ, dirs["blockmodel"])
-    bmviz.sections(df, bg, rec, dirs["blockmodel"])
-    bmviz.sections(df, bg, rec, dirs["blockmodel"], "frac_fms", "fraction FMS-tracked")
-    bmviz.view3d(df, bg, dirs["blockmodel"])
-    bmviz.grade_tonnage(st["grade_tonnage"], dirs["blockmodel"])
-    bmviz.class_maps(df, bg, rec, dirs["blockmodel"])
-    if mc is not None:
-        bmviz.uncertainty_maps(df, bg, dirs["uncertainty"])
-        bmviz.bench_plans(df, bg, rec, "cu_cv", "Cu grade CV (Monte Carlo)", bmviz.pl.SEQ_OR, dirs["uncertainty"], 0, 0.3)
+    if do_figs:
+        log("    figures")
+        bmviz.bench_plans(df, bg, rec, "cu_pct", "Cu (%)", bmviz.pl.SEQ, dirs["blockmodel"])
+        bmviz.bench_plans(df, bg, rec, "au_gpt", "Au (g/t)", bmviz.pl.SEQ_OR, dirs["blockmodel"])
+        bmviz.bench_plans(df, bg, rec, "frac_fms", "fraction FMS-tracked", bmviz.pl.SEQ, dirs["blockmodel"], 0, 1)
+        bmviz.bench_plans(df, bg, rec, "tonnes", "tonnes per block", bmviz.pl.SEQ, dirs["blockmodel"])
+        bmviz.sections(df, bg, rec, dirs["blockmodel"])
+        bmviz.sections(df, bg, rec, dirs["blockmodel"], "frac_fms", "fraction FMS-tracked")
+        bmviz.view3d(df, bg, dirs["blockmodel"])
+        bmviz.grade_tonnage(st["grade_tonnage"], dirs["blockmodel"])
+        bmviz.class_maps(df, bg, rec, dirs["blockmodel"])
+        if mc is not None:
+            bmviz.uncertainty_maps(df, bg, dirs["uncertainty"])
+            bmviz.bench_plans(df, bg, rec, "cu_cv", "Cu grade CV (Monte Carlo)", bmviz.pl.SEQ_OR, dirs["uncertainty"], 0, 0.3)
+
     # 9 validation -----------------------------------------------------------
     log("9   validation and reconciliation")
     vb = validation.mass_metal_balance(rec, agg, df)

@@ -15,15 +15,30 @@ python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\a
 pip install -r requirements.txt
 ```
 
+## Web front end
+
+```bash
+python -m spbm serve               # then open http://127.0.0.1:8413
+```
+
+A local page that explains the method, takes new data files (drag and drop), lets you change any parameter or assumption, choose which steps to run, follow progress live, and browse the results (key numbers, checks, scenarios, every figure and table, downloads).
+
+* **Parameters.** Every value in `config/project.yaml` can be changed, through a form (about 50 values, grouped, each with its unit, assumption ID and limits) or as raw YAML. Changes are saved to `config/project_custom.yaml`, and runs with them write to `outputs_custom/`. The official configuration and results are never changed from the page. The model has no economic or price parameters.
+* **Steps.** The core (import, checks, f_v calibration, reconstruction, block model, balances, audit) always runs and takes about 20 s. Each slow step can be switched off: Monte Carlo, forward-model test, synthetic twin, robustness, scenarios, sensitivity, cut-off scan and figures. The page shows the expected run time for the selection. A table or figure left over from a skipped step is marked "earlier run".
+* The server binds to this computer only and has no login; do not expose it on a shared network (`--host`).
+
 ## Running
 
 ```bash
-python -m pytest -q                # 67 tests (unit, real data, platform), about 3 min
+python -m pytest -q                # 70 tests (unit, real data, platform), about 3 min
 python -m pytest -q -m "not slow"  # skip the end-to-end pipeline test
 python -m spbm run --fast          # base reconstruction, block model, QA/QC, balances, scenarios (about 1 min)
 python -m spbm run                 # full analysis incl. Monte Carlo, validation, sensitivity (about 40 min)
 python -m spbm run --mc 200        # more Monte Carlo realisations
+python -m spbm run --skip mc,sensitivity   # skip chosen optional steps
 ```
+
+Steps for `--skip`: `align` (cut-off scan), `mc` (Monte Carlo), `temporal` (forward-model test), `twin` (synthetic twin), `robust` (numerical robustness), `scenarios` (volume-gap scenarios), `sensitivity` (one-at-a-time), `figures`. `--fast` is `--skip mc,temporal,twin,robust,sensitivity`.
 
 The run is deterministic: the base case has no randomness and the Monte Carlo uses the fixed seed in the configuration, so re-running gives identical numbers.
 
@@ -101,7 +116,7 @@ Grade units are as supplied and unconfirmed (8.4% Cu / 8.0 g/t Au is about ten t
 ```
 Data_Topo 2026.zip     supplied data (read into data/raw_store/ on first run)
 config/                parameters and manual interventions
-spbm/                  platform source code
+spbm/                  platform source code (spbm/web.py + spbm/webui/index.html: web front end)
 tests/                 unit, real-data and platform tests
 outputs/               results of the full run
 examples/              update demonstration
