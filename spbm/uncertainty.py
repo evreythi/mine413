@@ -220,7 +220,10 @@ def sensitivity_oat(ds_loader, cfg, base_df, base_rec, out: Path, verbose=True) 
         if verbose:
             print(f"    OAT {k}/{total}", flush=True)
 
-    for slot, km in zip(slots, run_cases(_oat_case, cases, {"loader": ds_loader, "base_df": base_df}, progress)):
+    # relative run times: a finer grid is far slower, re-calibrating f_v adds a little
+    costs = [12.0 if n == "cell" and float(v) < 1 else 2.0 if n in ("survey_cutoff_hours", "sigma_z", "front_unobserved_fill")
+             else 1.0 for n, _, v, _ in cases]
+    for slot, km in zip(slots, run_cases(_oat_case, cases, {"loader": ds_loader, "base_df": base_df}, progress, costs)):
         rows[slot] = km
     tab = pd.DataFrame(rows)
     tab.to_csv(out / "sensitivity_oat.csv", index=False)

@@ -77,9 +77,11 @@ def _init(shared: dict):
     _STATE.update(shared)
 
 
-def run_cases(fn, cases: list, shared: dict | None = None, on_done=None) -> list:
+def run_cases(fn, cases: list, shared: dict | None = None, on_done=None, costs=None) -> list:
     """fn(case) for every case, using the data in `shared` (via state()).
-    fn must be a module-level function. on_done(k, n) is called as cases finish."""
+    fn must be a module-level function. on_done(k, n) is called as cases finish.
+    `costs` (relative run times) makes the slowest cases start first, so no
+    long case is left running alone at the end; results keep the case order."""
     shared = shared or {}
     n = n_workers(len(cases))
     if n == 1:
@@ -95,7 +97,8 @@ def run_cases(fn, cases: list, shared: dict | None = None, on_done=None) -> list
     os.environ.update({v: "1" for v in _THREAD_VARS})
     try:
         with ProcessPoolExecutor(max_workers=n, initializer=_init, initargs=(shared,)) as ex:
-            futs = {ex.submit(fn, c): k for k, c in enumerate(cases)}
+            order = sorted(range(len(cases)), key=lambda k: -costs[k]) if costs else range(len(cases))
+            futs = {ex.submit(fn, cases[k]): k for k in order}
             out = [None] * len(cases)
             for done, f in enumerate(as_completed(futs), 1):
                 out[futs[f]] = f.result()

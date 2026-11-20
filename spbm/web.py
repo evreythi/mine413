@@ -78,31 +78,51 @@ def plan(skip, n_mc, workers=1):
     return out
 
 
-def progress(lines, skip, n_mc, workers=1):
-    """Estimated fraction done, from the stages reached in the log."""
+def progress(lines, skip, n_mc, workers=1, elapsed=None):
+    """Estimated fraction done and seconds left, from the stages reached in
+    the log. The time left learns from this run: a step with a counter (Monte
+    Carlo, sensitivity) uses its own rate so far, and the steps still to come
+    are scaled by how fast the finished steps went compared with the plan."""
     st = plan(skip, n_mc, workers)
     total = sum(d for _, _, d in st)
     text = "\n".join(lines)
-    reached = -1
+    reached, t_start = -1, {}
     for i, (key, _, _) in enumerate(st):
-        if key in text:
-            reached = i
+        for line in lines:
+            if key in line:
+                reached = i
+                m = re.match(r"\[\s*([\d.]+)s\]", line)   # pipeline time stamp of the stage start
+                if m and i not in t_start:
+                    t_start[i] = float(m.group(1))
+                break
     if reached < 0:
-        return 0.0, st
+        return 0.0, st, None
     done = sum(d for _, _, d in st[:reached])
     key, _, dur = st[reached]
-    part = 0.0
+    part, counter = 0.0, None
     if key.startswith("8"):
-        mc = re.findall(r"MC (\d+)/(\d+)", text)
-        if mc:
-            part = int(mc[-1][0]) / int(mc[-1][1])
+        counter = re.findall(r"MC (\d+)/(\d+)", text)
     elif "sensitivity" in key:
-        oat = re.findall(r"OAT (\d+)/(\d+)", text)
-        if oat:
-            part = int(oat[-1][0]) / (int(oat[-1][1]) + 1)
+        counter = re.findall(r"OAT (\d+)/(\d+)", text)
+    if counter:
+        k, n = int(counter[-1][0]), int(counter[-1][1])
+        part = k / n if key.startswith("8") else k / (n + 1)
     elif key == "done - run":
         part = 1.0
-    return min((done + part * dur) / total, 1.0), st
+    frac = min((done + part * dur) / total, 1.0)
+    if elapsed is None:
+        return frac, st, None
+    # speed of this machine relative to the plan, from the steps already finished
+    t_cur = t_start.get(reached, elapsed)
+    factor = t_cur / done if done > 5 else 1.0
+    factor = min(max(factor, 0.2), 8.0)
+    in_stage = max(elapsed - t_cur, 0.0)
+    if counter and part > 0:
+        stage_left = in_stage * (1 - part) / part        # this step's own rate
+    else:
+        stage_left = max(dur * factor - in_stage, 0.1 * dur * factor)
+    later = sum(d for _, _, d in st[reached + 1:]) * factor
+    return frac, st, stage_left + later
 
 
 # Tables shown on the results page: (key, title, path in the output folder).
@@ -450,18 +470,26 @@ class Job:
         i = self.info
         running = i["finished"] is None
         end = time.time() if running else i["finished"]
-        frac, st = progress(i["lines"], i["skip"], i["mc"], i["workers"])
+        elapsed = end - i["started"]
+        frac, st, left = progress(i["lines"], i["skip"], i["mc"], i["workers"], elapsed)
         ok = not running and i["returncode"] == 0
         if ok:
             frac = 1.0
-        elapsed = end - i["started"]
-        eta = elapsed * (1 - frac) / frac if running and frac > 0.01 else None
+        eta = None
+        if running and left is not None:
+            # smooth: blend the new estimate with the previous one counted down
+            prev, t_prev = i.get("eta"), i.get("eta_t")
+            if prev is not None:
+                left = 0.7 * max(prev - (time.time() - t_prev), 0.0) + 0.3 * left
+            i["eta"], i["eta_t"] = left, time.time()
+            eta = left
         text = "\n".join(i["lines"])
         reached = max([k for k, (key, _, _) in enumerate(st) if key in text], default=-1)
         mc = re.findall(r"MC (\d+)/(\d+)", text)
         stages = [{"label": label, "state": "done" if k < reached or ok else "now" if k == reached and running else
                    "failed" if k == reached else "todo"} for k, (_, label, _) in enumerate(st)]
         return {"set": i["set"], "skip": i["skip"], "mc": i["mc"], "workers": i["workers"], "cmd": i["cmd"], "running": running,
+                "started": i["started"], "now": time.time(),
                 "returncode": i["returncode"], "elapsed_s": round(elapsed, 1), "eta_s": None if eta is None else round(eta),
                 "progress": round(frac, 3), "stages": stages, "mc_done": [int(x) for x in mc[-1]] if mc else None,
                 "run_id": i["run_id"], "log": i["lines"][-400:]}

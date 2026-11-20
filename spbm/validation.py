@@ -401,7 +401,8 @@ def robustness(ds_loader, cfg, out: Path, base_df) -> pd.DataFrame:
                 ("LoD k=1 (tau 0.07 m)", {"survey.lod_k": 1.0}),
                 ("LoD k=4 (tau 0.28 m)", {"survey.lod_k": 4.0})]
     rows = run_cases(_robust_case, [(name, apply_overrides(cfg, ov)) for name, ov in variants],
-                     {"loader": ds_loader, "base_df": base_df})
+                     {"loader": ds_loader, "base_df": base_df},
+                     costs=[12.0 if ov.get("grid.cell", 1.0) < 1 else 1.0 for _, ov in variants])
     tab = pd.DataFrame(rows)
     tab.to_csv(out / "robustness_numerical.csv", index=False)
     return tab

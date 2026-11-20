@@ -30,7 +30,6 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import dijkstra
-from scipy.special import logsumexp
 
 from .surfaces import fit_base_plane, infer_surface, model_domain
 
@@ -161,19 +160,55 @@ def geodesic_cost(surface, domain, cell, alpha, src_cells, limit):
     return full[inv]
 
 
+def _lse(M, axis):
+    """log(sum(exp(M))) along an axis, without scipy's overhead (rows or
+    columns that are all -inf give -inf)."""
+    m = M.max(axis=axis, keepdims=True)
+    m = np.where(np.isfinite(m), m, 0.0)
+    with np.errstate(divide="ignore"):
+        return (np.log(np.exp(M - m).sum(axis=axis)) + np.squeeze(m, axis=axis))
+
+
 def sinkhorn(a, b, C, eps, tol=1e-6, max_iter=5000):
-    """Log-domain entropic OT. Rows are re-scaled at the end so that every
-    source is conserved exactly; the column residual is returned."""
+    """Entropic OT (Sinkhorn). Rows are re-scaled at the end so that every
+    source is conserved exactly; the column residual is returned.
+
+    The iterations are the classical scaling updates u = a / (K v),
+    v = b / (K' u) with K = exp(-C / eps), done as matrix-vector products.
+    When exp(-C / eps) would come too close to the smallest representable
+    number (very short mixing lengths), the same updates run in the log domain."""
     logK = -C / eps
+    fin = np.isfinite(logK)
+    if fin.any() and logK[fin].min() > -200.0:
+        K = np.exp(logK)                       # infinite cost -> exactly 0
+        u = np.ones(len(a)); v = np.ones(len(b))
+        it = 0
+        ok = True
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            for it in range(1, max_iter + 1):
+                u = a / (K @ v)
+                v = b / (K.T @ u)
+                if it % 10 == 0 or it == max_iter:
+                    if not (np.all(np.isfinite(u)) and np.all(np.isfinite(v))):
+                        ok = False
+                        break
+                    err = np.abs(u * (K @ v) - a).sum() / a.sum()
+                    if err < tol:
+                        break
+        if ok:
+            Pm = u[:, None] * K * v[None, :]
+            Pm *= (a / np.maximum(Pm.sum(1), 1e-300))[:, None]
+            col_err = np.abs(Pm.sum(0) - b).sum() / b.sum()
+            return Pm, float(col_err), it
+    # log-domain fallback
     la, lb = np.log(a), np.log(b)
     u = np.zeros(len(a)); v = np.zeros(len(b))
-    err = np.inf
     it = 0
     for it in range(1, max_iter + 1):
-        u = la - logsumexp(logK + v[None, :], axis=1)
-        v = lb - logsumexp(logK + u[:, None], axis=0)
+        u = la - _lse(logK + v[None, :], axis=1)
+        v = lb - _lse(logK + u[:, None], axis=0)
         if it % 10 == 0 or it == max_iter:
-            rows = np.exp(logsumexp(logK + v[None, :], axis=1) + u)
+            rows = np.exp(_lse(logK + v[None, :], axis=1) + u)
             err = np.abs(rows - a).sum() / a.sum()
             if err < tol:
                 break

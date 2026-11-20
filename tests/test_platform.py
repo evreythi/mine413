@@ -160,8 +160,11 @@ def test_web_upload_names_and_progress():
     assert web.safe_name("run.sh") is None and web.safe_name(".hidden.csv") is None
     lines = ["[ 0.0s] 1-2 import FMS records", "[ 1.0s] 3   data-quality checks", "[ 3.0s] 4b  volume factor calibration",
              "[ 6.0s] 5   material-movement reconstruction", "[19.0s] 6-7 block model", "[19.5s] 8   Monte Carlo", "    MC 30/60  (300 s)"]
-    f_half, st = web.progress(lines, [], 60)
-    f_fast, st_fast = web.progress(lines[:4], ["mc", "temporal", "twin", "robust", "sensitivity"], 60)
+    f_half, st, _ = web.progress(lines, [], 60)
+    f_fast, st_fast, _ = web.progress(lines[:4], ["mc", "temporal", "twin", "robust", "sensitivity"], 60)
+    # time left follows the run's own pace: 30 of 60 realisations in 300 s -> about 300 s more for the rest
+    _, _, left = web.progress(lines, ["temporal", "twin", "robust", "scenarios", "sensitivity", "figures"], 60, 1, elapsed=319.5)
+    assert 280 < left < 340
     assert 0 < f_half < 0.5 and 0 < f_fast < 1
     assert all("Monte Carlo" not in s[1] for s in st_fast) and any("Monte Carlo" in s[1] for s in st)
 

@@ -635,7 +635,23 @@ const STEP_INFO = {
 const ORDER = ["align", "mc", "figures", "temporal", "twin", "robust", "scenarios", "sensitivity"];
 const PRESETS = { fast: ["mc", "temporal", "twin", "robust", "sensitivity"], full: [], core: ORDER.slice() };
 const CORE_S = 22;
-let polling = null, lastJobRunning = false, runCfg = "default", runData = "example", ST = null;
+let polling = null, lastJobRunning = false, runCfg = "default", runData = "example", ST = null, CLOCK = null;
+// Elapsed time counts up every second from the run's start; the time left
+// counts down between server updates instead of jumping.
+function roundLeft(s) { return s < 90 ? Math.max(5, Math.round(s / 5) * 5) : Math.round(s / 30) * 30; }
+function tickClock() {
+  if (!CLOCK) return;
+  const j = CLOCK.job, now = Date.now() / 1000 + CLOCK.offset;
+  const elapsed = j.running ? now - j.started : j.elapsed_s;
+  let txt = j.workers + (j.workers === 1 ? " core" : " cores") + " · elapsed " + dur(Math.floor(elapsed));
+  if (j.running && j.eta_s != null) {
+    const left = Math.max(j.eta_s - (Date.now() / 1000 - CLOCK.at), 0);
+    txt += left > 0 ? " · about " + dur(roundLeft(left)) + " left" : " · almost done";
+  }
+  $("#jobtime").textContent = txt;
+}
+setInterval(tickClock, 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && ST) refreshState(); });
 const SET_LABEL = { default: "example data · default settings", custom: "example data · custom settings",
                     own_default: "my data · default settings", own_custom: "my data · custom settings" };
 const setKey = (data, params) => (data === "own" ? "own_" : "") + params;
@@ -756,7 +772,9 @@ function renderJob(j) {
   $("#jobpct").textContent = j.running ? Math.round(100 * j.progress) + "% (estimated)" : "";
   const now = j.stages.find(s => s.state === "now");
   $("#jobstage").textContent = j.running ? (now ? now.label : "starting") : ok ? "Run " + (j.run_id || "") + " complete" : "The run did not finish; see the log below.";
-  $("#jobtime").textContent = j.workers + (j.workers === 1 ? " core" : " cores") + " · elapsed " + dur(j.elapsed_s) + (j.running && j.eta_s != null ? " · about " + dur(j.eta_s) + " left" : "");
+  // the clock ticks in the page (see tickClock); here we only record what the server knows
+  CLOCK = { job: j, offset: j.now - Date.now() / 1000, at: Date.now() / 1000 };
+  tickClock();
   const log = $("#log"), atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
   log.textContent = "$ " + j.cmd + "\n" + j.log.join("\n");
   if (atEnd) log.scrollTop = log.scrollHeight;
