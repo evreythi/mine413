@@ -10,3 +10,5 @@ data/inbox/*
 outputs_demo/
 config/project_custom.yaml
 outputs_custom/
+.spbm_server.log
+.venv/

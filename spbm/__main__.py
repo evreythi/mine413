@@ -5,7 +5,7 @@
     python -m spbm update   [--config C]          # pick up new files in data/inbox and re-run
     python -m spbm qaqc     [--config C]          # data checks only
     python -m spbm status   [--config C]          # registered data and last run
-    python -m spbm serve    [--port 8413]         # web front end on http://127.0.0.1:8413
+    python -m spbm serve    [--port 8413] [--open] [--idle-exit MIN]   # web page on http://127.0.0.1:8413
 """
 from __future__ import annotations
 
@@ -47,6 +47,9 @@ def main(argv=None):
         if name == "serve":
             p.add_argument("--host", default="127.0.0.1", help="address to bind (default: this computer only)")
             p.add_argument("--port", type=int, default=8413)
+            p.add_argument("--open", action="store_true", help="open the page in the default browser")
+            p.add_argument("--idle-exit", type=float, default=0, metavar="MIN",
+                           help="stop after MIN minutes with no page open and no run in progress (0 = never)")
     a = ap.parse_args(argv)
     cfg = load_config(a.config)
     if getattr(a, "out", None):
@@ -54,7 +57,7 @@ def main(argv=None):
 
     if a.cmd == "serve":
         from .web import serve
-        serve(cfg, a.host, a.port)
+        serve(cfg, a.host, a.port, open_browser=a.open, idle_exit_min=a.idle_exit)
         return 0
     if a.cmd == "ingest":
         from . import io as sio

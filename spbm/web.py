@@ -3,6 +3,7 @@
 A small standard-library HTTP server that serves one page (spbm/webui/
 index.html) and a JSON API around the normal command line:
 
+    GET  /api/ping              {"app": "spbm"} (used by SPBM.html and the launchers)
     GET  /api/state             inbox files, registered inputs, current/last job
     PUT  /api/upload?name=F     store the request body as data/inbox/F (.csv/.dxf/.zip)
     GET  /api/params            editable parameters: official and custom values
@@ -449,6 +450,12 @@ def make_handler(cfg: dict, job: Job):
 
     class H(BaseHTTPRequestHandler):
         server_version = "spbm"
+        last_seen = time.time()          # last request from any page (for --idle-exit)
+
+        def parse_request(self):
+            ok = super().parse_request()
+            H.last_seen = time.time()
+            return ok
 
         def log_message(self, fmt, *args):        # keep the console quiet
             pass
@@ -482,6 +489,8 @@ def make_handler(cfg: dict, job: Job):
             q = parse_qs(u.query)
             if u.path in ("/", "/index.html"):
                 return self._send(200, UI.read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/api/ping":
+                return self._json({"app": "spbm"})
             if u.path == "/api/state":
                 return self._json(self._state())
             if u.path == "/api/params":
@@ -638,12 +647,47 @@ def make_handler(cfg: dict, job: Job):
     return H
 
 
-def serve(cfg: dict, host: str = "127.0.0.1", port: int = 8413):
+def _already_running(host, port):
+    """True if an SPBM front end already answers on this address."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://{host}:{port}/api/ping", timeout=2) as r:
+            return json.loads(r.read()).get("app") == "spbm"
+    except Exception:
+        return False
+
+
+def serve(cfg: dict, host: str = "127.0.0.1", port: int = 8413, open_browser: bool = False, idle_exit_min: float = 0):
+    """Start the front end. open_browser opens the page once the server is up.
+    idle_exit_min > 0 stops the server after that many minutes without any
+    request from a page and with no run in progress (used by the launchers,
+    so closing the browser eventually stops the background program)."""
+    import webbrowser
+    url = f"http://{host}:{port}/"
+    if _already_running(host, port):            # e.g. the launcher was double-clicked twice
+        print(f"SPBM is already running at {url}")
+        if open_browser:
+            webbrowser.open(url)
+        return
     job = Job()
-    httpd = ThreadingHTTPServer((host, port), make_handler(cfg, job))
-    print(f"spbm web front end on http://{host}:{port}  (Ctrl+C to stop)")
+    handler = make_handler(cfg, job)
+    httpd = ThreadingHTTPServer((host, port), handler)
+    print(f"SPBM is running at {url}  (close this window or press Ctrl+C to stop)")
     if host not in ("127.0.0.1", "localhost", "::1"):
         print("warning: the page has no login; anyone who can reach this address can upload files and start runs")
+    if open_browser:
+        threading.Timer(0.5, webbrowser.open, args=(url,)).start()
+    if idle_exit_min > 0:
+        def watch():
+            while True:
+                time.sleep(30)
+                st = job.status()
+                busy = st is not None and st["running"]
+                if not busy and time.time() - handler.last_seen > idle_exit_min * 60:
+                    print(f"no page open for {idle_exit_min:g} min - stopping")
+                    httpd.shutdown()
+                    return
+        threading.Thread(target=watch, daemon=True).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

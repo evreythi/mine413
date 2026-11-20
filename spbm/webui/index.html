@@ -337,9 +337,9 @@ footer { color: var(--muted); font-size: 13px; padding: 24px 0 40px; border-top:
     <li><b>Build the surfaces</b>Each survey solid is rasterised on a 1 m grid, giving a top and bottom elevation per cell. A floor plane is fitted to the toe, and the surface under the earliest surveys is inferred.</li>
     <li><b>Reconstruct the movement (CPST)</b>For each survey interval: <em>sources</em> are the loads dumped, material cut by dozers, and material carried from earlier; <em>sinks</em> are the cells where the survey shows new fill. The cost of moving a source to a sink is the dozer push distance over the real terrain, with uphill pushing penalised:
       <div class="eq">w<sub>ij</sub> = ℓ<sub>ij</sub> + α · max(0, z<sub>j</sub> − z<sub>i</sub>) &nbsp;&nbsp;&nbsp; C<sub>kc</sub> = shortest-path push distance (≤ 90 m)</div>
-      The allocation is an entropy-regularised optimal transport problem, solved with log-domain Sinkhorn iterations. ε is a mixing length (6 m) that represents GPS error and spill:
+      The loads are then shared out over the fill so that the total pushing is as small as possible, with a little mixing allowed (the mixing length ε = 6 m covers GPS error and spill). Mathematically this is an “optimal transport” problem, solved with the Sinkhorn method:
       <div class="eq">min<sub>P ≥ 0</sub> Σ P<sub>kc</sub> C<sub>kc</sub> − ε H(P) &nbsp;&nbsp; subject to &nbsp; P 1 = a (load volumes), &nbsp; P<sup>T</sup> 1 = b (surveyed fill)</div>
-      Two dummy nodes keep the books honest: fill no load can explain becomes <em>unattributed</em>, and load volume that found no fill stays on the platform and is pushed later.</li>
+      Two extra “bins” keep the books honest: fill that no truck explains is labelled <em>unattributed</em>, and truck volume that finds no fill waits on the platform and is pushed in the next period.</li>
     <li><b>Build the block model</b>Layers are integrated exactly into 5 × 5 × 2 m blocks. Grades are always metal ÷ tonnes, never averaged. Each block keeps its tonnes by class, its contributing loads and a confidence class (High / Medium / Low / Uninformed).</li>
     <li><b>Validate</b>Mass and metal balance against the FMS; model surface against the survey; a forward physics model tested on survey intervals it never saw; and a synthetic “twin” where the true answer is known.</li>
     <li><b>Quantify uncertainty</b>A Monte Carlo run re-does the whole reconstruction with GPS error, tonnage error, grade error, survey error, cut-off, mixing length, push penalty and cost form all sampled together. A one-at-a-time sensitivity table and separate scenarios cover what the ranges do not.</li>
@@ -963,10 +963,23 @@ $("#reload").onclick = () => loadResults(true);
 $("#setseg").addEventListener("click", e => { const b = e.target.closest("[data-set]"); if (b && b.dataset.set !== resSet) { resSet = b.dataset.set; loadResults(true); } });
 
 /* ---------- start ---------- */
-loadOverview();
-refreshState();
+if (location.protocol === "file:") {
+  // Opened as a file: the explanation tabs work, but uploads, runs and results need the program running.
+  const n = document.createElement("div");
+  n.className = "note wrap"; n.style.margin = "16px auto";
+  n.innerHTML = "SPBM is not running, so only <b>Overview</b> and <b>How it works</b> are available. Start it with the launcher in the project folder: <code>Start SPBM (Windows).bat</code>, <code>Start SPBM (Mac).command</code> or <code>./start_spbm.sh</code>. The page then opens by itself with everything working.";
+  document.querySelector("main").before(n);
+  $("#ov-empty").textContent = "Results appear here once SPBM is running.";
+  const offline = el => !["overview", "how"].includes(el.dataset.tab || el.dataset.go);
+  document.querySelectorAll("nav [data-tab], [data-go]").forEach(el => { if (offline(el)) el.hidden = true; });
+} else {
+  loadOverview();
+  refreshState();
+  setInterval(() => fetch("/api/ping").catch(() => {}), 60000);   // tells the program a page is still open
+}
 const start = location.hash.slice(1);
-if (["overview", "how", "params", "run", "results"].includes(start)) show(start);
+const allowed = location.protocol === "file:" ? ["overview", "how"] : ["overview", "how", "params", "run", "results"];
+if (allowed.includes(start)) show(start);
 </script>
 </body>
 </html>

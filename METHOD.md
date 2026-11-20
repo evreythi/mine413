@@ -1,21 +1,25 @@
-# Method: Constrained Push-and-Settle Transport (CPST)
+# Method: how SPBM works
 
-Mathematical model, algorithm and assumptions behind the `spbm` platform. Parameter values are in `config/project.yaml`; each is tagged with the assumption ID (A-xx) listed in Section 10.
+This file explains the model behind SPBM: the idea, the maths, the steps and every assumption. Each main section starts with a short **In plain words** summary; the detail follows for anyone who wants to check it. Settings are in `config/project.yaml`, each tagged with its assumption number (A-xx, listed in Section 10).
 
-# 1. Purpose and design philosophy
+# 1. The idea
 
-The movement of material from a truck dump point to its final place in the pile is never observed. Two kinds of observation constrain it:
+> **In plain words.** Nobody sees where a truckload ends up once the dozers push it over the edge. But we know what each truck dumped and where (truck records), and we know where the pile grew (surveys). SPBM matches the two: the surveys say *where* new material went, the truck records say *what* it was, and the least dozer pushing decides *which* load went *where*. Every recorded tonne and every gram of metal is kept.
 
-* **where material came from**: FMS dump coordinates, tonnage and grade (*sources*);
-* **where volume appeared**: the sequential survey change solids (*sinks*).
+Two kinds of observation constrain the movement of material:
 
-Physics-only rules (push to the crest, roll down at the angle of repose) can predict the shape of a deposit, but they predict *where* fill appears only moderately well. Our forward model places only about half (53%) of its predicted volume inside the observed fill footprint on unseen periods (Section 8). A reconstruction used for inventory must therefore be **constrained by the surveys**. The design principle is:
+* **where material came from**: FMS dump coordinates, tonnage and grade (the *sources*);
+* **where volume appeared**: the survey change solids, one per survey (the *sinks*).
 
-> *Let the surveys decide **where** volume went, let the FMS decide **what** went there, and use a physically based transport cost (dozer push work over the real terrain) to decide **which** source filled **which** part of the observed fill, conserving mass and metal exactly.*
+Physics rules alone (push to the crest, roll down the face at the angle of repose) predict the *shape* of the pile well, but not *where* new fill appears: our physics model puts only about half (53%) of its predicted volume where the next survey actually shows fill (Section 8). The inventory therefore has to be **tied to the surveys**. The rule is:
 
-This is a classical earth-moving problem. Optimal transport was formulated by Monge (1781) to move *déblais* (cuts) to *remblais* (fills) with minimum work. We use its modern entropy-regularised form (Cuturi, 2013; Peyré and Cuturi, 2019), where the regularisation strength is a physically interpretable **mixing length**. We name the method **CPST: Constrained Push-and-Settle Transport**. A separate **forward physics model** (dozer push to crest + avalanche cellular automaton at the angle of repose) is used for prediction (temporal validation), for loads not yet surveyed (nowcast), and to generate known-truth data (synthetic twin validation).
+> *The surveys decide **where** volume went, the FMS decides **what** went there, and the dozer push effort over the real ground decides **which** load filled **which** part of the new fill. Mass and metal are kept exactly.*
+
+Mathematically this is an *optimal transport* problem: moving material from sources to destinations with the least total work. We use its modern smoothed (entropy-regularised) form (Cuturi, 2013; Peyré and Cuturi, 2019), where the amount of smoothing has a physical meaning: a **mixing length**, how far loads get smeared into each other. We call the method **CPST** (Constrained Push-and-Settle Transport). A separate **physics model** (push to the crest, then let the material roll down until it is stable) is used where there is no survey to follow: to test predictions, to place loads dumped after the last survey, and to create test data with a known answer.
 
 # 2. Data model
+
+> **In plain words.** The site is divided into 1 m squares. For each square the model keeps a stack of layers, oldest at the bottom, and each layer remembers how many tonnes and how much metal it holds and where it came from. Truck records are split into periods ending at each survey (the survey is taken to cover everything dumped up to 07:00 the next morning). Tonnes are turned into volume with a factor measured from the surveys.
 
 ## 2.1 Grid and survey change solids
 
@@ -62,6 +66,8 @@ The in-pile volume $v_i$ is the same for **any** split between bulking ($\rho < 
 * X2: the excess is loads missing from the FMS. This is not excluded by these data.
 
 # 3. The CPST algorithm (one period)
+
+> **In plain words.** For each period between two surveys: (1) find where the survey shows new material (fill) and where material was removed (cuts); (2) list what could have made that fill: the period's truckloads, material the dozers cut, and material left on the platform from before; (3) work out how hard it is to push each source to each fill spot over the real ground; (4) share the sources out over the fill so the total pushing is smallest, with a little mixing; (5) add the result as a new layer. Fill that no truck explains is labelled *unattributed*; trucks with nowhere to go wait for the next period.
 
 ## 3.1 Prior surface and legacy material (first-surveyed cells)
 
@@ -185,6 +191,8 @@ blocks <- integrate layers into 5x5x2 m blocks (exact partial-layer fractions)
 
 # 4. Forward (predictive) physics model
 
+> **In plain words.** A simple simulation of what a dozer and gravity do: push the load to the nearest edge, drop it over, and let it slide until no slope is steeper than the angle of repose.
+
 Used where no survey constrains the result (temporal validation, nowcasting, synthetic truth). Code: `spbm/forward.py`.
 
 1. **Crest detection.** On the surface smoothed with a 1.5 m Gaussian, a face cell has slope > 20° and at least 5 m of local relief within 11 m. Crest cells are gentle cells adjacent to a face and near the local maximum. Only crests within the surveyed area are used.
@@ -192,6 +200,8 @@ Used where no survey constrains the result (temporal validation, nowcasting, syn
 3. **Gravity / avalanche cellular automaton.** Only the newly placed (*mobile*) material may move. For each cell $i$ and neighbour $j$, the excess is $e_{ij} = \max(0, z_i - z_j - \ell_{ij}\tan\phi)$. The cell releases $o_i = \min(\tfrac12\max_j e_{ij},\, \text{mobile}_i)$, distributed to neighbours in proportion to $e_{ij}$. This repeats until $\max o_i < 0.01$ m. Volume is conserved exactly (unit test). Slopes relax to ≤ φ.
 
 # 5. Block model construction
+
+> **In plain words.** The layers are cut into 5 × 5 × 2 m blocks. Each block gets its tonnes, grades (always metal ÷ tonnes, never an average of grades), the truckloads it contains, and a confidence class.
 
 * **Blocks**: 5 m × 5 m × 2 m, origin (511,290; 7,122,280; 4,474). Horizontal size: GPS error (σ ≈ 3 m) plus the mixing length (6 m) mean no information exists below about 5 m. Vertical size: 2 m gives 6-8 slices over the 13-15 m face, matching the vertical resolution of daily layers (median solid thickness 0.9-3.0 m). It also suits loader reclaim slices. Larger and smaller blocks were tested (tornado).
 * **Discretisation / partial blocks**: layers are integrated exactly into blocks (the fraction of each layer's thickness inside each 2 m slice). No sub-blocking is needed: each block carries its **fill fraction** and true material volume; partial blocks are exported, not rounded.
@@ -226,6 +236,8 @@ These are internal planning classes, **not** JORC/NI 43-101 resource categories.
 
 # 7. Uncertainty methodology
 
+> **In plain words.** We re-run the whole model 60 times, each time nudging the uncertain inputs (GPS position, tonnes, grades, survey timing, mixing, dozer behaviour) within reasonable limits. The spread of the answers gives the low / likely / high range (P10 / P50 / P90). Separately, each assumption is changed on its own to see which ones matter most.
+
 **Monte Carlo** (60 realisations, seed 413). Each realisation runs the full reconstruction with jointly sampled inputs:
 
 | Source | Sampling |
@@ -248,6 +260,8 @@ Blocks are accumulated on the base block grid. For each block we report P10/P50/
 **Scenarios outside the ranges.** The interpretations of the volume gap that the data cannot exclude (X2: missing loads) or that physics excludes (X1: all under-recording) are run as separate deterministic scenarios (`uncertainty.scenarios`). Their results (`uncertainty/scenarios.csv`) are kept separate from the ranges and are not included in them.
 
 # 8. Validation methodology
+
+> **In plain words.** We check that the books balance (tonnes and metal in = out), that the model surface matches the survey, that the physics model can predict surveys it never saw, and that the method gets close to the right answer on made-up data where the answer is known.
 
 | Area | Metric |
 |---|---|
@@ -321,7 +335,6 @@ Blocks are accumulated on the base block grid. For each block we report P10/P50/
 
 # References
 
-* Monge, G. (1781). *Mémoire sur la théorie des déblais et des remblais.* Histoire de l'Académie Royale des Sciences de Paris.
 * Cuturi, M. (2013). Sinkhorn distances: lightspeed computation of optimal transport. *Advances in Neural Information Processing Systems* 26.
 * Peyré, G. and Cuturi, M. (2019). Computational optimal transport. *Foundations and Trends in Machine Learning* 11(5-6), 355-607.
 * Chizat, L., Peyré, G., Schmitzer, B. and Vialard, F.-X. (2018). Scaling algorithms for unbalanced optimal transport problems. *Mathematics of Computation* 87, 2563-2609.

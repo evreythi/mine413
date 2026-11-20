@@ -170,3 +170,22 @@ def test_cli_rejects_unknown_skip_step():
     from spbm.__main__ import main
     with pytest.raises(SystemExit):
         main(["run", "--skip", "blockmodel"])
+
+
+def test_web_ping_and_already_running_check():
+    import socket
+    import threading
+    from http.server import ThreadingHTTPServer
+    from spbm import web
+    from spbm.config import load_config
+    with socket.socket() as s:                      # a free port
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    assert not web._already_running("127.0.0.1", port)
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), web.make_handler(load_config(), web.Job()))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        assert web._already_running("127.0.0.1", port)   # the launcher reuses a running copy
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

@@ -1,124 +1,133 @@
-# SPBM: stockpile reconstruction and block model
+# SPBM: stockpile model
 
-`spbm` reconstructs how truck-dumped material moved through the Pit I copper-gold HG stockpile and builds a 3-D block model of tonnage, Cu, Au, Ag, contained metal and uncertainty.
+SPBM works out where the ore in the Pit I copper-gold stockpile came from and what grade it is, block by block.
 
-**Method in one sentence:** the survey change solids say *where* volume appeared, the FMS says *what* was dumped and where, and an entropy-regularised optimal-transport allocation over a slope-aware dozer push cost decides *which* load filled *which* part of the observed fill. Mass and metal are conserved exactly. Anything the data cannot explain is kept in its own class (unattributed or pre-record), never mixed with measured material.
+**The problem.** Trucks dump ore on top of the stockpile and dozers push it over the edge. Nobody records where each truckload finally ends up, so the grade inside the pile is unknown.
 
-The mathematics, algorithm, validation design and every assumption (A-01 to A-32) are in **[METHOD.md](METHOD.md)**.
+**What we have.** Two records:
 
-## Requirements
+* the truck system (FMS) says *what* each truck dumped (tonnes, grade), *where* and *when*;
+* the surveys show *where* the pile grew between survey dates.
 
-Python 3.10 or later on Windows, macOS or Linux. All dependencies are open source.
+**What SPBM does.** For each period between surveys it matches the truckloads to the new volume the survey shows, choosing the arrangement that needs the least dozer pushing. Every tonne of ore and metal the trucks recorded is kept. Nothing is lost or invented. The result is a 3-D block model (5 × 5 × 2 m blocks) with tonnes, Cu, Au and Ag, a confidence rating for each block, and a range (low / likely / high) for every total.
+
+The maths, the steps and every assumption (A-01 to A-32) are explained in **[METHOD.md](METHOD.md)**.
+
+## Starting it (no typing needed)
+
+Double-click the launcher for your computer:
+
+| Computer | Double-click |
+|---|---|
+| Windows | `Start SPBM (Windows).bat` |
+| Mac | `Start SPBM (Mac).command` (the first time, right-click it and choose **Open**) |
+| Linux | `start_spbm.sh` |
+
+The first start takes a few minutes to set everything up. It needs [Python](https://www.python.org/downloads/) 3.10 or later. After that, SPBM starts in a few seconds and opens in your web browser. It runs quietly in the background and stops by itself about 15 minutes after you close the page (never in the middle of a run).
+
+You can also open **`SPBM.html`**: it jumps straight to SPBM if it is running, and otherwise tells you how to start it. A web page cannot start a program by itself, because browsers do not allow that, so the launcher is needed once per session.
+
+### What the page does
+
+* **Overview** and **How it works**: what the model is and how it gets its answer, in plain language.
+* **Parameters**: change any value or assumption (angle of repose, swell/volume factor, density, survey timing, dozer push, block size, uncertainty ranges…), on a form or as raw text. Your changes are saved separately (`config/project_custom.yaml`) and their results go to `outputs_custom/`. The official settings and results are never changed. The model has no prices or economic values; it reports tonnes, grades and contained metal.
+* **Upload & run**: drag in new truck data (`.csv`) or surveys (`.dxf`), tick which steps to run, and watch the progress bar. The core always runs, takes about 20 s, and produces the full block model. The slow extras can each be turned off:
+
+  | Step | Time |
+  |---|---|
+  | Monte Carlo (60 runs) | ~13 min |
+  | Sensitivity | ~9 min |
+  | Forward-model test | ~6 min |
+  | Robustness | ~4.5 min |
+  | Synthetic test | ~1.5 min |
+  | Scenarios | ~40 s |
+  | Figures | ~5 s |
+
+* **Results**: key numbers, checks, scenarios, every figure and table, and downloads (block model as CSV and VTK). You can switch between the official results and your custom ones.
+
+## Running from a terminal (optional)
 
 ```bash
 python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+
+python -m spbm serve --open        # the web page (same as the launcher)
+python -m spbm run --fast          # core + scenarios, about 1 min
+python -m spbm run                 # everything, about 35 min
+python -m spbm run --skip mc,sensitivity   # leave out chosen steps
+python -m pytest -q                # 71 automated checks, about 2-3 min
 ```
 
-## Web front end
+Steps that `--skip` accepts:
 
-```bash
-python -m spbm serve               # then open http://127.0.0.1:8413
-```
-
-A local page that explains the method, takes new data files (drag and drop), lets you change any parameter or assumption, choose which steps to run, follow progress live, and browse the results (key numbers, checks, scenarios, every figure and table, downloads).
-
-* **Parameters.** Every value in `config/project.yaml` can be changed, through a form (about 50 values, grouped, each with its unit, assumption ID and limits) or as raw YAML. Changes are saved to `config/project_custom.yaml`, and runs with them write to `outputs_custom/`. The official configuration and results are never changed from the page. The model has no economic or price parameters.
-* **Steps.** The core (import, checks, f_v calibration, reconstruction, block model, balances, audit) always runs and takes about 20 s. Each slow step can be switched off: Monte Carlo, forward-model test, synthetic twin, robustness, scenarios, sensitivity, cut-off scan and figures. The page shows the expected run time for the selection. A table or figure left over from a skipped step is marked "earlier run".
-* The server binds to this computer only and has no login; do not expose it on a shared network (`--host`).
-
-## Running
-
-```bash
-python -m pytest -q                # 70 tests (unit, real data, platform), about 3 min
-python -m pytest -q -m "not slow"  # skip the end-to-end pipeline test
-python -m spbm run --fast          # base reconstruction, block model, QA/QC, balances, scenarios (about 1 min)
-python -m spbm run                 # full analysis incl. Monte Carlo, validation, sensitivity (about 40 min)
-python -m spbm run --mc 200        # more Monte Carlo realisations
-python -m spbm run --skip mc,sensitivity   # skip chosen optional steps
-```
-
-Steps for `--skip`: `align` (cut-off scan), `mc` (Monte Carlo), `temporal` (forward-model test), `twin` (synthetic twin), `robust` (numerical robustness), `scenarios` (volume-gap scenarios), `sensitivity` (one-at-a-time), `figures`. `--fast` is `--skip mc,temporal,twin,robust,sensitivity`.
-
-The run is deterministic: the base case has no randomness and the Monte Carlo uses the fixed seed in the configuration, so re-running gives identical numbers.
+| Name | Step |
+|---|---|
+| `align` | survey-timing check |
+| `mc` | Monte Carlo |
+| `temporal` | forward-model test |
+| `twin` | synthetic test |
+| `robust` | robustness |
+| `scenarios` | scenarios |
+| `sensitivity` | sensitivity |
+| `figures` | figures |
 
 Other commands:
 
-```bash
-python -m spbm ingest PATH ...     # add files, folders or zips to the managed raw store
-python -m spbm update              # import new data from data/inbox/ and re-run
-python -m spbm qaqc                # data checks only
-python -m spbm status              # registered input files and run log
-python -m spbm run --fast --until "2026-03-23 07:00" --out outputs_demo   # model with data up to a date
-```
+* `python -m spbm update` picks up new files dropped into `data/inbox/` and re-runs.
+* `python -m spbm qaqc` runs the data checks only.
+* `python -m spbm status` lists the files the program knows about and the past runs.
+* `examples/demo_update.sh` builds the model with data up to 22 March, then updates it with the rest.
 
-`examples/demo_update.sh` builds a model with the data available on 22 March, updates it with the rest, and prints the change report.
+Every run is repeatable: the same data and settings give exactly the same numbers.
 
 ## Inputs
 
-| Input | Format |
+* **`Data_Topo 2026.zip`**: the supplied truck records and surveys. It is never modified. On the first run each file is fingerprinted and copied into `data/raw_store/`, and the program only reads from there.
+* **Truck records (FMS)**: CSV with `Cycle ID, Truck PayLoad, Au, Ag, Cu, Dens, X (Dump Event), Y (Dump Event), Z (Dump Event), Dump_tstamp`.
+* **Surveys**: DXF change solids; the file name contains the date as `YYMMDD`.
+* **`config/project.yaml`**: every setting, each tagged with its assumption number.
+* **`config/manual_interventions.csv`**: the only way to correct the data. Every correction needs a reason, an author and a date. The two supplied rows fix the year in two survey file names.
+
+## What it produces
+
+All results go to `outputs/`; the results of the full run `20261118T182336` are included.
+
+| Folder | Content |
 |---|---|
-| `Data_Topo 2026.zip` | The supplied data: FMS dump records (CSV) and the survey change solids (DXF). Never modified |
-| FMS | CSV with columns `Cycle ID, Truck PayLoad, Au, Ag, Cu, Dens, X (Dump Event), Y (Dump Event), Z (Dump Event), Dump_tstamp` |
-| Surveys | DXF with 3DFACE entities forming a closed change solid; the file name contains the nominal date as `YYMMDD` |
-| `config/project.yaml` | Every parameter, tagged with its assumption ID |
-| `config/manual_interventions.csv` | The only way to correct data (`id, type, target, value, reason, author, date, approved_by`); a row without reason, author or date stops the run |
+| `blockmodel/` | Block model (CSV for mine-planning software, VTK for ParaView), summaries, figures |
+| `movement/` | Where each truckload went; surfaces as grids |
+| `qaqc/` | Data checks |
+| `growth/` | How the pile grew; survey timing; tonnes-to-volume factor |
+| `validation/` | Mass and metal balance, surface check, model tests |
+| `uncertainty/` | Monte Carlo ranges, sensitivity, scenarios |
+| `audit/` | Fingerprints of the inputs, settings and code version used; change report |
+| `history/` | A copy of the key results of every run |
 
-On the first run every source file is hashed (SHA-256) and copied once into `data/raw_store/`; the analysis reads only from there. New data go into `data/inbox/` (or `python -m spbm ingest <path>`), followed by `python -m spbm update`.
+## Main results
 
-Intervention types: `survey_date`, `survey_cutoff_hours`, `fms_exclude`, `fms_location_unknown`, `supersede`. The two supplied rows (MI-001, MI-002) re-date `Topo_250328.dxf` and `Topo_250329.dxf` to 2026.
-
-## Steps the platform runs
-
-1. **Ingest and QA/QC** (`io.py`, `dataset.py`, `rules.py`, `qaqc.py`): hash and register inputs, apply interventions, check every FMS record and survey file against the rule catalogue. Records are flagged, never deleted.
-2. **Growth and timing** (`growth.py`, `volume.py`): scan the survey cut-off (result: D+1 07:00), calibrate the volume factor f_v and test it on held-out intervals.
-3. **Surfaces** (`grid.py`, `surfaces.py`): rasterise the change solids on a 1 m grid, fit the floor plane, infer the pre-record surface.
-4. **Reconstruction** (`movement.py`): for each survey interval, compute cuts, fill and the push cost, solve the transport problem (log-domain Sinkhorn), deposit layers; carry retained material forward; place loads after the last survey with the forward model (`forward.py`).
-5. **Block model** (`blockmodel.py`, `bmviz.py`): integrate layers into 5 × 5 × 2 m blocks, with provenance, information and confidence classes.
-6. **Validation** (`validation.py`): mass and metal balance, geometry check, forward-model temporal test, synthetic twin, numerical robustness.
-7. **Uncertainty** (`uncertainty.py`): Monte Carlo, one-at-a-time sensitivity, volume-gap scenarios.
-8. **Audit** (`audit.py`): run manifest (input hashes, configuration, code identity, library versions), model-version history and change report.
-
-## Outputs
-
-Everything is written to `outputs/`. The results of the full run `20261118T182336` (60 Monte Carlo realisations) are included; `python -m spbm run` reproduces them exactly.
-
-| Folder / file | Content |
-|---|---|
-| `blockmodel/` | Block model (CSV, VTK), block definition, summaries by class, confidence, bench; grade-tonnage; figures |
-| `movement/` | Destination of each load, transport plans of every interval, surfaces as ESRI ASCII grids |
-| `qaqc/` | Rule catalogue, records with one column per rule, daily coverage, grade signatures, survey QA, figures |
-| `growth/` | Interval reconciliation, cut-off scan, volume-factor calibration and hold-out, figures |
-| `validation/` | Mass/metal balance, inventory by class, geometry, temporal test, twin, robustness |
-| `uncertainty/` | Monte Carlo realisations and summary, sensitivity table, scenarios, figures |
-| `audit/` | Data registry, ingest log, survey register, interventions applied, run manifest, configuration used, run log, change report |
-| `history/<run_id>/` | Manifest and key tables of every model version |
-| `summary.json`, `summary_tables.md` | Key numbers and tables of the run |
-
-## Base-case results (run `20261118T182336`)
-
-| Class | Tonnes | Cu % | Au g/t | Basis |
+| Material placed 15-31 March | Tonnes | Cu % | Au g/t | |
 |---|---|---|---|---|
-| FMS-tracked (survey-reconciled + provisional) | 44,650 | 8.42 | 8.00 | measured tonnes and grades |
-| Unattributed (surveyed fill, no FMS record) | 3,901 | 10.22 | 8.82 | imputed grade |
-| **Record period (15-31 March)** | **48,551** | 8.57 | 8.06 | |
+| Recorded by the trucks | 44,650 | 8.42 | 8.00 | measured |
+| Surveyed but not in the truck records | 3,901 | 10.22 | 8.82 | grade estimated |
+| **Total** | **48,551** | 8.57 | 8.06 | |
 
-* Monte Carlo P10/P50/P90 of record-period tonnes: 48.5 / 51.9 / 55.4 kt. The base case sits near P10 because the only sampled alternative for payloads (under-recording) adds tonnes.
-* If the 47% volume excess is loads missing from the FMS rather than bulking, record-period tonnes are 71,338 t (scenario X2, outside the ranges).
-* Survey cut-off D+1 07:00; volume factor f_v = 1.472 (hold-out error 3.5%).
-* FMS mass and metal are conserved exactly (relative error < 1e-9); model surface vs survey RMSE 0.03 m.
-* Pre-record core 89,795 t (inferred geometry, assumed grade); whole modelled pile 138,346 t.
+* **Likely range:** 48.5 to 55.4 kt (P10 to P90, middle 51.9 kt). The base case is at the low end because the only alternative tested for truck payloads (under-recording) can only add tonnes.
+* **Volume gap:** the surveys show about 47% more volume than the truck tonnes would fill at their recorded density. The base case treats this as loose material taking up more room (swell). If it were truckloads missing from the records instead, the total would be 71,338 t. The data cannot rule that out, so it is reported separately.
+* **Checks:** truck tonnes and metal are kept exactly, and the model surface matches the latest survey to 0.03 m.
+* **Whole pile:** about 138,346 t. Of that, 89,795 t was already there before the records start; its shape is estimated and its grade assumed.
 
-Grade units are as supplied and unconfirmed (8.4% Cu / 8.0 g/t Au is about ten times typical Cu-Au feed). Confirm with Geology before using any contained-metal figure.
+Grade units are as supplied and unconfirmed: 8.4% Cu and 8 g/t Au is about ten times typical copper-gold ore. Check with Geology before using any contained-metal number.
 
-## Layout
+## Folder layout
 
 ```
-Data_Topo 2026.zip     supplied data (read into data/raw_store/ on first run)
-config/                parameters and manual interventions
-spbm/                  platform source code (spbm/web.py + spbm/webui/index.html: web front end)
-tests/                 unit, real-data and platform tests
+Start SPBM (…)         double-click launchers (Windows, Mac); start_spbm.sh for Linux
+SPBM.html              opens SPBM if it is running, otherwise explains how to start it
+Data_Topo 2026.zip     supplied data
+config/                settings and data corrections
+spbm/                  program code (spbm/web.py and spbm/webui/ are the web page)
+tests/                 automated checks
 outputs/               results of the full run
-examples/              update demonstration
-METHOD.md              mathematics, algorithm, validation and assumptions
+current docs/          report, presentation and other course documents
+METHOD.md              maths, steps and assumptions
 ```
