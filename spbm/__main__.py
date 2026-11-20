@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 from .config import load_config, resolve
@@ -43,6 +44,8 @@ def main(argv=None):
             p.add_argument("--mc", type=int, default=None, help="number of Monte Carlo realisations (default from config)")
             p.add_argument("--fast", action="store_true", help="skip Monte Carlo, forward-model validation, twin experiment, robustness and sensitivity")
             p.add_argument("--skip", default="", help="comma-separated optional steps to skip: " + ", ".join(STEPS))
+            p.add_argument("--workers", default=None,
+                           help="CPU cores to use: low (1), medium, high (default: all but one) or a number")
             p.add_argument("--out", default=None, help="output folder (default from config)")
         if name == "serve":
             p.add_argument("--host", default="127.0.0.1", help="address to bind (default: this computer only)")
@@ -78,6 +81,11 @@ def main(argv=None):
             print(f"update: {len(newf)} new file(s): " + ", ".join(f.name for f in newf))
             if not newf:
                 print("nothing new - re-running anyway for reproducibility check")
+        from .parallel import machine, resolve_workers
+        if a.workers is not None:
+            os.environ["SPBM_WORKERS"] = str(resolve_workers(a.workers))
+        m = machine()
+        print(f"using up to {resolve_workers(os.environ.get('SPBM_WORKERS'))} of {m['cores']} cores", flush=True)
         skip = {s.strip() for s in a.skip.split(",") if s.strip()}
         bad = sorted(skip - set(STEPS))
         if bad:

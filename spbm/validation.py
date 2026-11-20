@@ -145,6 +145,13 @@ def _forward_metrics(rec, s, fcfg, mode="push"):
             "w1_m": _w1(dp, ob, g), "pred": dp}
 
 
+def _fw_case(task):
+    """One forward-model simulation of one period (runs in a worker)."""
+    from .parallel import state
+    s, f, mode = task
+    return _forward_metrics(state()["rec"], s, f, mode)
+
+
 def temporal_validation(rec, cfg, out: Path) -> dict:
     fc = cfg["forward"]
     calib, test = list(fc["calib_periods"]), list(fc["test_periods"])
@@ -158,12 +165,14 @@ def temporal_validation(rec, cfg, out: Path) -> dict:
         calib, test = avail[:k], avail[k:]
     if not calib or not test:
         return None                       # too few survey intervals for a hold-out test
+    from .parallel import run_cases
     grid = list(itertools.product([35.0, 37.0, 39.0], [2.0, 3.0, 5.0], [0.0, 2.0, 4.0]))
+    fs = [dict(fc, repose_deg=rep, deposit_radius=rad, release_offset=off) for rep, rad, off in grid]
+    # every (setting, period) simulation is independent: run them in parallel
+    flat = run_cases(_fw_case, [(s, f, "push") for f in fs for s in calib], {"rec": rec})
     rows = []
-    for rep, rad, off in grid:
-        f = dict(fc, repose_deg=rep, deposit_radius=rad, release_offset=off)
-        ms = [_forward_metrics(rec, s, f) for s in calib]
-        ms = [m for m in ms if m]
+    for j, (rep, rad, off) in enumerate(grid):
+        ms = [m for m in flat[j * len(calib):(j + 1) * len(calib)] if m]
         rows.append({"repose_deg": rep, "deposit_radius": rad, "release_offset": off,
                      "calib_w1_m": np.mean([m["w1_m"] for m in ms]), "calib_capture": np.mean([m["capture"] for m in ms])})
     cal = pd.DataFrame(rows).sort_values("calib_w1_m").reset_index(drop=True)
@@ -172,17 +181,19 @@ def temporal_validation(rec, cfg, out: Path) -> dict:
     fbest = dict(fc, repose_deg=best.repose_deg, deposit_radius=best.deposit_radius, release_offset=best.release_offset)
     res = []
     keep = {}
-    for s in calib + test:
-        for mode, f in [("push (calibrated)", fbest), ("push (default)", dict(fc, release_offset=2.0)), ("no-push baseline", fbest),
-                        ("uniform baseline", fbest)]:
-            m = _forward_metrics(rec, s, f, "uniform" if mode.startswith("uniform") else "dump" if "baseline" in mode else "push")
-            if m is None:
-                continue
-            keep[(s, mode)] = m.pop("pred")
-            m["mode"] = mode
-            m["set"] = "calibration" if s in calib else "test (unseen)"
-            m["fms_explains_frac"] = float(rec.periods.loc[s, "placed_volume"] / max(rec.periods.loc[s, "fill_volume"], 1))
-            res.append(m)
+    runs = [(s, mode, f) for s in calib + test
+            for mode, f in [("push (calibrated)", fbest), ("push (default)", dict(fc, release_offset=2.0)),
+                            ("no-push baseline", fbest), ("uniform baseline", fbest)]]
+    out_m = run_cases(_fw_case, [(s, f, "uniform" if mode.startswith("uniform") else "dump" if "baseline" in mode else "push")
+                                 for s, mode, f in runs], {"rec": rec})
+    for (s, mode, f), m in zip(runs, out_m):
+        if m is None:
+            continue
+        keep[(s, mode)] = m.pop("pred")
+        m["mode"] = mode
+        m["set"] = "calibration" if s in calib else "test (unseen)"
+        m["fms_explains_frac"] = float(rec.periods.loc[s, "placed_volume"] / max(rec.periods.loc[s, "fill_volume"], 1))
+        res.append(m)
     tab = pd.DataFrame(res)
     tab.to_csv(out / "forward_temporal_validation.csv", index=False)
     summ = tab.groupby(["set", "mode"])[["w1_m", "capture", "centroid_err_m"]].mean().round(3)
@@ -370,8 +381,18 @@ def twin_experiment(rec, ds, cfg, out: Path, seed=7, drop_frac=0.15, gps_sigma=3
 
 
 # --------------------------------------------------------- 5. robustness
+def _robust_case(task):
+    name, c2 = task
+    from .parallel import state
+    st = state()
+    r2 = reconstruct(st["loader"](c2), c2)
+    bg = bm.make_block_grid(r2, c2)
+    return _key_metrics(name, r2, bm.block_table(r2, bg, bm.aggregate(r2, bg), c2), st["base_df"])
+
+
 def robustness(ds_loader, cfg, out: Path, base_df) -> pd.DataFrame:
-    """Key results under different numerical settings."""
+    """Key results under different numerical settings (variants run in parallel)."""
+    from .parallel import run_cases
     variants = [("base (1 m cell, tol 1e-6)", {}),
                 ("cell 0.5 m", {"grid.cell": 0.5}),
                 ("cell 2.5 m", {"grid.cell": 2.5}),
@@ -379,15 +400,8 @@ def robustness(ds_loader, cfg, out: Path, base_df) -> pd.DataFrame:
                 ("Sinkhorn tol 1e-8", {"movement.sinkhorn_tol": 1e-8}),
                 ("LoD k=1 (tau 0.07 m)", {"survey.lod_k": 1.0}),
                 ("LoD k=4 (tau 0.28 m)", {"survey.lod_k": 4.0})]
-    rows = []
-    for name, ov in variants:
-        c2 = apply_overrides(cfg, ov)
-        ds2 = ds_loader(c2)
-        r2 = reconstruct(ds2, c2)
-        bg = bm.make_block_grid(r2, c2)
-        a2 = bm.aggregate(r2, bg)
-        df2 = bm.block_table(r2, bg, a2, c2)
-        rows.append(_key_metrics(name, r2, df2, base_df))
+    rows = run_cases(_robust_case, [(name, apply_overrides(cfg, ov)) for name, ov in variants],
+                     {"loader": ds_loader, "base_df": base_df})
     tab = pd.DataFrame(rows)
     tab.to_csv(out / "robustness_numerical.csv", index=False)
     return tab

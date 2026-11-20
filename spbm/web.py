@@ -30,6 +30,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 import yaml
 
 from .config import ROOT, load_config, resolve
+from .parallel import machine, resolve_workers
 
 UI = Path(__file__).resolve().parent / "webui" / "index.html"
 ALLOWED_UPLOAD = {".csv", ".dxf", ".zip"}
@@ -37,36 +38,49 @@ MAX_UPLOAD = 1024 ** 3          # 1 GB per file
 
 # Progress model: the log line that opens each stage, the optional step it
 # belongs to (None = always runs) and its duration in seconds in a timed full
-# run on the supplied data. "mc" is per realisation.
+# run on one core on the supplied data ("mc" is per realisation), and how many
+# independent cases the step has (it runs that many at once, up to the workers).
 _STAGES = [
-    ("1-2 import", None, 1, "Import FMS records and surveys"),
-    ("3   data-quality", None, 2, "Data-quality checks"),
-    ("4   survey cut-off", "align", 1, "Survey cut-off scan"),
-    ("4b  volume factor", None, 3, "Volume factor calibration"),
-    ("5   material-movement", None, 13, "Movement reconstruction (CPST)"),
-    ("6-7 block model", None, 1, "Block model and inventories"),
-    ("8   Monte Carlo", "mc", 12.6, "Monte Carlo uncertainty"),
-    ("    figures", "figures", 5, "Block-model figures"),
-    ("9   validation", None, 1, "Balances and geometry check"),
-    ("forward-model temporal", "temporal", 375, "Forward-model temporal test"),
-    ("synthetic twin", "twin", 87, "Synthetic twin experiment"),
-    ("numerical robustness", "robust", 272, "Numerical robustness"),
-    ("volume-gap scenarios", "scenarios", 41, "Volume-gap scenarios"),
-    ("one-at-a-time sensitivity", "sensitivity", 515, "Sensitivity analysis"),
-    ("done - run", None, 1, "Write summary and audit trail"),
+    ("1-2 import", None, 1, 1, "Import FMS records and surveys"),
+    ("3   data-quality", None, 2, 1, "Data-quality checks"),
+    ("4   survey cut-off", "align", 1, 1, "Survey cut-off scan"),
+    ("4b  volume factor", None, 3, 1, "Volume factor calibration"),
+    ("5   material-movement", None, 13, 1, "Movement reconstruction (CPST)"),
+    ("6-7 block model", None, 1, 1, "Block model and inventories"),
+    ("8   Monte Carlo", "mc", 12.6, "n_mc", "Monte Carlo uncertainty"),
+    ("    figures", "figures", 5, 1, "Block-model figures"),
+    ("9   validation", None, 1, 1, "Balances and geometry check"),
+    ("forward-model temporal", "temporal", 375, 36, "Forward-model temporal test"),
+    ("synthetic twin", "twin", 87, 1, "Synthetic twin experiment"),
+    ("numerical robustness", "robust", 272, 7, "Numerical robustness"),
+    ("volume-gap scenarios", "scenarios", 41, 1, "Volume-gap scenarios"),
+    ("one-at-a-time sensitivity", "sensitivity", 515, 20, "Sensitivity analysis"),
+    ("done - run", None, 1, 1, "Write summary and audit trail"),
 ]
-_N_OAT = 22                     # one-at-a-time cases in the sensitivity step
 
 
-def plan(skip, n_mc):
+def _speedup(cases, workers):
+    """Rough speed-up of a step with `cases` independent cases on `workers` cores."""
+    w = max(1, min(cases, workers))
+    rounds = -(-cases // w)                       # cases are run in rounds of w
+    return cases / rounds * 0.85 if w > 1 else 1.0
+
+
+def plan(skip, n_mc, workers=1):
     """Stages that will run and their expected durations (s)."""
-    return [(key, label, dur * (n_mc if step == "mc" else 1))
-            for key, step, dur, label in _STAGES if step is None or step not in skip]
+    out = []
+    for key, step, dur, cases, label in _STAGES:
+        if step is not None and step in skip:
+            continue
+        n = n_mc if cases == "n_mc" else cases
+        d = dur * (n_mc if step == "mc" else 1)
+        out.append((key, label, d / _speedup(n, workers)))
+    return out
 
 
-def progress(lines, skip, n_mc):
+def progress(lines, skip, n_mc, workers=1):
     """Estimated fraction done, from the stages reached in the log."""
-    st = plan(skip, n_mc)
+    st = plan(skip, n_mc, workers)
     total = sum(d for _, _, d in st)
     text = "\n".join(lines)
     reached = -1
@@ -83,7 +97,9 @@ def progress(lines, skip, n_mc):
         if mc:
             part = int(mc[-1][0]) / int(mc[-1][1])
     elif "sensitivity" in key:
-        part = min(sum(1 for l in lines if l.strip().startswith("OAT ")), _N_OAT) / (_N_OAT + 1)
+        oat = re.findall(r"OAT (\d+)/(\d+)", text)
+        if oat:
+            part = int(oat[-1][0]) / (int(oat[-1][1]) + 1)
     elif key == "done - run":
         part = 1.0
     return min((done + part * dur) / total, 1.0), st
@@ -392,7 +408,7 @@ class Job:
         self.proc = None
         self.info = None        # dict describing the current or last job
 
-    def start(self, config_path: str, which: str, skip: list[str], n_mc: int):
+    def start(self, config_path: str, which: str, skip: list[str], n_mc: int, workers: int = 1):
         with self.lock:
             if self.proc is not None and self.proc.poll() is None:
                 raise RuntimeError("a run is already in progress")
@@ -401,9 +417,10 @@ class Job:
                 cmd += ["--skip", ",".join(skip)]
             if "mc" not in skip:
                 cmd += ["--mc", str(int(n_mc))]
+            cmd += ["--workers", str(workers)]
             self.proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                          text=True, bufsize=1)
-            self.info = {"set": which, "skip": skip, "mc": n_mc, "cmd": "python " + " ".join(cmd[1:]),
+            self.info = {"set": which, "skip": skip, "mc": n_mc, "workers": workers, "cmd": "python " + " ".join(cmd[1:]),
                          "started": time.time(), "finished": None, "returncode": None, "lines": [], "run_id": None}
             threading.Thread(target=self._read, args=(self.proc, self.info), daemon=True).start()
 
@@ -433,7 +450,7 @@ class Job:
         i = self.info
         running = i["finished"] is None
         end = time.time() if running else i["finished"]
-        frac, st = progress(i["lines"], i["skip"], i["mc"])
+        frac, st = progress(i["lines"], i["skip"], i["mc"], i["workers"])
         ok = not running and i["returncode"] == 0
         if ok:
             frac = 1.0
@@ -444,7 +461,7 @@ class Job:
         mc = re.findall(r"MC (\d+)/(\d+)", text)
         stages = [{"label": label, "state": "done" if k < reached or ok else "now" if k == reached and running else
                    "failed" if k == reached else "todo"} for k, (_, label, _) in enumerate(st)]
-        return {"set": i["set"], "skip": i["skip"], "mc": i["mc"], "cmd": i["cmd"], "running": running,
+        return {"set": i["set"], "skip": i["skip"], "mc": i["mc"], "workers": i["workers"], "cmd": i["cmd"], "running": running,
                 "returncode": i["returncode"], "elapsed_s": round(elapsed, 1), "eta_s": None if eta is None else round(eta),
                 "progress": round(frac, 3), "stages": stages, "mc_done": [int(x) for x in mc[-1]] if mc else None,
                 "run_id": i["run_id"], "log": i["lines"][-400:]}
@@ -564,7 +581,7 @@ def make_handler(cfg: dict, job: Job):
                     "result_sets": {k: {"data": d, "params": pr, "root": rel(roots[k])} for k, (d, pr, _) in RESULT_SETS.items()},
                     "custom_config": resolve(CUSTOM_CONFIG).exists(),
                     "steps": [{"id": k, "label": v} for k, v in STEPS.items()],
-                    "default_mc": cfg["uncertainty"]["n_realizations"]}
+                    "default_mc": cfg["uncertainty"]["n_realizations"], "machine": machine()}
 
         def _results(self, which):
             root = roots.get(which)
@@ -668,7 +685,7 @@ def make_handler(cfg: dict, job: Job):
                         path = str(own_config_path(params))
                     else:
                         path = default_path if params == "default" else str(resolve(CUSTOM_CONFIG))
-                    job.start(path, result_set(data, params), skip, n_mc)
+                    job.start(path, result_set(data, params), skip, n_mc, resolve_workers(b.get("workers", "high")))
                     return self._json(job.status())
                 if u.path == "/api/cancel":
                     return self._json({"cancelled": job.cancel()})

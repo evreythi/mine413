@@ -26,6 +26,17 @@ def _md(df: pd.DataFrame, floatfmt="{:,.2f}") -> str:
     return "\n".join(lines)
 
 
+class Loader:
+    """Loads the dataset for a (modified) configuration; a class rather than a
+    lambda so it can be handed to worker processes."""
+
+    def __init__(self, until=None):
+        self.until = until
+
+    def __call__(self, cfg):
+        return load_dataset(cfg, until=self.until, verbose=False)
+
+
 def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do_sens=True, do_align=True, do_temporal=True,
         do_scen=True, do_figs=True, verbose=True):
     """Run the whole chain. The do_* switches turn off optional steps; the
@@ -43,7 +54,7 @@ def run(cfg, until=None, n_mc=None, do_mc=True, do_twin=True, do_robust=True, do
         if verbose:
             print(f"[{time.time() - t0:6.1f}s] {msg}", flush=True)
 
-    loader = lambda c: load_dataset(c, until=until, verbose=False)  # noqa: E731
+    loader = Loader(until)
     # 1-2 import -----------------------------------------------------------
     log("1-2 import FMS records and survey surfaces")
     ds = load_dataset(cfg, until=until, verbose=verbose)

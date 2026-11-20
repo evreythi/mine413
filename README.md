@@ -47,6 +47,7 @@ You can also open **`SPBM.html`**: it jumps straight to SPBM if it is running, a
   | Scenarios | ~40 s |
   | Figures | ~5 s |
 
+* **Speed**: Low (1 core, leaves the computer free), Medium, High (all cores but one, within the memory) or a custom number of cores. The slow steps run their cases side by side, so High on a many-core computer is several times faster. The numbers are identical whatever the speed.
 * **Results**: key numbers, checks, scenarios, every figure and table, and downloads (block model as CSV and VTK). Two switches choose which results to show: example data or your own data, and Default or Custom settings.
 
 ## Running from a terminal (optional)
@@ -59,7 +60,8 @@ python -m spbm serve --open        # the web page (same as the launcher)
 python -m spbm run --fast          # core + scenarios, about 1 min
 python -m spbm run                 # everything, about 35 min
 python -m spbm run --skip mc,sensitivity   # leave out chosen steps
-python -m pytest -q                # 73 automated checks, about 2-3 min
+python -m spbm run --workers low         # CPU cores: low (1), medium, high (default) or a number
+python -m pytest -q                # 74 automated checks, about 2-3 min
 ```
 
 Steps that `--skip` accepts:

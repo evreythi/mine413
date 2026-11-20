@@ -410,6 +410,14 @@ footer { color: var(--muted); font-size: 13px; padding: 24px 0 40px; border-top:
         <button class="btn" data-preset="core" style="padding:5px 12px">Core only</button>
       </div>
       <div class="steplist" id="steplist"></div>
+      <h3 style="margin-top:18px">5. Speed</h3>
+      <div class="row">
+        <div class="seg" id="speedseg">
+          <button data-speed="low">Low</button><button data-speed="medium">Medium</button><button data-speed="high" aria-pressed="true">High</button><button data-speed="custom">Custom</button>
+        </div>
+        <span id="customwrap" hidden class="small">cores <input type="number" id="workers" min="1" value="1"></span>
+      </div>
+      <p class="muted small" id="speednote" style="margin-top:8px"></p>
       <div class="row" style="margin-top:14px">
         <button class="btn primary" id="go">Start run</button>
         <button class="btn danger" id="stop" hidden>Cancel</button>
@@ -644,11 +652,49 @@ function renderSteps() {
 }
 function setPreset(name) { $$("[data-step]").forEach(c => c.checked = !PRESETS[name].includes(c.dataset.step)); estimate(); }
 function skipList() { return $$("[data-step]").filter(c => !c.checked).map(c => c.dataset.step); }
+let speed = "high";
+try { speed = localStorage.getItem("spbm-speed") || "high"; } catch (e) {}
+// independent cases per step (they run side by side, up to the number of cores)
+const CASES = { mc: () => nMC(), temporal: () => 36, robust: () => 7, sensitivity: () => 20 };
+function maxW() { return ST && ST.machine ? ST.machine.max_workers : 1; }
+function nWorkers() {
+  if (!ST || !ST.machine) return 1;
+  if (speed === "custom") return Math.max(1, Math.min(maxW(), Number($("#workers").value) || 1));
+  return ST.machine.modes[speed];
+}
+function speedup(cases, w) {
+  w = Math.max(1, Math.min(cases, w));
+  return w > 1 ? cases / Math.ceil(cases / w) * 0.85 : 1;
+}
+function renderSpeed() {
+  if (!ST || !ST.machine) return;
+  const m = ST.machine, md = m.modes;
+  document.querySelectorAll("#speedseg button").forEach(b => {
+    b.setAttribute("aria-pressed", b.dataset.speed === speed);
+    if (md[b.dataset.speed]) b.textContent = b.dataset.speed[0].toUpperCase() + b.dataset.speed.slice(1) + " (" + md[b.dataset.speed] + ")";
+  });
+  $("#customwrap").hidden = speed !== "custom";
+  $("#workers").max = m.max_workers;
+  if (Number($("#workers").value) > m.max_workers) $("#workers").value = m.max_workers;
+  const w = nWorkers();
+  $("#speednote").innerHTML = `This computer: <b>${m.cores}</b> cores${m.ram_gb ? `, <b>${m.ram_gb} GB</b> memory` : ""}. ` +
+    `Up to <b>${m.max_workers}</b> can be used (one core is kept free${m.ram_gb ? ", about 0.6 GB memory each" : ""}). ` +
+    `This run uses <b>${w}</b>. Low keeps the computer free for other work; High is fastest. Results are the same either way.`;
+  estimate();
+}
+document.getElementById("speedseg").addEventListener("click", e => {
+  const b = e.target.closest("[data-speed]"); if (!b) return;
+  speed = b.dataset.speed;
+  try { localStorage.setItem("spbm-speed", speed); } catch (err) {}
+  renderSpeed();
+});
+document.getElementById("workers").addEventListener("input", renderSpeed);
 function nMC() { return Math.max(1, Math.min(1000, Number($("#mc") && $("#mc").value) || 60)); }
 function estimate() {
   let s = CORE_S;
+  const w = nWorkers();
   ORDER.forEach(id => {
-    const sec = STEP_INFO[id][0] * (id === "mc" ? nMC() : 1);
+    const sec = STEP_INFO[id][0] * (id === "mc" ? nMC() : 1) / (CASES[id] ? speedup(CASES[id](), w) : 1);
     const el = $(`[data-tm="${id}"]`); if (el) el.textContent = "~" + dur(sec);
     if ($(`[data-step="${id}"]`).checked) s += sec;
   });
@@ -710,7 +756,7 @@ function renderJob(j) {
   $("#jobpct").textContent = j.running ? Math.round(100 * j.progress) + "% (estimated)" : "";
   const now = j.stages.find(s => s.state === "now");
   $("#jobstage").textContent = j.running ? (now ? now.label : "starting") : ok ? "Run " + (j.run_id || "") + " complete" : "The run did not finish; see the log below.";
-  $("#jobtime").textContent = "elapsed " + dur(j.elapsed_s) + (j.running && j.eta_s != null ? " · about " + dur(j.eta_s) + " left" : "");
+  $("#jobtime").textContent = j.workers + (j.workers === 1 ? " core" : " cores") + " · elapsed " + dur(j.elapsed_s) + (j.running && j.eta_s != null ? " · about " + dur(j.eta_s) + " left" : "");
   const log = $("#log"), atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
   log.textContent = "$ " + j.cmd + "\n" + j.log.join("\n");
   if (atEnd) log.scrollTop = log.scrollHeight;
@@ -742,7 +788,7 @@ async function refreshState() {
   try {
     const s = await api("/api/state");
     const first = !ST; ST = s;
-    if (first) renderSteps();
+    if (first) { renderSteps(); renderSpeed(); }
     renderData();
     $("#cfgcustom").disabled = !s.custom_config;
     $("#cfgnote").innerHTML = s.custom_config ? `Custom settings are saved. <a href="#params" data-go="params">Review them</a>.`
@@ -786,7 +832,7 @@ $("#file").onchange = e => { handleFiles(e.target.files); e.target.value = ""; }
 drop.addEventListener("drop", e => handleFiles(e.dataTransfer.files));
 
 $("#go").onclick = async () => {
-  const body = { data: runData, params: runCfg, skip: skipList(), mc: nMC() };
+  const body = { data: runData, params: runCfg, skip: skipList(), mc: nMC(), workers: nWorkers() };
   if (runData === "own" && !ST.datasets.own.inbox.length && !ST.datasets.own.registered) { toast("Upload your own FMS and survey files first"); return; }
   if (setKey(runData, runCfg) === "default" && !confirm("This run replaces the default results for the example data in " + ST.result_sets.default.root + "/ (the previous version stays in history/). Continue?")) return;
   try { const j = await api("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); lastJobRunning = true; renderJob(j); schedule(true); }

@@ -10,28 +10,53 @@ import pandas as pd
 from . import blockmodel as bm
 from . import plots as pl
 from .config import apply_overrides
-from .movement import NP, P, prepare_loads, reconstruct
+from .movement import NP, P, impute_grade, prepare_loads, reconstruct
+from .parallel import run_cases, state
 from .validation import _key_metrics
+
+
+def _mc_case(task):
+    """One Monte Carlo realisation (runs in a worker process)."""
+    st = state()
+    r, c2, rng_state, prm = task
+    rng = np.random.default_rng()
+    rng.bit_generator.state = rng_state
+    cut = c2["time"]["survey_cutoff_hours"]
+    if cut not in st["ds"]:
+        st["ds"][cut] = st["loader"](c2)
+    ds = st["ds"][cut]
+    u = c2["uncertainty"]
+    loads = prepare_loads(ds, c2, rng=rng, perturb={"gps_sigma": u["gps_sigma"], "payload_cv": u["payload_cv"],
+                                                     "assay_cv": u["assay_cv"]})
+    bias = rng.normal(0, u["survey_bias_sd"], len(ds.surveys) + 1)
+    rec = reconstruct(ds, c2, loads=loads, rng=rng, survey_bias=bias)
+    a = bm.aggregate(rec, st["bg"])
+    sums = a.reshape(-1, NP).sum(0)
+    km = _key_metrics(f"mc{r}", rec, bm.block_table(rec, st["bg"], a, c2), st["base_df"])
+    km.update(prm)
+    return {"T": a[..., P["T_F"]] + a[..., P["T_U"]] + a[..., P["T_L"]],
+            "CU": a[..., P["CU_F"]] + a[..., P["CU_U"]] + a[..., P["CU_L"]],
+            "AU": a[..., P["AU_F"]] + a[..., P["AU_U"]] + a[..., P["AU_L"]],
+            "TF": a[..., P["T_F"]],
+            "cls": {k.lower(): sums[P[k]] for k in ["T_F", "CU_F", "AU_F", "T_U", "CU_U", "AU_U", "T_L", "CU_L", "AU_L"]},
+            "row": km}
 
 
 def monte_carlo(ds_loader, cfg, bg, base_df, out: Path, n=None, verbose=True) -> dict:
     """Joint sampling of measurement errors and model parameters.
     Every realisation is a full reconstruction; block statistics are taken
-    on the base block grid."""
+    on the base block grid. Realisations run in parallel (spbm.parallel); the
+    random stream is the same as in a one-core run (see below)."""
     u = cfg["uncertainty"]
     n = n or u["n_realizations"]
     rng = np.random.default_rng(u["seed"])
     ds_cache = {}
-    T = np.zeros((n,) + bg.shape)
-    CU = np.zeros_like(T)
-    AU = np.zeros_like(T)
-    TF = np.zeros_like(T)
-    rows = []
-    cls_tot = []
     t0 = time.time()
     from .volume import calibrate
     lo, hi = u["survey_cutoff_range"]
     cutoffs = np.arange(lo, hi + 1e-9, 0.5)
+    perturb = {"gps_sigma": u["gps_sigma"], "payload_cv": u["payload_cv"], "assay_cv": u["assay_cv"]}
+    tasks = []
     for r in range(n):
         prm = {
             "survey_cutoff_hours": float(rng.choice(cutoffs)),
@@ -55,23 +80,23 @@ def monte_carlo(ds_loader, cfg, bg, base_df, out: Path, n=None, verbose=True) ->
         cal = calibrate(ds, c2)
         prm["volume_factor"] = float(rng.choice(cal["boot"])) if u.get("volume_factor_bootstrap", True) else float(cal["f_v"])
         c2 = apply_overrides(c2, {"density.volume_factor": prm["volume_factor"]})
-        loads = prepare_loads(ds, c2, rng=rng, perturb={"gps_sigma": u["gps_sigma"], "payload_cv": u["payload_cv"],
-                                                         "assay_cv": u["assay_cv"]})
-        bias = rng.normal(0, u["survey_bias_sd"], len(ds.surveys) + 1)
-        rec = reconstruct(ds, c2, loads=loads, rng=rng, survey_bias=bias)
-        a = bm.aggregate(rec, bg)
-        T[r] = a[..., P["T_F"]] + a[..., P["T_U"]] + a[..., P["T_L"]]
-        CU[r] = a[..., P["CU_F"]] + a[..., P["CU_U"]] + a[..., P["CU_L"]]
-        AU[r] = a[..., P["AU_F"]] + a[..., P["AU_U"]] + a[..., P["AU_L"]]
-        TF[r] = a[..., P["T_F"]]
-        sums = a.reshape(-1, NP).sum(0)
-        cls_tot.append({f"{k.lower()}": sums[P[k]] for k in ["T_F", "CU_F", "AU_F", "T_U", "CU_U", "AU_U", "T_L", "CU_L", "AU_L"]})
-        df = bm.block_table(rec, bg, a, c2)
-        km = _key_metrics(f"mc{r}", rec, df, base_df)
-        km.update(prm)
-        rows.append(km)
-        if verbose and (r + 1) % 5 == 0:
-            print(f"    MC {r + 1}/{n}  ({time.time() - t0:.0f} s)")
+        tasks.append((r, c2, rng.bit_generator.state, prm))
+        # Replay the draws the realisation itself makes (load perturbations, survey
+        # bias, one grade imputation per period; their number depends only on the
+        # data), so the next realisation starts where it would in a one-core run.
+        loads = prepare_loads(ds, c2, rng=rng, perturb=perturb)
+        rng.normal(0, u["survey_bias_sd"], len(ds.surveys) + 1)
+        for s in range(len(ds.surveys)):
+            impute_grade(loads, s, c2, rng)
+
+    def progress(k, total):
+        if verbose and (k % 5 == 0 or k == total):
+            print(f"    MC {k}/{total}  ({time.time() - t0:.0f} s)", flush=True)
+
+    res = run_cases(_mc_case, tasks, {"loader": ds_loader, "bg": bg, "base_df": base_df, "ds": dict(ds_cache)}, progress)
+    T, CU, AU, TF = (np.stack([x[k] for x in res]) for k in ("T", "CU", "AU", "TF"))
+    cls_tot = [x["cls"] for x in res]
+    rows = [x["row"] for x in res]
     real = pd.DataFrame(rows)
     real.to_csv(out / "mc_realizations.csv", index=False)
     with np.errstate(invalid="ignore", divide="ignore"):
@@ -150,6 +175,21 @@ def apply_prior_ranges(df: pd.DataFrame, loads: pd.DataFrame, min_tracked=0.5) -
     return df
 
 
+def _oat_case(task):
+    """One sensitivity case: a full reconstruction with one setting changed (runs in a worker)."""
+    name, level, val, c2 = task
+    st = state()
+    ds = st["loader"](c2)
+    from .volume import resolve_density
+    c2 = resolve_density(ds, c2)
+    rec = reconstruct(ds, c2)
+    bg = bm.make_block_grid(rec, c2)
+    df = bm.block_table(rec, bg, bm.aggregate(rec, bg), c2)
+    km = _key_metrics(f"{name}_{level}", rec, df, st["base_df"])
+    km.update(parameter=name, level=level, value=str(val))
+    return km
+
+
 def sensitivity_oat(ds_loader, cfg, base_df, base_rec, out: Path, verbose=True) -> pd.DataFrame:
     s = cfg["sensitivity"]
     keymap = {"epsilon": "movement.epsilon", "alpha_up": "movement.alpha_up", "max_push": "movement.max_push",
@@ -157,32 +197,31 @@ def sensitivity_oat(ds_loader, cfg, base_df, base_rec, out: Path, verbose=True) 
               "sigma_z": "survey.sigma_z", "survey_cutoff_hours": "time.survey_cutoff_hours", "cell": "grid.cell",
               "front_unobserved_fill": "infill.front_unobserved_fill", "cost": "movement.cost"}
     rows = [dict(_key_metrics("base", base_rec, base_df, base_df), parameter="base", level="base", value="")]
+    cases, slots = [], []
     for name, (lo, hi) in s.items():
         for level, val in [("low", lo), ("high", hi)]:
-            if name == "block":
-                c2 = cfg
-                ds = ds_loader(c2)
-                rec = base_rec
-                bg = bm.make_block_grid(rec, c2, block=val)
-            else:
-                ov = {keymap[name]: val}
-                if name == "max_push":
-                    ov["movement.retain_cost"] = max(val, cfg["movement"]["retain_cost"])
-                if name in ("survey_cutoff_hours", "cell", "sigma_z", "front_unobserved_fill"):
-                    ov.update({"density.volume_factor": "auto", "density.volume_factor_resolved": None})  # re-calibrate f_v
-                c2 = apply_overrides(cfg, ov)
-                ds = ds_loader(c2)
-                from .volume import resolve_density
-                c2 = resolve_density(ds, c2)
-                rec = reconstruct(ds, c2)
-                bg = bm.make_block_grid(rec, c2)
-            a = bm.aggregate(rec, bg)
-            df = bm.block_table(rec, bg, a, c2)
-            km = _key_metrics(f"{name}_{level}", rec, df, base_df if name != "block" else None)
-            km.update(parameter=name, level=level, value=str(val))
-            rows.append(km)
-            if verbose:
-                print(f"    OAT {name} {level}={val}")
+            if name == "block":           # only the block grid changes: no new reconstruction needed
+                bg = bm.make_block_grid(base_rec, cfg, block=val)
+                df = bm.block_table(base_rec, bg, bm.aggregate(base_rec, bg), cfg)
+                km = _key_metrics(f"{name}_{level}", base_rec, df, None)
+                km.update(parameter=name, level=level, value=str(val))
+                rows.append(km)
+                continue
+            ov = {keymap[name]: val}
+            if name == "max_push":
+                ov["movement.retain_cost"] = max(val, cfg["movement"]["retain_cost"])
+            if name in ("survey_cutoff_hours", "cell", "sigma_z", "front_unobserved_fill"):
+                ov.update({"density.volume_factor": "auto", "density.volume_factor_resolved": None})  # re-calibrate f_v
+            cases.append((name, level, val, apply_overrides(cfg, ov)))
+            slots.append(len(rows))
+            rows.append(None)
+
+    def progress(k, total):
+        if verbose:
+            print(f"    OAT {k}/{total}", flush=True)
+
+    for slot, km in zip(slots, run_cases(_oat_case, cases, {"loader": ds_loader, "base_df": base_df}, progress)):
+        rows[slot] = km
     tab = pd.DataFrame(rows)
     tab.to_csv(out / "sensitivity_oat.csv", index=False)
     _tornado(tab, out)

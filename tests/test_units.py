@@ -362,3 +362,11 @@ def test_ingest_reads_zip_inside_a_folder(tmp_path):
     assert names == ["Topo_260401.dxf", "fms.csv"]
     with pytest.raises(RuntimeError, match="No FMS"):
         sio.scan_sources({"inputs": dict(cfg["inputs"], sources=[str(tmp_path / "empty")], raw_store=str(tmp_path / "s2"))})
+
+
+def test_speed_modes_never_exceed_the_machine():
+    from spbm.parallel import machine, resolve_workers
+    m = machine()
+    assert 1 <= m["max_workers"] <= m["cores"]
+    assert resolve_workers("low") == 1 and resolve_workers("high") == m["max_workers"]
+    assert resolve_workers(10_000) == m["max_workers"] and resolve_workers("nonsense") == m["max_workers"]
